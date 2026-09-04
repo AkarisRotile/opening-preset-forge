@@ -968,6 +968,16 @@ function wpkCategory(e){
   for (var q = 0; q < ecoW.length; q++) { if (s.indexOf(ecoW[q]) >= 0) return "经济·产业"; }
   return "其他";
 }
+function wpkRegion(cm){
+  var s1 = (cm || "").indexOf("[");
+  if (s1 < 0) return "";
+  var e1 = (cm || "").indexOf("]", s1);
+  if (e1 <= s1 + 1) return "";
+  var inner = (cm || "").slice(s1 + 1, e1).trim();
+  var dash = inner.indexOf("-");
+  if (dash > 0) return inner.slice(0, dash).trim();
+  return inner;
+}
 function wpkNorm(rawList, idPrefix){
   var out = []; if (!Array.isArray(rawList)) return out;
   var pre = idPrefix || "";
@@ -975,7 +985,8 @@ function wpkNorm(rawList, idPrefix){
     var e = rawList[i];
     if (!e || typeof e.content !== "string" || !e.content.trim()) continue;
     var keyStr = Array.isArray(e.key) ? e.key.join(" / ") : (typeof e.key === "string" ? e.key : "");
-    out.push({ id: pre + (e.uid != null ? "u" + e.uid : "i" + i), srcKey: pre, comment: (e.comment || ""), key: keyStr, content: e.content, constant: !!e.constant, sel: false, cat: wpkCategory(e) });
+    var cv = wpkCategory(e);
+    out.push({ id: pre + (e.uid != null ? "u" + e.uid : "i" + i), srcKey: pre, comment: (e.comment || ""), key: keyStr, content: e.content, constant: !!e.constant, sel: false, cat: cv, region: (cv === "地区·地理" ? wpkRegion(e.comment || "") : "") });
   }
   return out;
 }
@@ -996,6 +1007,7 @@ function importWorldEntries(rawEntries, sourceName, fileName){
   ST.wb.bookOf = ST.wb.bookOf || {}; ST.wb.bookOf[key] = label;
   if (fresh.length && ST.wb.books.indexOf(label) < 0) ST.wb.books.push(label);
   ST.worldSource = (ST.wb.books.length > 1) ? "multi" : (fileName ? "file:" + fileName : (sourceName === "st" ? "st" : "file"));
+  ST.catOpen = null; ST.regionOpen = null;
   ST.worldInfo = "";
   updateSendText();
   try { renderWorldSide(); } catch (e) { opfErr("renderWorldSide", e); }
@@ -1022,6 +1034,7 @@ function updateSendText(){
 function clearWorldbook(){
   ST.wb = { entries: [], books: [], loaded: {}, bookOf: {}, source: "none", fileName: null };
   ST.catOpen = null;
+  ST.regionOpen = null;
   ST.worldSource = "none";
   ST.worldInfo = "";
   try { renderWorldSide(); } catch (e) {}
@@ -1050,6 +1063,7 @@ function renderWorldSide(){
     return;
   }
   if (!ST.catOpen) ST.catOpen = {};
+  if (!ST.regionOpen) ST.regionOpen = {};
   var defTrue = ["命定系统","规则·系统","导览开关","种族","角色"];
   ["命定系统","规则·系统","导览开关","地区·地理","种族","角色","组织·势力","经济·产业","节庆","DLC扩展","DLC事件","DLC内容","其他"].forEach(function (kk){ if (!Object.prototype.hasOwnProperty.call(ST.catOpen, kk)) { ST.catOpen[kk] = defTrue.indexOf(kk) >= 0; } });
   var f = (getEl("opf-lside-filter") && getEl("opf-lside-filter").value || "").toLowerCase();
@@ -1081,21 +1095,39 @@ function renderWorldSide(){
     hdRow.appendChild(hd); hdRow.appendChild(bOn); hdRow.appendChild(bOff);
     listEl.appendChild(hdRow);
     if (!isOpen) return;
-    rows.forEach(function (e) {
+    function makeRow(ee){
       var lab = document.createElement("label"); lab.className = "opf-wi-row";
-      var cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!e.sel;
-      cb.addEventListener("change", function(){ e.sel = !!cb.checked; updateSendText(); renderWorldSide(); renderMetaStatus(); });
+      var cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!ee.sel;
+      cb.addEventListener("change", function(){ ee.sel = !!cb.checked; updateSendText(); renderWorldSide(); renderMetaStatus(); });
       lab.appendChild(cb);
       var tx = document.createElement("span"); tx.className = "tx";
-      tx.textContent = e.comment || e.key || e.content.slice(0, 24);
-      tx.title = (e.comment ? e.comment + "\n" : "") + (e.key ? e.key + "\n" : "") + e.content.slice(0, 300);
+      tx.textContent = ee.comment || ee.key || ee.content.slice(0, 24);
+      tx.title = (ee.comment ? ee.comment + "\n" : "") + (ee.key ? ee.key + "\n" : "") + ee.content.slice(0, 300);
       lab.appendChild(tx);
-      var ln = document.createElement("span"); ln.className = "ln"; ln.textContent = e.content.length;
+      var ln = document.createElement("span"); ln.className = "ln"; ln.textContent = ee.content.length;
       lab.appendChild(ln);
-      if (e.constant) { var cst = document.createElement("span"); cst.className = "cst"; cst.textContent = "常驻"; lab.appendChild(cst); }
-      if (ST.wb && ST.wb.books && ST.wb.books.length > 1) { var bln = (ST.wb.bookOf || {})[e.srcKey] || ""; if (bln) { var bsp = document.createElement("span"); bsp.className = "b"; bsp.textContent = bln.slice(0, 8); lab.appendChild(bsp); } }
-      listEl.appendChild(lab);
-    });
+      if (ee.constant) { var cst = document.createElement("span"); cst.className = "cst"; cst.textContent = "常驻"; lab.appendChild(cst); }
+      if (ST.wb && ST.wb.books && ST.wb.books.length > 1) { var bln2 = (ST.wb.bookOf || {})[ee.srcKey] || ""; if (bln2) { var bsp2 = document.createElement("span"); bsp2.className = "b"; bsp2.textContent = bln2.slice(0, 8); lab.appendChild(bsp2); } }
+      return lab;
+    }
+    if (cat === "地区·地理") {
+      var regMap = {};
+      rows.forEach(function (e2){ var r = e2.region || "未分组"; (regMap[r] = regMap[r] || []).push(e2); });
+      var regs = Object.keys(regMap).sort(function(x, y){ return x.localeCompare(y, "zh"); });
+      regs.forEach(function (r){
+        var rOpen = !!ST.regionOpen[r];
+        var selR = 0; regMap[r].forEach(function (e3){ if (e3.sel) selR++; });
+        var sub = document.createElement("div"); sub.className = "opf-wi-sub";
+        sub.textContent = (rOpen ? "▾ " : "▸ ") + r + " · " + regMap[r].length + " 条" + (selR ? "（已勾 " + selR + "）" : "");
+        sub.title = "点击展开/收起";
+        sub.addEventListener("click", function(){ ST.regionOpen[r] = !rOpen; renderWorldSide(); });
+        listEl.appendChild(sub);
+        if (!rOpen) return;
+        regMap[r].forEach(function (e3){ listEl.appendChild(makeRow(e3)); });
+      });
+    } else {
+      rows.forEach(function (e2){ listEl.appendChild(makeRow(e2)); });
+    }
   });
   if (!totalShown) { var nd = document.createElement("div"); nd.className = "opf-lside-hint"; nd.textContent = "没有匹配的条目。"; listEl.appendChild(nd); }
 }
@@ -1136,7 +1168,7 @@ function buildWorldSideButton(root){
   try { injectGlobalSizeCSS(); } catch (e) { opfErr("injectGlobalSizeCSS", e); }
 }
 
-var LSIDE_CSS3 = "#opf-lside{font-size:12.5px;top:60px;bottom:60px}.opf-wi-cat{cursor:pointer;user-select:none;font-size:11.5px;padding:3px 8px}.opf-wi-cat:hover{color:#ff8a95;border-color:rgba(255,150,165,.55);background:rgba(255,90,105,.12)}.opf-wi-row{font-size:11.5px}.opf-wi-row .ln{font-size:10px}.opf-lside-hint{font-size:11.5px}#opf-lside-filter{font-size:12px}#opf-lside-count{font-size:10.5px}.opf-wi-cat-row{display:flex;align-items:center;gap:4px;margin:6px 0 2px;flex:none}.opf-wi-cat-row .opf-wi-cat{flex:1;margin:0}.opf-cat-all{border:none;cursor:pointer;border-radius:6px;padding:1px 7px;font-size:10px;color:#ffd5da;background:rgba(255,77,94,.12);border:1px solid rgba(255,122,138,.3)}.opf-cat-all:hover{background:rgba(255,77,94,.25)}.opf-cat-all.off{color:#ffc0c8;background:rgba(255,255,255,.06)}.opf-wi-row .b{flex:none;color:#b7d7ff;font-size:9px;border:1px solid rgba(140,180,255,.35);border-radius:8px;padding:0 4px}";
+var LSIDE_CSS3 = "#opf-lside{font-size:12.5px;top:60px;bottom:60px}.opf-wi-cat{cursor:pointer;user-select:none;font-size:11.5px;padding:3px 8px}.opf-wi-cat:hover{color:#ff8a95;border-color:rgba(255,150,165,.55);background:rgba(255,90,105,.12)}.opf-wi-row{font-size:11.5px}.opf-wi-row .ln{font-size:10px}.opf-lside-hint{font-size:11.5px}#opf-lside-filter{font-size:12px}#opf-lside-count{font-size:10.5px}.opf-wi-cat-row{display:flex;align-items:center;gap:4px;margin:6px 0 2px;flex:none}.opf-wi-cat-row .opf-wi-cat{flex:1;margin:0}.opf-cat-all{border:none;cursor:pointer;border-radius:6px;padding:1px 7px;font-size:10px;color:#ffd5da;background:rgba(255,77,94,.12);border:1px solid rgba(255,122,138,.3)}.opf-cat-all:hover{background:rgba(255,77,94,.25)}.opf-cat-all.off{color:#ffc0c8;background:rgba(255,255,255,.06)}.opf-wi-row .b{flex:none;color:#b7d7ff;font-size:9px;border:1px solid rgba(140,180,255,.35);border-radius:8px;padding:0 4px}.opf-wi-sub{display:flex;gap:6px;align-items:center;cursor:pointer;user-select:none;font-size:11px;font-weight:600;color:#ffd9b0;background:rgba(255,170,90,.10);border:1px solid rgba(255,190,120,.25);border-radius:6px;padding:2px 8px;margin:5px 2px 1px}.opf-wi-sub:hover{color:#fff;background:rgba(255,170,90,.18)}";
 var SIZE_CSS = "#opf-root{width:448px;font-size:13px}#opf-title{font-size:14.5px}.opf-sec-label{font-size:11px;letter-spacing:1.5px}#opf-demand{font-size:13px;min-height:50px}.opf-opt{font-size:12px}#opf-meta{font-size:12px}.opf-step-title{font-size:13px}.opf-step-sub{font-size:11px}.opf-step-act{font-size:11px;padding:3px 8px}.opf-btn{font-size:13px;padding:8px 5px}#opf-json-out{font-size:11.5px}.opf-dim{font-size:11.5px}.opf-ref-input{font-size:11.5px}.opf-dir-chip{font-size:12px}.opf-step-body{font-size:12px}#opf-pname{font-size:12px;width:170px}.opf-num{font-size:12px}";
 function injectGlobalSizeCSS(){
   try { if (getEl(NS + "_css_size")) return; var st = document.createElement("style"); st.id = NS + "_css_size"; st.textContent = SIZE_CSS; document.head.appendChild(st); } catch (e) { opfErr("injectGlobalSizeCSS", e); }
