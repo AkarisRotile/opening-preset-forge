@@ -1027,12 +1027,18 @@ function renderWorldSide(){
     if (!rows.length) return;
     totalShown += rows.length;
     var isOpen = catSel === cat ? true : (catSel === "全部" ? !!ST.catOpen[cat] : false);
-    var hd = document.createElement("div"); hd.className = "opf-wi-cat"; hd.id = "opf-wi-cat-" + cat;
+    var hdRow = document.createElement("div"); hdRow.className = "opf-wi-cat-row";
+    var hd = document.createElement("div"); hd.className = "opf-wi-cat";
     var selN = 0; for (var si = 0; si < rows.length; si++) if (rows[si].sel) selN++;
     hd.textContent = (isOpen ? "▾ " : "▸ ") + cat + " · " + rows.length + " 条" + (selN ? "（已勾 " + selN + "）" : "");
     hd.title = "点击展开/收起";
     hd.addEventListener("click", function(){ if (catSel === "全部") { ST.catOpen[cat] = !ST.catOpen[cat]; renderWorldSide(); } });
-    listEl.appendChild(hd);
+    var bOn = document.createElement("button"); bOn.type = "button"; bOn.className = "opf-cat-all"; bOn.textContent = "全开"; bOn.title = "一键勾选本板块全部条目";
+    bOn.addEventListener("click", function(ev){ ev.stopPropagation(); wpkSetCat(cat, true); });
+    var bOff = document.createElement("button"); bOff.type = "button"; bOff.className = "opf-cat-all off"; bOff.textContent = "全关"; bOff.title = "一键清空本板块勾选";
+    bOff.addEventListener("click", function(ev){ ev.stopPropagation(); wpkSetCat(cat, false); });
+    hdRow.appendChild(hd); hdRow.appendChild(bOn); hdRow.appendChild(bOff);
+    listEl.appendChild(hdRow);
     if (!isOpen) return;
     rows.forEach(function (e) {
       var lab = document.createElement("label"); lab.className = "opf-wi-row";
@@ -1051,6 +1057,7 @@ function renderWorldSide(){
   });
   if (!totalShown) { var nd = document.createElement("div"); nd.className = "opf-lside-hint"; nd.textContent = "没有匹配的条目。"; listEl.appendChild(nd); }
 }
+function wpkSetCat(cat, v){ var wb = ST.wb; if (!wb) return; var hit = false; wb.entries.forEach(function (e){ if ((e.cat || "其他") === cat) { e.sel = !!v; hit = true; } }); if (hit) { updateSendText(); renderWorldSide(); renderMetaStatus(); } }
 function wpkSetAll(v){ var wb = ST.wb; if (!wb) return; wb.entries.forEach(function (e){ e.sel = v; }); updateSendText(); renderWorldSide(); renderMetaStatus(); }
 function wpkSetConst(){ var wb = ST.wb; if (!wb) return; wb.entries.forEach(function (e){ e.sel = !!e.constant; }); updateSendText(); renderWorldSide(); renderMetaStatus(); }
 function buildWorldSide(){
@@ -1087,7 +1094,7 @@ function buildWorldSideButton(root){
   try { injectGlobalSizeCSS(); } catch (e) { opfErr("injectGlobalSizeCSS", e); }
 }
 
-var LSIDE_CSS3 = "#opf-lside{font-size:12.5px;top:60px;bottom:60px}.opf-wi-cat{cursor:pointer;user-select:none;font-size:11.5px;padding:3px 8px}.opf-wi-cat:hover{color:#ff8a95;border-color:rgba(255,150,165,.55);background:rgba(255,90,105,.12)}.opf-wi-row{font-size:11.5px}.opf-wi-row .ln{font-size:10px}.opf-lside-hint{font-size:11.5px}#opf-lside-filter{font-size:12px}#opf-lside-count{font-size:10.5px}";
+var LSIDE_CSS3 = "#opf-lside{font-size:12.5px;top:60px;bottom:60px}.opf-wi-cat{cursor:pointer;user-select:none;font-size:11.5px;padding:3px 8px}.opf-wi-cat:hover{color:#ff8a95;border-color:rgba(255,150,165,.55);background:rgba(255,90,105,.12)}.opf-wi-row{font-size:11.5px}.opf-wi-row .ln{font-size:10px}.opf-lside-hint{font-size:11.5px}#opf-lside-filter{font-size:12px}#opf-lside-count{font-size:10.5px}.opf-wi-cat-row{display:flex;align-items:center;gap:4px;margin:6px 0 2px;flex:none}.opf-wi-cat-row .opf-wi-cat{flex:1;margin:0}.opf-cat-all{border:none;cursor:pointer;border-radius:6px;padding:1px 7px;font-size:10px;color:#ffd5da;background:rgba(255,77,94,.12);border:1px solid rgba(255,122,138,.3)}.opf-cat-all:hover{background:rgba(255,77,94,.25)}.opf-cat-all.off{color:#ffc0c8;background:rgba(255,255,255,.06)}";
 var SIZE_CSS = "#opf-root{width:448px;font-size:13px}#opf-title{font-size:14.5px}.opf-sec-label{font-size:11px;letter-spacing:1.5px}#opf-demand{font-size:13px;min-height:50px}.opf-opt{font-size:12px}#opf-meta{font-size:12px}.opf-step-title{font-size:13px}.opf-step-sub{font-size:11px}.opf-step-act{font-size:11px;padding:3px 8px}.opf-btn{font-size:13px;padding:8px 5px}#opf-json-out{font-size:11.5px}.opf-dim{font-size:11.5px}.opf-ref-input{font-size:11.5px}.opf-dir-chip{font-size:12px}.opf-step-body{font-size:12px}#opf-pname{font-size:12px;width:170px}.opf-num{font-size:12px}";
 function injectGlobalSizeCSS(){
   try { if (getEl(NS + "_css_size")) return; var st = document.createElement("style"); st.id = NS + "_css_size"; st.textContent = SIZE_CSS; document.head.appendChild(st); } catch (e) { opfErr("injectGlobalSizeCSS", e); }
