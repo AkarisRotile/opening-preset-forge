@@ -340,6 +340,7 @@ async function runOne(phase) {
     }
     setPhase(phase.id, 'ok');
     if (ST.elPre && ST.elPre[phase.id]) ST.elPre[phase.id].textContent = (resp || '').slice(0, 4000) + (resp && resp.length > 4000 ? '\n……(截断显示，完整内容已记录)' : '');
+    enablePhaseRefine(phase.id);
     return resp;
   } catch (e) {
     setPhase(phase.id, 'err');
@@ -355,6 +356,7 @@ async function runAll() {
   if (ST.running) { toast('已经在运行中'); return; }
   var s = getSettings();
   ST.running = true; ST.stopReq = false; ST.finalJson = null; ST.finalText = '';
+  ST._freshDraft = true;
   dirsReset();
   ST.userName = currentUserName();
   ST.contextText = s.includeCard ? collectCardText() : '';
@@ -425,8 +427,9 @@ function handleModelReply(text) {
     ST.finalJson = ex.obj;
     var warns = validatePreset(ex.obj);
     renderJsonOut(ex.obj, warns);
+    markSummarized();
     toast('已解析出开局预设 JSON' + (warns.length ? '（' + warns.length + ' 条提示）' : ''));
-    scheduleAutoSuggest();
+    draftReadyHint();
   } else {
     renderJsonOut(null, [{ msg: '未能从回复中解析出合法 JSON（可能被截断或格式跑偏），可重试“汇总输出”一步。' }]);
     toast('未能解析 JSON，请检查输出或重试', 'warning');
@@ -670,26 +673,42 @@ function makeDraggable(handle, root){
 
 function renderSteps(){
   var box = getEl("opf-steps"); if (!box) return; box.textContent = "";
-  PHASES.forEach(function(p, i){
+  PHASES.forEach(function (p, i) {
     var row = document.createElement("div"); row.className = "opf-step"; row.setAttribute("data-st", "wait"); row.id = "opf-ph-" + p.id;
     var head = document.createElement("div"); head.className = "opf-step-head";
     var idx = document.createElement("span"); idx.className = "opf-idx"; idx.textContent = String(i + 1);
     var dot = document.createElement("span"); dot.className = "opf-dot"; dot.textContent = "·";
     var ttl = document.createElement("span"); ttl.className = "opf-step-title"; ttl.textContent = p.title;
     var sub = document.createElement("span"); sub.className = "opf-step-sub"; sub.textContent = p.short;
-    var btn = document.createElement("button"); btn.className = "opf-step-act"; btn.type = "button"; btn.textContent = p.key === "final" ? "重汇总" : "重跑";
-    btn.addEventListener("click", function(ev){ ev.stopPropagation(); if (ST.running) { toast("请先停止当前流程"); return; } runFrom(p.id); });
+    var btn = document.createElement("button"); btn.className = "opf-step-act"; btn.type = "button";
+    btn.textContent = p.key === "final" ? "重汇总" : "重跑该步及后续";
+    btn.title = p.key === "final" ? "基于各步当前内容重新生成汇总 JSON" : "从本步重跑到最后（覆盖后续修改）";
+    btn.addEventListener("click", function (ev) { ev.stopPropagation(); if (ST.running) { toast("请先停止当前流程"); return; } runFrom(p.id); });
     head.appendChild(idx); head.appendChild(dot); head.appendChild(ttl); head.appendChild(sub); head.appendChild(btn);
-    var body = document.createElement("div"); body.className = "opf-step-body";
-    var pre = document.createElement("pre"); pre.textContent = "（本步结果将显示在这里）"; body.appendChild(pre);
-    ST.elPre = ST.elPre || {}; ST.elPre[p.id] = pre;
     head.addEventListener("click", function(){ row.classList.toggle("open"); });
-    row.appendChild(head); row.appendChild(body); box.appendChild(row);
-    if (ST.results[p.id]) { pre.textContent = ST.results[p.id]; setPhase(p.id, "ok"); }
+    row.appendChild(head);
+    var body = document.createElement("div"); body.className = "opf-step-body";
+    var pre = document.createElement("pre"); pre.textContent = "（内容显示在这里，点击标题展开/收起）"; body.appendChild(pre);
+    ST.elPre = ST.elPre || {}; ST.elPre[p.id] = pre;
+    row.appendChild(body);
+    if (p.key !== "final") {
+      var ref = document.createElement("div"); ref.className = "opf-step-ref";
+      var tag = document.createElement("span"); tag.className = "opf-ref-tag"; tag.id = "opf-ref-tag-" + p.id; tag.textContent = "先跑出本步后可精修";
+      var chips = document.createElement("div"); chips.id = "opf-ref-chips-" + p.id;
+      var r1 = document.createElement("div"); r1.className = "opf-step-ref-row";
+      var inp = document.createElement("input"); inp.type = "text"; inp.className = "opf-ref-input"; inp.id = "opf-ref-input-" + p.id; inp.placeholder = "输入本步精修方向…"; inp.disabled = true;
+      var doB = document.createElement("button"); doB.type = "button"; doB.className = "opf-step-act opf-ref-do"; doB.textContent = "按方向精修本步"; doB.disabled = true;
+      var sug = document.createElement("button"); sug.type = "button"; sug.className = "opf-step-act opf-ref-sug"; sug.textContent = "该步建议"; sug.disabled = true;
+      doB.addEventListener("click", function (ev) { ev.stopPropagation(); refinePhase(p.id, inp.value); });
+      sug.addEventListener("click", function (ev) { ev.stopPropagation(); suggestPhaseDirections(p.id); });
+      r1.appendChild(inp); r1.appendChild(doB); r1.appendChild(sug);
+      ref.appendChild(tag); ref.appendChild(chips); ref.appendChild(r1);
+      row.appendChild(ref);
+    }
+    box.appendChild(row);
+    if (ST.results[p.id]) { pre.textContent = ST.results[p.id]; setPhase(p.id, "ok"); enablePhaseRefine(p.id); }
   });
-}
-
-function renderMetaStatus(){
+}function renderMetaStatus(){
   var el = getEl("opf-meta"); if (!el) return;
   el.textContent = "";
   function add(label, cls){ var sp = document.createElement("span"); sp.className = "tag " + (cls || ""); sp.textContent = label; el.appendChild(sp); }
@@ -733,6 +752,7 @@ async function runFrom(pid){
   if (start < 0) return;
   if (start === 0) { renderSteps(); await runAll(); return; }
   ST.running = true; ST.stopReq = false;
+  ST._freshDraft = (start === 0);
   dirsReset();
   try {
     ST.userName = currentUserName();
@@ -766,108 +786,138 @@ function renderJsonOut(obj, warns){
   pre.className = warns.length ? "warn" : "";
 }
 
-// ============ 工作流：初稿 → 可选方向 → 串行精修（Agent式，单线程不并发） ============
-var EXTRA_CSS = ".opf-dirs{display:flex;flex-direction:column;gap:6px;margin:2px 0 6px}.opf-dir-chip{text-align:left;cursor:pointer;border-radius:8px;border:1px solid rgba(255,122,138,.28);background:rgba(255,235,238,.05);color:#ffd5da;font-size:11px;line-height:1.45;padding:6px 9px;transition:all .14s ease}.opf-dir-chip:hover{background:rgba(255,77,94,.16);border-color:rgba(255,150,165,.55);box-shadow:0 0 8px rgba(255,77,94,.28)}.opf-dim{font-size:11px;color:rgba(255,200,208,.5);padding:2px 0;line-height:1.5}.opf-dir-row{display:flex;gap:6px;margin:4px 0 2px;flex-wrap:wrap}#opf-dir-input{flex:1 1 160px;min-width:120px;border-radius:8px;padding:6px 8px;font-size:11px;color:#ffeef1;background:rgba(10,2,5,.55);border:1px solid rgba(255,122,138,.25);outline:none}#opf-dir-input:focus{border-color:rgba(255,110,125,.6);box-shadow:0 0 8px rgba(255,77,94,.25)}";
+// ============ 工作流 v2：分步精修（每步自己的精修框）+ 最后重新汇总 ============
+var EXTRA_CSS = ".opf-dir-chip{display:block;text-align:left;cursor:pointer;border-radius:8px;border:1px solid rgba(255,122,138,.28);background:rgba(255,235,238,.05);color:#ffd5da;font-size:11px;line-height:1.45;padding:5px 8px;margin:3px 0;transition:all .14s ease}.opf-dir-chip:hover{background:rgba(255,77,94,.16);border-color:rgba(255,150,165,.55);box-shadow:0 0 8px rgba(255,77,94,.28)}.opf-dim{font-size:11px;color:rgba(255,200,208,.5);padding:2px 0;line-height:1.5}.opf-step-ref{display:flex;flex-direction:column;gap:4px;padding:2px 9px 8px 30px}.opf-step-ref-row{display:flex;gap:5px;flex-wrap:wrap;align-items:center}.opf-ref-input{flex:1 1 150px;min-width:110px;border-radius:7px;padding:4px 7px;font-size:10.5px;color:#ffeef1;background:rgba(10,2,5,.55);border:1px solid rgba(255,122,138,.25);outline:none}.opf-ref-input:focus{border-color:rgba(255,110,125,.6);box-shadow:0 0 6px rgba(255,77,94,.25)}.opf-ref-tag{font-size:9.5px;color:#8fd6ff;background:rgba(60,140,200,.15);border:1px solid rgba(120,190,255,.3);border-radius:10px;padding:0 6px;line-height:1.6}.opf-ref-tag.dirty{color:#ffd9a3;background:rgba(200,130,40,.16);border-color:rgba(255,180,90,.4)}#opf-resum-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:2px}";
 var WORLD_RULES = "依据世界书《角色生成》《角色辅助指导》与 装备/道具/技能/资产 之书等条目提炼，生成与精修一律遵守：\n1) 属性 = 天赋基础 + 层级固定 + 等级额外。开局统一 25 点天赋基础（basePoints，每项0-6，五维总和必须=25）；等级额外 = Lv-1 点（attributePoints）；层级点 = 生命层级(一~七)-1，只结算面板不写表。\n2) 玩家开局最高等级固定10级，只会处于 第一层级_普通(Lv.1-4)/第二层级_中坚(Lv.5-8)/第三层级_精英(Lv.9-10)，层级点 +0/+1/+2；五维单值不超所在层级极值（一≤8、二≤10、三≤12），禁止极端加点。\n3) 开局等级由需求与背景决定（1-10），要符合人设，不要为堆属性乱定级；实力获取/成长经历须在背景中说得通。\n4) 品级从高到低：神话/传说/史诗/稀有/优秀/普通 + 唯一；自定义条目按品级消耗点数（普通5-30…唯一666-666）；FP 即 reincarnationPoints（随机1000-9999）。\n5) 装备不增减持有者属性；装备/道具/技能/资产条目须符合对应“之书”的格式与世界观惯例。\n6) 资产写全：类型/标签/总空间/结算/描述/位置/内部资产（名称/品质/标签/数量/效果/描述/总占用空间），数量与空间必须自洽。\n7) 伙伴(契约)字段写全：lifeLevel/race/identity/career/personality/like/app/cloth/equip/attributes(strength…mind)/stairway/isContract/affinity/comment/backgroundInfo(≥200字)/skills；没有契约伙伴则 partners=[]。\n8) background.description 为开局剧情（≥500字），须与角色等级、身份、资产、伙伴互相咬合。";
 
 function dirsReset(){
-  ST.dirsSuggested = false; ST.refineCount = 0; ST.dirs = [];
-  var box = getEl("opf-dirs"); if (box) box.textContent = "";
-  renderDirsStatus("（初稿完成后会自动给出可选精修方向；也可直接在下框输入你自己的方向后点“按输入精修”）");
+  ST.dirsSuggested = false; ST.refineCount = 0; ST.dirty = false; ST.modified = {};
+  renderDirsStatus("生成初稿后：可在每一步下方单独输入/生成该步的精修方向，只改自己那一步；都改完后再点“⟳ 重新汇总”生成新版 JSON。");
+  renderResum();
 }
 function renderDirsStatus(msg){
   var el = getEl("opf-dir-status"); if (!el) return; el.textContent = msg || "";
 }
-function scheduleAutoSuggest(){
-  if (ST.dirsSuggested || ST.inRefine) return;
-  if (!ST.finalJson) return;
-  ST.dirsSuggested = true;
-  renderDirsStatus("✓ 初稿完成，正在生成可选精修方向…");
-  setTimeout(function(){ suggestDirections(); }, 400);
+function draftReadyHint(){
+  if (!ST._freshDraft) return;
+  renderDirsStatus("✓ 初稿完成。各步下方已出现精修框：可输入方向或点“该步建议”生成方向，只改对应一步；全部改完后点“⟳ 重新汇总”。");
+  renderResum();
 }
-function renderDirections(list){
-  var box = getEl("opf-dirs"); if (!box) return;
-  box.textContent = "";
-  if (!list || !list.length) { renderDirsStatus("暂无方向，可点“再给几组方向”或自行输入。"); return; }
-  list.forEach(function (t, i) {
-    var b = document.createElement("button");
-    b.type = "button"; b.className = "opf-dir-chip";
-    b.textContent = (i + 1) + ". " + t;
-    b.addEventListener("click", function(){ runRefine(t); });
-    box.appendChild(b);
-  });
-  renderDirsStatus("点击上方任一方向即可串行精修（不并发）；精修后可继续“再给几组方向”多轮迭代，满意后导出。");
+function markDirty(pid){
+  ST.modified[pid] = true; ST.dirty = true;
+  var tag = getEl("opf-ref-tag-" + pid);
+  if (tag) { tag.textContent = "✦ 本步已修改"; tag.className = "opf-ref-tag dirty"; }
+  renderDirsStatus("分步修改完成：点下方“⟳ 重新汇总”基于最新各步内容重建 P6 汇总 JSON。");
+  renderResum();
 }
-async function suggestDirections(){
-  if (ST.running) { toast("已有任务进行中，请稍候"); return; }
-  if (!ST.finalJson) { toast("请先“生成初稿”"); return; }
+function markSummarized(){
+  if (!ST.dirty) { renderResum(); return; }
+  ST.dirty = false; ST.modified = {};
+  renderDirsStatus("✓ 已重新汇总。如再改某一步，记得再次点“⟳ 重新汇总”。");
+  renderResum();
+}
+function renderResum(){
+  var b = getEl("opf-resum");
+  if (!b) return;
+  var can = !!ST.finalJson || (ST.msgs && ST.msgs.length > 0);
+  b.disabled = !can;
+  b.textContent = ST.dirty ? "⟳ 重新汇总（有分步修改）" : "⟳ 重新汇总";
+}
+function phaseRow(pid){ return getEl("opf-ph-" + pid); }
+function enablePhaseRefine(pid){
+  var row = phaseRow(pid); if (!row) return;
+  var has = !!ST.results[pid];
+  var inp = row.querySelector(".opf-ref-input");
+  var b1 = row.querySelector(".opf-ref-do");
+  var b2 = row.querySelector(".opf-ref-sug");
+  if (inp) inp.disabled = !has;
+  if (b1) b1.disabled = !has;
+  if (b2) b2.disabled = !has;
+  var tag = row.querySelector(".opf-ref-tag");
+  if (tag && !ST.modified[pid]) tag.textContent = has ? "可精修本步" : "先跑出本步后可精修";
+}
+async function refinePhase(pid, direction){
+  if (ST.running) { toast("已有任务进行中（单线程），请稍候"); return; }
+  var phase = null, idx = -1;
+  for (var i = 0; i < PHASES.length; i++) { if (PHASES[i].id === pid) { phase = PHASES[i]; idx = i; break; } }
+  if (!phase || phase.key === "final") return;
+  if (!ST.results[pid]) { toast("该步还没有可精修的内容，请先“生成初稿”", "warning"); return; }
+  var dir = (direction || "").trim();
+  if (!dir) dir = "整体打磨：修正设定漏洞、提升与角色/背景的契合度与文笔，条目数量与格式保持不变。";
+  ST.running = true; setPhase(pid, "run"); renderRunButtons();
+  try {
+    var msgs = [{ role: "system", content: buildSystemContent() }, { role: "user", content: buildUser0() }];
+    for (var k = 0; k < idx; k++) {
+      var pp = PHASES[k];
+      if (ST.results[pp.id]) {
+        msgs.push({ role: "user", content: "（供参考的既有内容，本阶段无需改动）：" + pp.title });
+        msgs.push({ role: "assistant", content: ST.results[pp.id] });
+      }
+    }
+    var nl = String.fromCharCode(10);
+    var refineMsg = phasePrompt(phase) + nl + nl + "【本步精修指令】" + nl + "方向：" + dir + nl + nl + "[世界规则·创作限制]" + nl + WORLD_RULES + nl + nl + "要求：只输出【" + phase.title + "】这一栏的修订内容（沿用本步的书条目格式与数量，可增删但要有理由），不要改动其它栏目，也不要输出整份 JSON。若确实无需修改，原样输出“无”。";
+    msgs.push({ role: "user", content: refineMsg });
+    var resp = await callModel(msgs);
+    ST.results[pid] = resp;
+    if (ST.elPre && ST.elPre[pid]) ST.elPre[pid].textContent = (resp || "").slice(0, 4000) + ((resp && resp.length > 4000) ? " ……(截断显示)" : "");
+    setPhase(pid, "ok"); enablePhaseRefine(pid);
+    markDirty(pid);
+    toast("已按方向修改【" + phase.title + "】，记得重新汇总");
+  } catch (e) {
+    setPhase(pid, "err");
+    toast("精修本步出错：" + (e && e.message ? e.message : e), "error");
+  } finally { ST.running = false; renderRunButtons(); }
+}
+async function suggestPhaseDirections(pid){
+  if (ST.running) { toast("已有任务进行中（单线程），请稍候"); return; }
+  var phase = null;
+  for (var i = 0; i < PHASES.length; i++) if (PHASES[i].id === pid) { phase = PHASES[i]; break; }
+  if (!phase || !ST.results[pid]) { toast("该步还没有可参考的内容，请先“生成初稿”", "warning"); return; }
+  var chipBox = getEl("opf-ref-chips-" + pid); if (!chipBox) return;
+  var cur = String(ST.results[pid]).slice(0, 3500);
+  var demand = (getEl("opf-demand") && getEl("opf-demand").value.trim()) || "(未填写)";
+  var nl = String.fromCharCode(10);
+  var ask = "请针对【" + phase.title + "】这一栏的现有内容，结合开局需求给出 2-3 条只针对本栏的修改方向。每条一行、≤50字、去掉编号外多余的话、直接可点；必须符合世界规则限制。\n[开局需求]\n" + demand + "\n[世界规则·创作限制]\n" + WORLD_RULES + "\n[本栏现有内容]\n" + cur;
+  var msgs = [{ role: "system", content: buildSystemContent() }, { role: "user", content: ask }];
+  var old = ST.running;
   ST.running = true; renderRunButtons();
   try {
-    var cur = JSON.stringify(ST.finalJson, null, 1);
-    if (cur.length > 12000) cur = cur.slice(0, 12000) + "……(过长截断)";
-    var demand = (getEl("opf-demand") && getEl("opf-demand").value.trim()) || "(未填写)";
-    var ask = "【审稿请求】请扮演开局预设审稿人。下面依次是：开局需求 / 世界规则·创作限制 / 当前初稿。" + "\n\n[开局需求]\n" + demand + "\n\n[世界规则·创作限制]\n" + WORLD_RULES + "\n\n[当前初稿]\n" + cur;
-    ask += "\n\n请给出 3 条风格迥异、可直接执行的修改方向，作为用户可选按钮。要求：\n- 每条一行，去掉编号以外不必要的话，长度≤60字\n- 方向要落在真实差异上（例：压低到Lv.3更贴背景并重排25点、给资产加一座工坊并压缩装备开销、换一位契约伙伴并重写羁绊与背景、改身份走向/强化剧情文笔、削减FP开销至稀有以下等）\n- 必须尊重上面的世界规则限制（等级1-10、25基础点、品级与点数、资产/伙伴字段完整）";
-    var msgs = [
-      { role: "system", content: buildSystemContent() },
-      { role: "user", content: ask }
-    ];
     var resp = await callModel(msgs);
-    var dirs = [];
+    var list = [];
     String(resp).split(/\r?\n/).forEach(function (ln) {
       var t = String(ln).replace(/^\s*(?:[-*•]|\d+[.、)])\s*/, "").trim();
-      if (t && t.length >= 4 && t.length <= 90 && dirs.indexOf(t) < 0) dirs.push(t);
+      if (t && t.length >= 4 && t.length <= 70 && list.indexOf(t) < 0) list.push(t);
     });
-    if (!dirs.length) {
-      dirs = ["把等级与实力压得更贴背景并重排 25 点基础点", "加一处资产（旅店/工坊/庄园）并压缩其它开销", "重写或新增契约伙伴并强化羁绊", "提升开局背景文笔、让身份与经历更有戏剧性"];
-      toast("没能解析出方向，已给出一组兜底方向", "warning");
-    }
-    ST.dirs = dirs.slice(0, 4);
-    renderDirections(ST.dirs);
+    if (!list.length) list = ["调整条目数量/品级分布", "让效果与标签更贴人设", "补足背景与描述文笔"];
+    renderPhaseChips(pid, list.slice(0, 3));
   } catch (e) {
-    toast("方向生成失败：" + (e && e.message ? e.message : e), "error");
-    renderDirections(null);
+    toast("该步建议生成失败：" + (e && e.message ? e.message : e), "error");
   } finally { ST.running = false; renderRunButtons(); }
 }
-async function runRefine(direction){
-  if (ST.running) { toast("已有任务进行中（单线程），请稍候"); return; }
-  if (!ST.msgs || !ST.msgs.length) { toast("没有可精修的基础，请先“生成初稿”"); return; }
-  ST.refineCount = (ST.refineCount || 0) + 1;
-  if (ST.refineCount > 6) { toast("已达本轮最大精修次数（6），请先导出或重新生成初稿", "warning"); ST.refineCount = 6; return; }
-  ST.running = true; renderRunButtons();
-  try {
-    var msg = "【精修指令】请按以下方向修改上一稿开局预设：\n方向：" + direction + "\n\n[世界规则·创作限制]\n" + WORLD_RULES + "\n\n要求：完整输出修订后的开局预设 JSON，放在 " + fence() + "text 代码块中；字段与结构不得比初稿缺失；若方向与规则冲突，先一句话说明取舍再继续。";
-    ST.msgs.push({ role: "user", content: msg });
-    var resp = await callModel(ST.msgs);
-    ST.results.final = resp;
-    ST.msgs.push({ role: "assistant", content: resp });
-    ST.inRefine = true;
-    handleModelReply(resp);
-    ST.inRefine = false;
-    if (ST.elPre && ST.elPre.final) ST.elPre.final.textContent = (resp || "").slice(0, 4000);
-    setPhase("final", "ok");
-    toast("已按方向完成一版修订：" + direction.slice(0, 30));
-  } catch (e) {
-    toast("精修出错：" + (e && e.message ? e.message : e), "error");
-  } finally { ST.running = false; renderRunButtons(); }
+function renderPhaseChips(pid, list){
+  var box = getEl("opf-ref-chips-" + pid); if (!box) return;
+  box.textContent = "";
+  list.forEach(function (t) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "opf-dir-chip";
+    b.textContent = "▶ " + t;
+    b.addEventListener("click", function(){ refinePhase(pid, t); });
+    box.appendChild(b);
+  });
 }
 function addWorkflowUI(root){
-  if (!root || getEl("opf-dirs")) return;
+  if (!root || getEl("opf-resum")) return;
   var stepsSec = root.querySelector("#opf-steps");
   var anchor = stepsSec ? stepsSec.parentElement : null;
   var sec = document.createElement("div"); sec.className = "opf-sec";
-  var lab = document.createElement("div"); lab.className = "opf-sec-label"; lab.textContent = "精修方向（Agent式 · 单线程）";
+  var lab = document.createElement("div"); lab.className = "opf-sec-label"; lab.textContent = "分步精修 → 重新汇总";
   var dim = document.createElement("div"); dim.id = "opf-dir-status"; dim.className = "opf-dim";
-  var box = document.createElement("div"); box.id = "opf-dirs"; box.className = "opf-dirs";
-  var row = document.createElement("div"); row.className = "opf-dir-row";
-  var inp = document.createElement("input"); inp.type = "text"; inp.id = "opf-dir-input"; inp.placeholder = "或输入你自己的修改方向…";
-  var go = document.createElement("button"); go.type = "button"; go.className = "opf-step-act opf-dir-go"; go.id = "opf-dir-go"; go.textContent = "按输入精修";
-  var more = document.createElement("button"); more.type = "button"; more.className = "opf-step-act"; more.id = "opf-dir-more"; more.textContent = "再给几组方向";
-  row.appendChild(inp); row.appendChild(go); row.appendChild(more);
-  sec.appendChild(lab); sec.appendChild(dim); sec.appendChild(box); sec.appendChild(row);
+  var row = document.createElement("div"); row.id = "opf-resum-row";
+  var go = document.createElement("button"); go.type = "button"; go.className = "opf-btn ghost"; go.id = "opf-resum"; go.textContent = "⟳ 重新汇总"; go.disabled = true;
+  row.appendChild(go);
+  sec.appendChild(lab); sec.appendChild(dim); sec.appendChild(row);
   if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(sec, anchor.nextSibling);
-  go.addEventListener("click", function(){ var v = getEl("opf-dir-input").value.trim(); if (!v) { toast("请先输入方向或点选上方方向", "warning"); return; } runRefine(v); });
-  more.addEventListener("click", function(){ suggestDirections(); });
+  go.addEventListener("click", function(){ runFrom("final"); });
   dirsReset();
 }
 
