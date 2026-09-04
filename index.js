@@ -360,9 +360,12 @@ async function runAll() {
   dirsReset();
   ST.userName = currentUserName();
   ST.contextText = s.includeCard ? collectCardText() : '';
-  // 世界书：自动探测酒馆激活世界书 → 只载入条目列表（不自动全量发送），由左侧栏勾选决定发送内容
-  if (s.includeWorld && ST.worldSource === "none" && (!ST.wb || !ST.wb.entries || !ST.wb.entries.length)) {
-    try { var wr = await loadWorldFromST(); if (wr && wr.entries && wr.entries.length) importWorldEntries(wr.entries, "st"); } catch (e) { opfErr("world from ST failed", e); }
+  // 世界书：内存已有则复用；没有则尝试从酒馆拉一次
+  if (s.includeWorld && ST.worldSource === 'none') {
+    try {
+      var wr = await loadWorldFromST();
+      applyWorldResult(wr);
+    } catch (e) { opfErr('world from ST failed', e); }
   }
   renderMetaStatus();
   try {
@@ -579,7 +582,7 @@ function getEl(id){return document.getElementById(id);}
 var OPF_CSS = "#opf-root,#opf-launcher{box-sizing:border-box;font-family:'Noto Sans SC','Microsoft YaHei',sans-serif;letter-spacing:.3px}#opf-root *,#opf-launcher *{box-sizing:border-box}#opf-launcher{position:fixed;right:6px;top:42%;z-index:2147480001;width:38px;height:38px;border-radius:12px 6px 6px 12px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#ffd9de;background:linear-gradient(160deg,rgba(74,10,20,.92),rgba(24,3,8,.88));border:1px solid rgba(255,106,122,.28);box-shadow:0 0 6px rgba(255,77,94,.55),0 0 18px rgba(200,16,46,.35);font-size:18px;transition:transform .18s ease,box-shadow .18s ease;user-select:none}#opf-launcher:hover{transform:scale(1.08);box-shadow:0 0 6px rgba(255,77,94,.55),0 0 18px rgba(200,16,46,.35),0 0 24px rgba(255,77,94,.5)}#opf-launcher .opf-la-dot{position:absolute;top:-3px;right:-3px;width:10px;height:10px;border-radius:50%;background:#39d353;border:1px solid rgba(0,0,0,.5);display:none}#opf-launcher.running .opf-la-dot{display:block;animation:opfPulse 1s infinite}@keyframes opfPulse{0%,100%{opacity:1}50%{opacity:.25}}#opf-root{position:fixed;z-index:2147480000;width:392px;max-width:calc(100vw - 18px);max-height:min(760px,92vh);display:flex;flex-direction:column;border-radius:14px;color:#fdeef0;overflow:hidden;background:linear-gradient(180deg,rgba(46,6,14,.92) 0%,rgba(30,4,10,.90) 45%,rgba(16,2,6,.94) 100%);border:1px solid rgba(255,122,138,.34);box-shadow:0 0 0 1px rgba(0,0,0,.35),0 10px 34px rgba(0,0,0,.55),inset 0 0 42px rgba(255,60,80,.05),0 0 22px rgba(255,77,94,.22);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);transition:opacity .16s ease,transform .16s ease}#opf-root::before{content:'';position:absolute;inset:0 0 auto 0;height:2px;background:linear-gradient(90deg,transparent,#ff4d5e 18%,#ffd9a8 50%,#c8102e 82%,transparent);box-shadow:0 0 12px rgba(255,90,100,.8);opacity:.9}#opf-root.opf-hidden{opacity:0;pointer-events:none;transform:translateY(6px) scale(.98)}#opf-head{display:flex;align-items:center;gap:6px;padding:8px 10px 7px 12px;cursor:move;user-select:none;background:linear-gradient(90deg,rgba(255,200,210,.10),rgba(200,16,46,.06) 55%,rgba(255,200,210,.04));border-bottom:1px solid rgba(255,122,138,.18)}#opf-title{font-weight:700;font-size:13px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#ffd9de;text-shadow:0 0 8px rgba(255,77,94,.65)}#opf-title .s{color:#ffb7be;font-size:11px;font-weight:500;margin-left:6px}.opf-ico-btn{border:1px solid transparent;background:rgba(255,255,255,.04);color:#ff8a95;border-radius:7px;cursor:pointer;width:24px;height:22px;font-size:12px;line-height:1;transition:all .14s ease}.opf-ico-btn:hover{background:rgba(255,77,94,.18);color:#fff;border-color:rgba(255,106,122,.28);box-shadow:0 0 4px rgba(255,77,94,.35),0 0 12px rgba(200,16,46,.22)}#opf-body{overflow-y:auto;display:flex;flex-direction:column;min-height:0}#opf-meta{display:flex;flex-wrap:wrap;gap:4px 8px;padding:6px 12px;font-size:11px;color:rgba(255,230,234,.72);background:rgba(255,255,255,.02);border-bottom:1px dashed rgba(255,122,138,.16)}#opf-meta .tag{padding:1px 6px;border-radius:20px;font-size:10px;background:rgba(255,77,94,.12);border:1px solid rgba(255,122,138,.25);color:#ffc9ce}#opf-meta .tag.ok{color:#a5f0c0;border-color:rgba(120,255,170,.35);background:rgba(60,160,90,.14)}#opf-meta .tag.err{color:#ffd0a3;border-color:rgba(255,170,90,.4);background:rgba(200,110,40,.14)}.opf-sec{padding:8px 12px 6px}.opf-sec-label{font-size:10px;letter-spacing:2px;color:rgba(255,170,180,.62);margin-bottom:6px;text-transform:uppercase;display:flex;align-items:center;gap:6px}.opf-sec-label::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(255,120,135,.35),transparent)}#opf-demand{width:100%;resize:vertical;min-height:44px;max-height:120px;border-radius:9px;padding:7px 9px;color:#ffeef1;font-size:12px;line-height:1.5;background:rgba(10,2,5,.55);border:1px solid rgba(255,122,138,.25);outline:none;transition:border-color .15s ease,box-shadow .15s ease}#opf-demand:focus{border-color:rgba(255,110,125,.6);box-shadow:0 0 10px rgba(255,77,94,.25)}#opf-demand::placeholder{color:rgba(255,210,216,.35)}.opf-opts{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:4px 12px 6px}.opf-opt{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:rgba(255,226,230,.78);cursor:pointer}.opf-opt input{accent-color:#ff4d5e;cursor:pointer}.opf-num{width:54px;background:rgba(10,2,5,.55);color:#ffeef1;border:1px solid rgba(255,122,138,.25);border-radius:6px;padding:2px 5px;font-size:11px}#opf-pname{width:150px;background:rgba(10,2,5,.55);color:#ffeef1;border:1px solid rgba(255,122,138,.25);border-radius:6px;padding:2px 6px;font-size:11px}.opf-steps{padding:2px 12px 6px;display:flex;flex-direction:column;gap:6px;overflow-y:auto;max-height:290px}.opf-step{border-radius:10px;border:1px solid rgba(255,122,138,.18);background:rgba(255,235,238,.035);transition:background .15s ease,border-color .15s ease,box-shadow .15s ease}.opf-step[data-st=run]{background:rgba(255,90,105,.10);border-color:rgba(255,120,135,.5);box-shadow:0 0 4px rgba(255,77,94,.35),0 0 12px rgba(200,16,46,.22)}.opf-step[data-st=ok]{background:rgba(120,230,160,.05);border-color:rgba(140,255,180,.25)}.opf-step[data-st=err]{border-color:rgba(255,150,90,.55)}.opf-step-head{display:flex;align-items:center;gap:7px;padding:6px 8px;cursor:pointer}.opf-idx{width:17px;height:17px;border-radius:6px 2px 6px 2px;flex:none;font-size:10px;font-weight:700;color:#ffd7dc;display:inline-flex;align-items:center;justify-content:center;background:linear-gradient(140deg,rgba(200,16,46,.55),rgba(80,10,22,.65));border:1px solid rgba(255,120,135,.35);box-shadow:0 0 6px rgba(255,77,94,.25)}.opf-dot{width:14px;font-size:11px;text-align:center;color:#8e6670;flex:none}.opf-step[data-st=run] .opf-dot{color:#ff8a95;animation:opfPulse 1s infinite}.opf-step[data-st=ok] .opf-dot{color:#7fe6a0}.opf-step[data-st=err] .opf-dot{color:#ffb066}.opf-step-title{flex:1;font-size:12px;color:#ffe9ec}.opf-step-sub{font-size:10px;color:rgba(255,200,208,.45)}.opf-step-act{border:none;background:rgba(255,255,255,.05);color:#ffc0c8;cursor:pointer;border-radius:6px;padding:2px 7px;font-size:10px;transition:all .14s ease}.opf-step-act:hover{background:rgba(255,77,94,.2);color:#fff;box-shadow:0 0 4px rgba(255,77,94,.35),0 0 12px rgba(200,16,46,.22)}.opf-step-body{display:none;padding:4px 9px 8px 30px;font-size:11px;line-height:1.55;color:rgba(255,226,230,.82)}.opf-step.open .opf-step-body{display:block}.opf-step-body pre{white-space:pre-wrap;word-break:break-word;margin:0;font-family:inherit}.opf-out{padding:2px 12px 8px}#opf-json-out{max-height:170px;overflow:auto;margin:0;padding:8px 10px;border-radius:9px;font-size:10.5px;line-height:1.5;white-space:pre-wrap;word-break:break-word;color:#ffd9de;background:rgba(8,1,4,.72);border:1px solid rgba(255,122,138,.22);box-shadow:inset 0 0 24px rgba(255,60,80,.05)}#opf-actions{display:flex;gap:6px;padding:8px 12px 10px;background:linear-gradient(0deg,rgba(200,16,46,.10),rgba(200,16,46,.02));border-top:1px solid rgba(255,122,138,.18)}.opf-btn{flex:1;cursor:pointer;border-radius:8px;border:1px solid transparent;font-size:12px;padding:7px 4px;color:#fff;letter-spacing:1px;transition:all .15s ease}.opf-btn:hover{filter:brightness(1.12)}.opf-btn:disabled{opacity:.45;cursor:not-allowed;filter:none}.opf-btn.primary{background:linear-gradient(135deg,rgba(255,110,120,.92),rgba(190,16,42,.96));border-color:rgba(255,180,190,.5);box-shadow:0 0 6px rgba(255,77,94,.55),0 0 18px rgba(200,16,46,.35);text-shadow:0 0 6px rgba(255,255,255,.4)}.opf-btn.ghost{background:rgba(255,235,238,.06);border-color:rgba(255,122,138,.25);color:#ffd5da}.opf-btn.ghost:hover{background:rgba(255,90,105,.14)}@media (max-width:640px){#opf-root{width:calc(100vw - 14px);left:7px !important;right:auto !important}}";
 var OPF_HTML = "<div id=\"opf-head\"><div id=\"opf-title\">✦ 始弦的魔法大典<span class=\"s\">destiny preset forge</span></div><button class=\"opf-ico-btn\" id=\"opf-btn-mini\" title=\"最小化\">─</button><button class=\"opf-ico-btn\" id=\"opf-btn-close\" title=\"关闭\">✕</button></div><div id=\"opf-body\"><div id=\"opf-meta\"></div><div class=\"opf-sec\"><div class=\"opf-sec-label\">开局需求</div><textarea id=\"opf-demand\" placeholder=\"例如：给一位从迷雾森林走出、想在瓦伦蒂亚城谋生的流浪剑士配齐开局（1级、偏好近战、带一只契约伙伴……）\"></textarea></div><div class=\"opf-opts\"><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-card\"> 带角色卡</label><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-world\"> 带世界书</label><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-const\"> 仅常驻</label><label class=\"opf-opt\">注入上限<input type=\"number\" id=\"opf-cap\" class=\"opf-num\" min=\"2000\" max=\"200000\" step=\"1000\"></label><label class=\"opf-opt\">名称<input id=\"opf-pname\" value=\"【自定义开局】\" title=\"开局预设名称（导出 name 字段与文件名）\"></label></div><div class=\"opf-opts\"><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-quick\"> 快出模式(单次)</label><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-meta\"> 导出含文件元数据</label><button class=\"opf-step-act\" id=\"opf-wload\" type=\"button\">导入世界书文件</button><button class=\"opf-step-act\" id=\"opf-wclear\" type=\"button\">清世界书</button></div><div class=\"opf-sec\"><div class=\"opf-sec-label\">创作步骤</div><div class=\"opf-steps\" id=\"opf-steps\"></div></div><div class=\"opf-out\"><div class=\"opf-sec-label\">预设 JSON</div><pre id=\"opf-json-out\">尚未生成</pre></div></div><div id=\"opf-actions\"><button class=\"opf-btn primary\" id=\"opf-btn-run\">▶ 生成初稿</button><button class=\"opf-btn ghost\" id=\"opf-btn-quick\">⚡ 快速初稿</button><button class=\"opf-btn ghost\" id=\"opf-btn-save\">⬇ 导出 .preset.json</button><button class=\"opf-btn ghost\" id=\"opf-btn-copy\">⧉ 复制</button></div>";
 
-function injectStyle(){ if (getEl(NS + "_css")) return; var st = document.createElement("style"); st.id = NS + "_css"; st.textContent = OPF_CSS; document.head.appendChild(st); var st2 = document.createElement("style"); st2.id = NS + "_css_extra"; st2.textContent = EXTRA_CSS; document.head.appendChild(st2); var st3 = document.createElement("style"); st3.id = NS + "_css_side"; st3.textContent = SIDE_CSS; document.head.appendChild(st3); }
+function injectStyle(){ if (getEl(NS + "_css")) return; var st = document.createElement("style"); st.id = NS + "_css"; st.textContent = OPF_CSS; document.head.appendChild(st); var st2 = document.createElement("style"); st2.id = NS + "_css_extra"; st2.textContent = EXTRA_CSS; document.head.appendChild(st2); }
 function launcher(){ if (!getEl("opf-launcher")) { var b = document.createElement("div"); b.id = "opf-launcher"; b.title = EXT_TITLE; b.addEventListener("click", togglePanel); var dot = document.createElement("span"); dot.className = "opf-la-dot"; b.appendChild(document.createTextNode("✦")); b.appendChild(dot); document.body.appendChild(b); } return getEl("opf-launcher"); }
 function showPanel(){ var root = getEl("opf-root"); var s = getSettings(); if (!root) return; root.classList.remove("opf-hidden"); root.classList.add("opf-show"); root.style.display = "flex"; placePanelInView(root); launcher().style.display = "none"; s.visible = true; saveSettings(); }
 function hidePanel(){ var root = getEl("opf-root"); var s = getSettings(); if (!root) return; root.classList.add("opf-hidden"); setTimeout(function(){ if (!s.visible) root.style.display = "none"; }, 200); launcher().style.display = "flex"; s.visible = false; saveSettings(); }
@@ -611,7 +614,7 @@ function keepPanelInView(){
   if (r.left < -20 || r.top < -20 || r.right > vw + 20 || r.bottom > vh + 20) placePanelInView(root);
 }
 
-function buildPanel(){ if (getEl("opf-root")) return; var root = document.createElement("div"); root.id = "opf-root"; root.className = "opf-hidden"; root.style.display = "none"; root.innerHTML = OPF_HTML; document.body.appendChild(root); launcher(); bindPanel(root); renderSteps(); syncFromSettings(); addWorkflowUI(root); buildSideUI(root); if (getSettings().visible) showPanel(); }
+function buildPanel(){ if (getEl("opf-root")) return; var root = document.createElement("div"); root.id = "opf-root"; root.className = "opf-hidden"; root.style.display = "none"; root.innerHTML = OPF_HTML; document.body.appendChild(root); launcher(); bindPanel(root); renderSteps(); syncFromSettings(); addWorkflowUI(root); if (getSettings().visible) showPanel(); }
 
 function bindPanel(root){
   root.querySelector("#opf-btn-close").addEventListener("click", hidePanel);
@@ -628,9 +631,9 @@ function bindPanel(root){
   root.querySelector("#opf-cap").addEventListener("change", syncFromControl);
   root.querySelector("#opf-pname").addEventListener("change", syncFromControl);
   var fi = document.createElement("input"); fi.type = "file"; fi.accept = ".json,application/json";
-  fi.addEventListener("change", function(){ var f = fi.files && fi.files[0]; if (!f) return; handleWorldFile(f); fi.value = ""; });
+  fi.addEventListener("change", function(){ var f = fi.files && fi.files[0]; if (!f) return; loadWorldFromFile(f).then(function(res){ applyWorldResult(res); renderMetaStatus(); toast("世界书已从文件载入：" + (res.fileName || "")); }).catch(function(e){ toast("世界书文件解析失败：" + (e && e.message ? e.message : e), "error"); }); fi.value = ""; });
   root.querySelector("#opf-wload").addEventListener("click", function(){ fi.click(); });
-  root.querySelector("#opf-wclear").addEventListener("click", function(){ clearWorldbook(); });
+  root.querySelector("#opf-wclear").addEventListener("click", function(){ ST.worldSource = "none"; ST.worldInfo = ""; renderMetaStatus(); toast("已清空世界书上下文"); });
   makeDraggable(root.querySelector("#opf-head"), root);
   window.addEventListener("resize", keepPanelInView);
 }
@@ -715,17 +718,17 @@ function renderSteps(){
   add("角色: " + charName);
   var s = getSettings();
   add("角色卡: " + (s.includeCard ? "自动读取" : "关闭"));
-  var wb = ST.wb || { entries: [] };
   if (s.includeWorld) {
-    if (ST.worldSource !== "none" && wb.entries && wb.entries.length) {
-      ST.worldInfo = buildSelectedWorldText();
-      var selN = 0; for (var i = 0; i < wb.entries.length; i++) if (wb.entries[i].sel) selN++;
-      var txt = (ST.worldInfo || "").length;
-      add("世界书: 已选 " + selN + "/" + wb.entries.length + " 条 · " + txt + " 字", selN ? "ok" : "");
-    } else { add("世界书: 未载入(左侧栏可导入/勾选)"); }
+    var wlab = ""; var wcls = "";
+    if (ST.worldSource === "st") { wlab = "世界书: 酒馆激活(" + ST.worldInfo.length + "字)"; wcls = "ok"; }
+    else if (String(ST.worldSource).indexOf("file") === 0) { wlab = "世界书: 文件(" + ST.worldInfo.length + "字)"; wcls = "ok"; }
+    else { wlab = "世界书: 未载入(可导入文件)"; }
+    add(wlab, wcls);
   } else { add("世界书: 关闭"); }
   add("主API: " + (c && typeof c.generateRaw === "function" ? "就绪" : "未就绪(检查版本)"), c && typeof c.generateRaw === "function" ? "ok" : "err");
-}function renderRunButtons(){
+}
+
+function renderRunButtons(){
   var run = getEl("opf-btn-run"); var qk = getEl("opf-btn-quick"); var la = getEl("opf-launcher");
   if (run) { run.disabled = !!ST.running; run.textContent = ST.running ? "■ 运行中…" : "▶ 生成初稿"; }
   if (qk) { qk.disabled = !!ST.running; if (!ST.running) qk.textContent = "⚡ 快速初稿"; }
@@ -918,194 +921,22 @@ function addWorkflowUI(root){
   dirsReset();
 }
 
-// ============ 世界书侧边栏 v1.3：导入只入库，勾选才发送 ============
-var SIDE_CSS = "#opf-root.opf-side-open{width:min(740px,94vw)}#opf-body{margin-left:0;transition:margin-left .18s ease}#opf-root.opf-side-open #opf-body{margin-left:min(320px,44%)}#opf-side{position:absolute;left:0;top:33px;bottom:49px;width:min(320px,44%);z-index:9;background:linear-gradient(180deg,rgba(22,3,9,.97),rgba(12,2,6,.98));border-right:1px solid rgba(255,122,138,.25);box-shadow:8px 0 22px rgba(0,0,0,.35);transform:translateX(-102%);opacity:0;visibility:hidden;transition:transform .18s ease,opacity .18s ease;display:flex;flex-direction:column;min-height:0}#opf-root.opf-side-open #opf-side{transform:none;opacity:1;visibility:visible}#opf-side-head{display:flex;align-items:center;gap:6px;padding:7px 9px;font-size:12px;font-weight:600;color:#ffd9de;border-bottom:1px solid rgba(255,122,138,.2);flex:none}#opf-side-head .t{flex:1}.opf-side-ico{border:none;background:transparent;color:#ff8a95;cursor:pointer;font-size:12px;padding:2px 6px;border-radius:6px}.opf-side-ico:hover{background:rgba(255,77,94,.16);color:#fff}#opf-side-tools{display:flex;gap:4px;padding:6px 8px 2px;flex-wrap:wrap;flex:none}#opf-side-count{font-size:10px;color:rgba(255,200,208,.7);padding:2px 8px;width:100%}#opf-side-filter{margin:2px 8px 4px;border-radius:7px;padding:4px 7px;font-size:11px;color:#ffeef1;background:rgba(10,2,5,.55);border:1px solid rgba(255,122,138,.25);outline:none}#opf-side-list{flex:1 1 auto;overflow-y:auto;padding:2px 6px 8px;min-height:0}.opf-wi-item{display:flex;gap:6px;align-items:flex-start;padding:3px 5px;border-radius:6px;cursor:pointer;font-size:10.5px;color:rgba(255,226,230,.88);border:1px solid transparent}.opf-wi-item:hover{background:rgba(255,235,238,.06)}.opf-wi-item input{margin-top:2px;accent-color:#ff4d5e;cursor:pointer}.opf-wi-tx{flex:1 1 auto;min-width:0;word-break:break-word;line-height:1.35}.opf-wi-ln{flex:none;color:rgba(255,200,208,.42);font-size:9.5px;padding-top:1px}.opf-wi-const{flex:none;color:#8fd6ff;font-size:9px;padding:0 4px;border:1px solid rgba(120,190,255,.35);border-radius:8px}.opf-side-hint{font-size:10.5px;color:rgba(255,200,208,.6);line-height:1.5;padding:10px 12px}@media (max-width:700px){#opf-root.opf-side-open{width:calc(100vw - 14px)}#opf-root.opf-side-open #opf-body{margin-left:46%}#opf-side{width:46%}}";
-
-function wbKey(){ var wb = ST.wb || {}; if (wb.fileName) return "file:" + wb.fileName; if (wb.source === "st") return "st-active"; return "none"; }
-function wbSelStore(){ var s = getSettings(); if (!s.wbSel || typeof s.wbSel !== "object") s.wbSel = {}; return s.wbSel; }
-function persistWbSel(){ var key = wbKey(); if (key === "none") return; var wb = ST.wb || { entries: [] }; var ids = []; for (var i = 0; i < wb.entries.length; i++) if (wb.entries[i].sel) ids.push(wb.entries[i].id); wbSelStore()[key] = ids; saveSettings(); }
-function normWorldEntries(rawList){
-  var out = [];
-  if (!Array.isArray(rawList)) return out;
-  for (var i = 0; i < rawList.length; i++) {
-    var e = rawList[i];
-    if (!e || typeof e.content !== "string" || !e.content.trim()) continue;
-    var keyStr = Array.isArray(e.key) ? e.key.join(" / ") : (typeof e.key === "string" ? e.key : "");
-    out.push({ id: (e.uid != null ? "u" + e.uid : "i" + i), raw: e, comment: (e.comment || ""), key: keyStr, content: e.content, constant: !!e.constant, sel: false });
-  }
-  return out;
-}
-function importWorldEntries(rawEntries, sourceName, fileName){
-  rawEntries = Array.isArray(rawEntries) ? rawEntries : [];
-  ST.wb = { entries: normWorldEntries(rawEntries), source: sourceName || "file", fileName: fileName || null };
-  ST.worldSource = ST.wb.source;
-  ST.worldInfo = "";
-  var key = wbKey();
-  var saved = (key !== "none") ? wbSelStore()[key] : null;
-  var hasSaved = Array.isArray(saved) && saved.length > 0;
-  var nConst = 0;
-  ST.wb.entries.forEach(function (e) { if (e.constant) nConst++; if (hasSaved) { e.sel = saved.indexOf(e.id) >= 0; } else { e.sel = !!e.constant; } });
-  renderWorldList();
-  renderMetaStatus();
-  return { total: ST.wb.entries.length, picked: ST.wb.entries.filter(function (e) { return e.sel; }).length, nConst: nConst };
-}
-function clearWorldbook(){
-  ST.wb = { entries: [], source: "none", fileName: null };
-  ST.worldSource = "none";
-  ST.worldInfo = "";
-  renderWorldList();
-  renderMetaStatus();
-  toast("已清空世界书条目");
-}
-function buildSelectedWorldText(){
-  var s = getSettings();
-  if (!s.includeWorld) { ST.worldInfo = ""; return ""; }
-  var wb = ST.wb || { entries: [] };
-  if (!wb.entries || !wb.entries.length) { ST.worldInfo = ""; return ""; }
-  var nl2 = String.fromCharCode(10) + String.fromCharCode(10);
-  var parts = []; var total = 0; var cap = s.capChars || 30000;
-  for (var i = 0; i < wb.entries.length; i++) {
-    var e = wb.entries[i];
-    if (!e.sel) continue;
-    if (s.worldConstantOnly && !e.constant) continue;
-    var head = e.comment || e.key || "";
-    var line = (head ? "【" + String(head).slice(0, 60) + "】" : "") + e.content;
-    if (total + line.length > cap) { parts.push("……(超过" + cap + "字注入上限，其余未发送)"); break; }
-    parts.push(line); total += line.length;
-  }
-  ST.worldInfo = parts.join(nl2);
-  return ST.worldInfo;
-}
-async function handleWorldFile(file){
-  try {
-    var res = await loadWorldFromFile(file);
-    var r = importWorldEntries(res.entries, "file", res.fileName || file.name);
-    var s = getSettings(); s.includeWorld = true; saveSettings();
-    openSideUI();
-    toast("世界书已载入 " + r.total + " 条；默认勾选常驻 " + r.picked + " 条，可在左侧栏勾选要发送的条目");
-  } catch (e) { toast("世界书文件解析失败：" + (e && e.message ? e.message : e), "error"); }
-}
-function renderWorldList(){
-  var wb = ST.wb || { entries: [] };
-  var listEl = getEl("opf-side-list");
-  var cntEl = getEl("opf-side-count");
-  if (cntEl) {
-    var selN = 0; for (var i = 0; i < wb.entries.length; i++) if (wb.entries[i].sel) selN++;
-    cntEl.textContent = "已勾选 " + selN + " / " + wb.entries.length + " 条（勾选的才会发给 AI）";
-  }
-  if (!listEl) return;
-  listEl.textContent = "";
-  if (!wb.entries || !wb.entries.length) {
-    var d = document.createElement("div"); d.className = "opf-side-hint";
-    d.textContent = "尚未载入世界书。\n\n可点“导入世界书文件”选择世界书 JSON（如 命定之诗与黄昏之歌v4.3 (3).json），或在“生成初稿”时自动探测酒馆当前激活世界书。载入后在此勾选条目，只有勾选的内容才会随生成请求发送。";
-    d.style.whiteSpace = "pre-wrap";
-    listEl.appendChild(d);
-    return;
-  }
-  var f = (getEl("opf-side-filter") && getEl("opf-side-filter").value || "").toLowerCase();
-  wb.entries.forEach(function (e) {
-    if (f && (e.comment + " " + e.key + " " + e.content).toLowerCase().indexOf(f) < 0) return;
-    var lab = document.createElement("label"); lab.className = "opf-wi-item";
-    var cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!e.sel;
-    cb.addEventListener("change", function(){ e.sel = !!cb.checked; persistWbSel(); renderWorldList(); renderMetaStatus(); });
-    lab.appendChild(cb);
-    var tx = document.createElement("span"); tx.className = "opf-wi-tx";
-    var t1 = e.comment || e.key || e.content.slice(0, 24);
-    tx.textContent = t1; tx.title = (e.comment ? e.comment + "\n" : "") + (e.key ? e.key + "\n" : "") + e.content.slice(0, 300);
-    lab.appendChild(tx);
-    var ln = document.createElement("span"); ln.className = "opf-wi-ln"; ln.textContent = e.content.length;
-    lab.appendChild(ln);
-    if (e.constant) { var cst = document.createElement("span"); cst.className = "opf-wi-const"; cst.textContent = "常驻"; lab.appendChild(cst); }
-    listEl.appendChild(lab);
-  });
-}
-function setAllSel(v){ var wb = ST.wb; if (!wb) return; wb.entries.forEach(function (e) { e.sel = v; }); persistWbSel(); renderWorldList(); renderMetaStatus(); }
-function setConstOnlySel(){ var wb = ST.wb; if (!wb) return; wb.entries.forEach(function (e) { e.sel = !!e.constant; }); persistWbSel(); renderWorldList(); renderMetaStatus(); }
-function openSideUI(){
-  var root = getEl("opf-root"); if (!root) return;
-  root.classList.add("opf-side-open");
-  var s = getSettings(); s.sideOpen = true; saveSettings();
-  renderWorldList();
-  var vw = window.innerWidth || 1000; var tgt = Math.min(760, Math.round(vw * 0.94));
-  var left = parseInt(root.style.left || "0", 10);
-  if (!isNaN(left) && left + tgt > vw - 6) { left = Math.max(6, vw - tgt - 6); root.style.left = left + "px"; s.x = left; saveSettings(); }
-}
-function closeSideUI(){
-  var root = getEl("opf-root"); if (!root) return;
-  root.classList.remove("opf-side-open");
-  var s = getSettings(); s.sideOpen = false; saveSettings();
-}
-function toggleSideUI(){ var root = getEl("opf-root"); if (!root) return; if (root.classList.contains("opf-side-open")) closeSideUI(); else openSideUI(); }
-function buildSideUI(root){
-  if (!root || getEl("opf-side")) return;
-  ST.wb = ST.wb || { entries: [], source: "none", fileName: null };
-  var side = document.createElement("div"); side.id = "opf-side";
-  var head = document.createElement("div"); head.id = "opf-side-head";
-  var ht = document.createElement("span"); ht.className = "t"; ht.textContent = "世界书条目 · 勾选发送";
-  var hx = document.createElement("button"); hx.type = "button"; hx.className = "opf-side-ico"; hx.textContent = "✕"; hx.title = "收起侧栏";
-  hx.addEventListener("click", closeSideUI);
-  head.appendChild(ht); head.appendChild(hx); side.appendChild(head);
-  var tools = document.createElement("div"); tools.id = "opf-side-tools";
-  var bAll = document.createElement("button"); bAll.type = "button"; bAll.className = "opf-step-act"; bAll.textContent = "全选";
-  bAll.addEventListener("click", function(){ setAllSel(true); });
-  var bConst = document.createElement("button"); bConst.type = "button"; bConst.className = "opf-step-act"; bConst.textContent = "仅常驻";
-  bConst.addEventListener("click", setConstOnlySel);
-  var bNone = document.createElement("button"); bNone.type = "button"; bNone.className = "opf-step-act"; bNone.textContent = "清空勾选";
-  bNone.addEventListener("click", function(){ setAllSel(false); });
-  tools.appendChild(bAll); tools.appendChild(bConst); tools.appendChild(bNone); side.appendChild(tools);
-  var cnt = document.createElement("div"); cnt.id = "opf-side-count"; side.appendChild(cnt);
-  var fil = document.createElement("input"); fil.type = "text"; fil.id = "opf-side-filter"; fil.placeholder = "筛选：注释 / 标签 / 内容关键字";
-  fil.addEventListener("input", function(){ renderWorldList(); });
-  side.appendChild(fil);
-  var listEl = document.createElement("div"); listEl.id = "opf-side-list"; side.appendChild(listEl);
-  root.appendChild(side);
-  var headBtn = document.createElement("button"); headBtn.type = "button"; headBtn.className = "opf-ico-btn"; headBtn.id = "opf-side-toggle"; headBtn.textContent = "☰"; headBtn.title = "世界书条目侧栏";
-  headBtn.addEventListener("click", toggleSideUI);
-  var mini = root.querySelector("#opf-btn-mini");
-  if (mini && mini.parentNode) mini.parentNode.insertBefore(headBtn, mini);
-  renderWorldList();
-  if (getSettings().sideOpen) openSideUI();
-}
-function applyWorldResult(res){
-  if (!res || !res.entries || !res.entries.length) { clearWorldbook(); return; }
-  var key = res.sourceName === "st" ? "st" : "file";
-  importWorldEntries(res.entries, res.sourceName || key, res.fileName || null);
-}
-
 // ============ boot ============
-function ensureLauncherEarly(){
-  try { if (typeof document !== "undefined" && !getEl("opf-launcher")) launcher(); } catch (e) { opfErr("ensureLauncherEarly", e); }
-}
-var _opfErrNet = false;
-function installErrorNet(){
-  if (_opfErrNet || typeof window === "undefined") return;
-  _opfErrNet = true;
-  try {
-    window.addEventListener("error", function(ev){
-      try { ensureLauncherEarly(); } catch (e) {}
-      var msg = (ev && ev.message) || (ev && ev.error && ev.error.message) || "unknown";
-      opfErr("uncaught:", msg);
-      try { toast("始弦·魔法大典 运行错误：" + String(msg).slice(0, 200), "error"); } catch (e2) {}
-    });
-  } catch (e) { opfErr("installErrorNet", e); }
-}
-
 function boot(){
-  try { injectStyle(); } catch (e) { opfErr("boot: injectStyle", e); }
-  try { buildPanel(); } catch (e) { opfErr("boot: buildPanel", e); try { toast("始弦的魔法大典 初始化出错：" + (e && e.message ? e.message : e), "error"); } catch (e2) {} }
-  try { renderRunButtons(); } catch (e) { opfErr("boot: renderRunButtons", e); }
+  injectStyle();
+  buildPanel();
+  renderRunButtons();
   opfLog("loaded. context ready:", !!getCtx());
 }
 function tryBoot(tryCount){
   var ok = false;
   try { ok = typeof SillyTavern !== "undefined" && !!SillyTavern.getContext && !!getCtx(); } catch (e) {}
-  if (ok) { try { ensureLauncherEarly(); } catch (e) { opfErr("pre-launcher", e); } try { boot(); } catch (e) { opfErr("boot error", e); } return; }
+  if (ok) { try { boot(); } catch (e) { opfErr("boot error", e); } return; }
   if ((tryCount || 0) > 60) { opfLog("SillyTavern context not ready after wait"); return; }
   setTimeout(function(){ tryBoot((tryCount || 0) + 1); }, 500);
 }
 
 if (typeof document !== "undefined") {
-  installErrorNet();
   if (document.readyState === "loading") { document.addEventListener("DOMContentLoaded", function(){ tryBoot(0); }); }
   else { tryBoot(0); }
 }
