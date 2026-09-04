@@ -919,7 +919,7 @@ function addWorkflowUI(root){
 }
 
 // ============ 世界书侧边栏 v1.3：导入只入库，勾选才发送 ============
-var SIDE_CSS = "#opf-root.opf-side-open{width:min(760px,94vw)}#opf-body{overflow:hidden;display:flex;flex-direction:row;min-height:0}#opf-main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;overflow-y:auto}#opf-side{flex:0 0 0;width:0;opacity:0;overflow:hidden;transition:width .18s ease,opacity .18s ease;background:linear-gradient(180deg,rgba(24,4,10,.95),rgba(14,2,6,.96));border-right:1px solid rgba(255,122,138,.2);display:flex;flex-direction:column;min-height:0}#opf-root.opf-side-open #opf-side{width:min(330px,52%);opacity:1}#opf-side-head{display:flex;align-items:center;gap:6px;padding:7px 9px;font-size:12px;font-weight:600;color:#ffd9de;border-bottom:1px solid rgba(255,122,138,.2);flex:none}#opf-side-head .t{flex:1}.opf-side-ico{border:none;background:transparent;color:#ff8a95;cursor:pointer;font-size:12px;padding:2px 6px;border-radius:6px}.opf-side-ico:hover{background:rgba(255,77,94,.16);color:#fff}#opf-side-tools{display:flex;gap:4px;padding:6px 8px 2px;flex-wrap:wrap;flex:none}#opf-side-count{font-size:10px;color:rgba(255,200,208,.7);padding:2px 8px;width:100%}#opf-side-filter{margin:2px 8px 4px;border-radius:7px;padding:4px 7px;font-size:11px;color:#ffeef1;background:rgba(10,2,5,.55);border:1px solid rgba(255,122,138,.25);outline:none}#opf-side-list{flex:1 1 auto;overflow-y:auto;padding:2px 6px 8px;min-height:0}.opf-wi-item{display:flex;gap:6px;align-items:flex-start;padding:3px 5px;border-radius:6px;cursor:pointer;font-size:10.5px;color:rgba(255,226,230,.88);border:1px solid transparent}.opf-wi-item:hover{background:rgba(255,235,238,.06)}.opf-wi-item input{margin-top:2px;accent-color:#ff4d5e;cursor:pointer}.opf-wi-tx{flex:1 1 auto;min-width:0;word-break:break-word;line-height:1.35}.opf-wi-ln{flex:none;color:rgba(255,200,208,.42);font-size:9.5px;padding-top:1px}.opf-wi-const{flex:none;color:#8fd6ff;font-size:9px;padding:0 4px;border:1px solid rgba(120,190,255,.35);border-radius:8px}.opf-side-hint{font-size:10.5px;color:rgba(255,200,208,.6);line-height:1.5;padding:10px 12px}@media (max-width:760px){#opf-root.opf-side-open{width:calc(100vw - 14px)}#opf-root.opf-side-open #opf-side{width:46%}}";
+var SIDE_CSS = "#opf-root.opf-side-open{width:min(740px,94vw)}#opf-body{margin-left:0;transition:margin-left .18s ease}#opf-root.opf-side-open #opf-body{margin-left:min(320px,44%)}#opf-side{position:absolute;left:0;top:33px;bottom:49px;width:min(320px,44%);z-index:9;background:linear-gradient(180deg,rgba(22,3,9,.97),rgba(12,2,6,.98));border-right:1px solid rgba(255,122,138,.25);box-shadow:8px 0 22px rgba(0,0,0,.35);transform:translateX(-102%);opacity:0;visibility:hidden;transition:transform .18s ease,opacity .18s ease;display:flex;flex-direction:column;min-height:0}#opf-root.opf-side-open #opf-side{transform:none;opacity:1;visibility:visible}#opf-side-head{display:flex;align-items:center;gap:6px;padding:7px 9px;font-size:12px;font-weight:600;color:#ffd9de;border-bottom:1px solid rgba(255,122,138,.2);flex:none}#opf-side-head .t{flex:1}.opf-side-ico{border:none;background:transparent;color:#ff8a95;cursor:pointer;font-size:12px;padding:2px 6px;border-radius:6px}.opf-side-ico:hover{background:rgba(255,77,94,.16);color:#fff}#opf-side-tools{display:flex;gap:4px;padding:6px 8px 2px;flex-wrap:wrap;flex:none}#opf-side-count{font-size:10px;color:rgba(255,200,208,.7);padding:2px 8px;width:100%}#opf-side-filter{margin:2px 8px 4px;border-radius:7px;padding:4px 7px;font-size:11px;color:#ffeef1;background:rgba(10,2,5,.55);border:1px solid rgba(255,122,138,.25);outline:none}#opf-side-list{flex:1 1 auto;overflow-y:auto;padding:2px 6px 8px;min-height:0}.opf-wi-item{display:flex;gap:6px;align-items:flex-start;padding:3px 5px;border-radius:6px;cursor:pointer;font-size:10.5px;color:rgba(255,226,230,.88);border:1px solid transparent}.opf-wi-item:hover{background:rgba(255,235,238,.06)}.opf-wi-item input{margin-top:2px;accent-color:#ff4d5e;cursor:pointer}.opf-wi-tx{flex:1 1 auto;min-width:0;word-break:break-word;line-height:1.35}.opf-wi-ln{flex:none;color:rgba(255,200,208,.42);font-size:9.5px;padding-top:1px}.opf-wi-const{flex:none;color:#8fd6ff;font-size:9px;padding:0 4px;border:1px solid rgba(120,190,255,.35);border-radius:8px}.opf-side-hint{font-size:10.5px;color:rgba(255,200,208,.6);line-height:1.5;padding:10px 12px}@media (max-width:700px){#opf-root.opf-side-open{width:calc(100vw - 14px)}#opf-root.opf-side-open #opf-body{margin-left:46%}#opf-side{width:46%}}";
 
 function wbKey(){ var wb = ST.wb || {}; if (wb.fileName) return "file:" + wb.fileName; if (wb.source === "st") return "st-active"; return "none"; }
 function wbSelStore(){ var s = getSettings(); if (!s.wbSel || typeof s.wbSel !== "object") s.wbSel = {}; return s.wbSel; }
@@ -1039,9 +1039,6 @@ function toggleSideUI(){ var root = getEl("opf-root"); if (!root) return; if (ro
 function buildSideUI(root){
   if (!root || getEl("opf-side")) return;
   ST.wb = ST.wb || { entries: [], source: "none", fileName: null };
-  var body = root.querySelector("#opf-body");
-  var main = document.createElement("div"); main.id = "opf-main";
-  while (body.firstChild) main.appendChild(body.firstChild);
   var side = document.createElement("div"); side.id = "opf-side";
   var head = document.createElement("div"); head.id = "opf-side-head";
   var ht = document.createElement("span"); ht.className = "t"; ht.textContent = "世界书条目 · 勾选发送";
@@ -1061,7 +1058,7 @@ function buildSideUI(root){
   fil.addEventListener("input", function(){ renderWorldList(); });
   side.appendChild(fil);
   var listEl = document.createElement("div"); listEl.id = "opf-side-list"; side.appendChild(listEl);
-  body.appendChild(side); body.appendChild(main);
+  root.appendChild(side);
   var headBtn = document.createElement("button"); headBtn.type = "button"; headBtn.className = "opf-ico-btn"; headBtn.id = "opf-side-toggle"; headBtn.textContent = "☰"; headBtn.title = "世界书条目侧栏";
   headBtn.addEventListener("click", toggleSideUI);
   var mini = root.querySelector("#opf-btn-mini");
@@ -1069,7 +1066,6 @@ function buildSideUI(root){
   renderWorldList();
   if (getSettings().sideOpen) openSideUI();
 }
-// 覆盖旧的全量载入实现：导入只登记条目，由勾选决定发送内容
 function applyWorldResult(res){
   if (!res || !res.entries || !res.entries.length) { clearWorldbook(); return; }
   var key = res.sourceName === "st" ? "st" : "file";
@@ -1078,9 +1074,9 @@ function applyWorldResult(res){
 
 // ============ boot ============
 function boot(){
-  injectStyle();
-  buildPanel();
-  renderRunButtons();
+  try { injectStyle(); } catch (e) { opfErr("boot: injectStyle", e); }
+  try { buildPanel(); } catch (e) { opfErr("boot: buildPanel", e); try { toast("始弦的魔法大典 初始化出错：" + (e && e.message ? e.message : e), "error"); } catch (e2) {} }
+  try { renderRunButtons(); } catch (e) { opfErr("boot: renderRunButtons", e); }
   opfLog("loaded. context ready:", !!getCtx());
 }
 function tryBoot(tryCount){
