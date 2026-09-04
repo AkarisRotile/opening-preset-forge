@@ -920,14 +920,30 @@ function addWorkflowUI(root){
 }
 
 // ============ 世界书左缘侧栏（懒加载独立浮层，不碰主窗口布局） ============
+var LSIDE_CSS2 = ".opf-wi-cat{font-size:10px;letter-spacing:1px;color:#ffb7be;background:rgba(255,77,94,.10);border:1px solid rgba(255,122,138,.22);border-radius:6px;padding:2px 8px;margin:6px 2px 2px;flex:none}#opf-lside-cat{flex:1 1 90px;min-width:80px;border-radius:7px;padding:4px 6px;font-size:11px;color:#ffeef1;background:rgba(10,2,5,.55);border:1px solid rgba(255,122,138,.25);outline:none}";
 var LSIDE_CSS = "#opf-lside{position:fixed;left:0;top:70px;bottom:70px;width:min(320px,82vw);z-index:2147480003;display:flex;flex-direction:column;min-height:0;background:linear-gradient(180deg,rgba(24,4,10,.96),rgba(12,2,6,.97));border:1px solid rgba(255,122,138,.3);border-left:none;border-radius:0 12px 12px 0;box-shadow:6px 0 22px rgba(0,0,0,.4),0 0 18px rgba(255,77,94,.18);transform:translateX(-110%);transition:transform .18s ease;overflow:hidden}#opf-lside.open{transform:translateX(0)}#opf-lside-head{display:flex;align-items:center;gap:6px;padding:8px 10px;font-size:12px;font-weight:600;color:#ffd9de;border-bottom:1px solid rgba(255,122,138,.2);flex:none}#opf-lside-head .t{flex:1}.opf-lside-ico{border:none;background:transparent;color:#ff8a95;cursor:pointer;font-size:12px;padding:2px 6px;border-radius:6px}.opf-lside-ico:hover{background:rgba(255,77,94,.16);color:#fff}#opf-lside-tools{display:flex;gap:4px;padding:6px 8px 2px;flex-wrap:wrap;flex:none}#opf-lside-count{font-size:10px;color:rgba(255,200,208,.7);padding:2px 8px;width:100%}#opf-lside-filter{margin:2px 8px 4px;border-radius:7px;padding:4px 7px;font-size:11px;color:#ffeef1;background:rgba(10,2,5,.55);border:1px solid rgba(255,122,138,.25);outline:none}#opf-lside-list{flex:1 1 auto;overflow-y:auto;padding:2px 6px 8px;min-height:0}.opf-lside-hint{font-size:10.5px;color:rgba(255,200,208,.6);line-height:1.5;padding:10px 12px;white-space:pre-wrap}.opf-wi-row{display:flex;gap:6px;align-items:flex-start;padding:3px 4px;border-radius:6px;cursor:pointer;font-size:10.5px;color:rgba(255,226,230,.88)}.opf-wi-row:hover{background:rgba(255,235,238,.06)}.opf-wi-row input{margin-top:2px;accent-color:#ff4d5e;cursor:pointer}.opf-wi-row .tx{flex:1 1 auto;min-width:0;word-break:break-word;line-height:1.35}.opf-wi-row .ln{flex:none;color:rgba(255,200,208,.42);font-size:9.5px}.opf-wi-row .cst{flex:none;color:#8fd6ff;font-size:9px;padding:0 4px;border:1px solid rgba(120,190,255,.35);border-radius:8px}";
+function wpkCategory(e){
+  var c = (e.comment || "") + " " + (e.key || "");
+  if (c.indexOf("[DLC]") >= 0) return "DLC内容";
+  var heads = ["诺斯加德联盟","精灵王庭","边陲之国","兽族联盟","索伦蒂斯","梵尼亚","瓦伦蒂亚","龙誓骑团","无尽树海","奥古斯提姆帝国","翼民圣国","潮汐王座"];
+  var isRule = false;
+  var ruleWords = ["命定系统","命运抽卡","[InitVar]","[mvu_update]","变量更新","[世界主设定]","[世界规则]","[角色生成]","[角色辅助指导]","美化规则","审美叙事","正文cot","[战斗协议]","[生产制作协议]","生命层级","世界初始设定","专用预设","禁止"];
+  for (var i = 0; i < ruleWords.length; i++) { if (c.indexOf(ruleWords[i]) >= 0) { isRule = true; break; } }
+  if (isRule) return "规则·系统";
+  if (c.indexOf("种族") >= 0) return "种族";
+  if (c.indexOf("角色") >= 0) return "角色";
+  for (var j = 0; j < heads.length; j++) { if (c.indexOf(heads[j]) >= 0) return "地区·地理"; }
+  var geoWords = ["城镇","地块","城区","地区","地图","王国","联盟","王庭","领地","港口","森林","山脉","湖泊","海岸","边境","帝国","圣国","王座","上层区","下城区"];
+  for (var k2 = 0; k2 < geoWords.length; k2++) { if (c.indexOf(geoWords[k2]) >= 0) return "地区·地理"; }
+  return "其他";
+}
 function wpkNorm(rawList){
   var out = []; if (!Array.isArray(rawList)) return out;
   for (var i = 0; i < rawList.length; i++) {
     var e = rawList[i];
     if (!e || typeof e.content !== "string" || !e.content.trim()) continue;
     var keyStr = Array.isArray(e.key) ? e.key.join(" / ") : (typeof e.key === "string" ? e.key : "");
-    out.push({ id: (e.uid != null ? "u" + e.uid : "i" + i), comment: (e.comment || ""), key: keyStr, content: e.content, constant: !!e.constant, sel: false });
+    out.push({ id: (e.uid != null ? "u" + e.uid : "i" + i), comment: (e.comment || ""), key: keyStr, content: e.content, constant: !!e.constant, sel: false, cat: wpkCategory(e) });
   }
   return out;
 }
@@ -981,7 +997,7 @@ function renderWorldSide(){
   var wb = ST.wb || { entries: [] };
   if (!wb.entries || !wb.entries.length) {
     var d = document.createElement("div"); d.className = "opf-lside-hint";
-    d.textContent = "尚未载入世界书。\n\n点“导入文件”选择世界书 JSON（如 命定之诗与黄昏之歌v4.3 (3).json）；或在“生成初稿”时自动探测酒馆激活世界书。\n载入后此处列出全部条目，勾选的才会发送给 AI（默认只勾选常驻）。";
+    d.textContent = "尚未载入世界书。\n\n点“导入文件”选择世界书 JSON（如 命定之诗与黄昏之歌v4.3 (3).json）；或在“生成初稿”时自动探测酒馆激活世界书。\n载入后此处按板块列出条目，勾选的才会发送给 AI（默认只勾选常驻）。";
     var bt = document.createElement("button"); bt.type = "button"; bt.className = "opf-step-act"; bt.textContent = "导入世界书文件";
     bt.addEventListener("click", function(){ if (ST.fileInput) ST.fileInput.click(); else { var wb2 = getEl("opf-wload"); if (wb2) wb2.click(); } });
     d.appendChild(bt);
@@ -989,30 +1005,45 @@ function renderWorldSide(){
     return;
   }
   var f = (getEl("opf-lside-filter") && getEl("opf-lside-filter").value || "").toLowerCase();
-  var shown = 0;
+  var catSel = getEl("opf-lside-cat") && getEl("opf-lside-cat").value || "全部";
+  var catOrder = ["规则·系统", "地区·地理", "种族", "角色", "DLC内容", "其他"];
+  var rowsByCat = {};
   wb.entries.forEach(function (e) {
     if (f && (e.comment + " " + e.key + " " + e.content).toLowerCase().indexOf(f) < 0) return;
-    shown++;
-    var lab = document.createElement("label"); lab.className = "opf-wi-row";
-    var cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!e.sel;
-    cb.addEventListener("change", function(){ e.sel = !!cb.checked; updateSendText(); renderWorldSide(); renderMetaStatus(); });
-    lab.appendChild(cb);
-    var tx = document.createElement("span"); tx.className = "tx";
-    tx.textContent = e.comment || e.key || e.content.slice(0, 24);
-    tx.title = (e.comment ? e.comment + "\n" : "") + (e.key ? e.key + "\n" : "") + e.content.slice(0, 300);
-    lab.appendChild(tx);
-    var ln = document.createElement("span"); ln.className = "ln"; ln.textContent = e.content.length;
-    lab.appendChild(ln);
-    if (e.constant) { var cst = document.createElement("span"); cst.className = "cst"; cst.textContent = "常驻"; lab.appendChild(cst); }
-    listEl.appendChild(lab);
+    var cat = e.cat || "其他";
+    if (catSel !== "全部" && cat !== catSel) return;
+    (rowsByCat[cat] = rowsByCat[cat] || []).push(e);
   });
-  if (!shown) { var nd = document.createElement("div"); nd.className = "opf-lside-hint"; nd.textContent = "没有匹配的条目。"; listEl.appendChild(nd); }
+  var totalShown = 0;
+  catOrder.forEach(function (cat) {
+    var rows = rowsByCat[cat] || [];
+    if (!rows.length) return;
+    totalShown += rows.length;
+    var hd = document.createElement("div"); hd.className = "opf-wi-cat";
+    hd.textContent = cat + " · " + rows.length + " 条";
+    listEl.appendChild(hd);
+    rows.forEach(function (e) {
+      var lab = document.createElement("label"); lab.className = "opf-wi-row";
+      var cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!e.sel;
+      cb.addEventListener("change", function(){ e.sel = !!cb.checked; updateSendText(); renderWorldSide(); renderMetaStatus(); });
+      lab.appendChild(cb);
+      var tx = document.createElement("span"); tx.className = "tx";
+      tx.textContent = e.comment || e.key || e.content.slice(0, 24);
+      tx.title = (e.comment ? e.comment + "\n" : "") + (e.key ? e.key + "\n" : "") + e.content.slice(0, 300);
+      lab.appendChild(tx);
+      var ln = document.createElement("span"); ln.className = "ln"; ln.textContent = e.content.length;
+      lab.appendChild(ln);
+      if (e.constant) { var cst = document.createElement("span"); cst.className = "cst"; cst.textContent = "常驻"; lab.appendChild(cst); }
+      listEl.appendChild(lab);
+    });
+  });
+  if (!totalShown) { var nd = document.createElement("div"); nd.className = "opf-lside-hint"; nd.textContent = "没有匹配的条目。"; listEl.appendChild(nd); }
 }
 function wpkSetAll(v){ var wb = ST.wb; if (!wb) return; wb.entries.forEach(function (e){ e.sel = v; }); updateSendText(); renderWorldSide(); renderMetaStatus(); }
 function wpkSetConst(){ var wb = ST.wb; if (!wb) return; wb.entries.forEach(function (e){ e.sel = !!e.constant; }); updateSendText(); renderWorldSide(); renderMetaStatus(); }
 function buildWorldSide(){
   if (getEl("opf-lside")) return;
-  var st = document.createElement("style"); st.id = NS + "_css_lside"; st.textContent = LSIDE_CSS; document.head.appendChild(st);
+  var st = document.createElement("style"); st.id = NS + "_css_lside"; st.textContent = LSIDE_CSS + LSIDE_CSS2; document.head.appendChild(st);
   var side = document.createElement("div"); side.id = "opf-lside";
   var head = document.createElement("div"); head.id = "opf-lside-head";
   var t = document.createElement("span"); t.className = "t"; t.textContent = "世界书条目 · 勾选发送";
@@ -1023,7 +1054,10 @@ function buildWorldSide(){
   var bConst = document.createElement("button"); bConst.type = "button"; bConst.className = "opf-step-act"; bConst.textContent = "仅常驻"; bConst.addEventListener("click", wpkSetConst);
   var bNone = document.createElement("button"); bNone.type = "button"; bNone.className = "opf-step-act"; bNone.textContent = "清空勾选"; bNone.addEventListener("click", function(){ wpkSetAll(false); });
   var filt = document.createElement("input"); filt.type = "text"; filt.id = "opf-lside-filter"; filt.placeholder = "筛选条目…"; filt.addEventListener("input", function(){ renderWorldSide(); });
-  tools.appendChild(bAll); tools.appendChild(bConst); tools.appendChild(bNone); tools.appendChild(filt); side.appendChild(tools);
+  var catSel = document.createElement("select"); catSel.id = "opf-lside-cat";
+  ["全部","规则·系统","地区·地理","种族","角色","DLC内容","其他"].forEach(function (v){ var o = document.createElement("option"); o.value = v; o.textContent = v; catSel.appendChild(o); });
+  catSel.addEventListener("change", function(){ renderWorldSide(); });
+  tools.appendChild(bAll); tools.appendChild(bConst); tools.appendChild(bNone); tools.appendChild(filt); tools.appendChild(catSel); side.appendChild(tools);
   var cnt = document.createElement("div"); cnt.id = "opf-lside-count"; side.appendChild(cnt);
   var list = document.createElement("div"); list.id = "opf-lside-list"; side.appendChild(list);
   document.body.appendChild(side);
