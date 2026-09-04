@@ -21,6 +21,8 @@ var DEFAULT_SETTINGS = {
   visible: false,
   x: null,
   y: null,
+  lx: null,                // 悬浮入口(✦)拖动后的 left（null=用 CSS 默认右侧位）
+  ly: null,                // 悬浮入口(✦)拖动后的 top
   w: 380,
   h: 560,
   quickMode: false,          // true = 单次调用直接出 JSON
@@ -588,7 +590,88 @@ var OPF_CSS = "#opf-root,#opf-launcher{box-sizing:border-box;font-family:'Noto S
 var OPF_HTML = "<div id=\"opf-head\"><div id=\"opf-title\">✦ 始弦的魔法大典<span class=\"s\">destiny preset forge</span></div><button class=\"opf-ico-btn\" id=\"opf-btn-mini\" title=\"最小化\">─</button><button class=\"opf-ico-btn\" id=\"opf-btn-close\" title=\"关闭\">✕</button></div><div id=\"opf-body\"><div id=\"opf-meta\"></div><div class=\"opf-sec\"><div class=\"opf-sec-label\">开局需求</div><textarea id=\"opf-demand\" placeholder=\"例如：给一位从迷雾森林走出、想在瓦伦蒂亚城谋生的流浪剑士配齐开局（1级、偏好近战、带一只契约伙伴……）\"></textarea></div><div class=\"opf-opts\"><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-card\"> 带角色卡</label><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-world\"> 带世界书</label><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-const\"> 仅常驻</label><label class=\"opf-opt\">注入上限<input type=\"number\" id=\"opf-cap\" class=\"opf-num\" min=\"2000\" max=\"200000\" step=\"1000\"></label><label class=\"opf-opt\">名称<input id=\"opf-pname\" value=\"【自定义开局】\" title=\"开局预设名称（导出 name 字段与文件名）\"></label></div><div class=\"opf-opts\"><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-quick\"> 快出模式(单次)</label><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-meta\"> 导出含文件元数据</label><button class=\"opf-step-act\" id=\"opf-wload\" type=\"button\">导入世界书文件</button><button class=\"opf-step-act\" id=\"opf-wclear\" type=\"button\">清世界书</button></div><div class=\"opf-sec\"><div class=\"opf-sec-label\">创作步骤</div><div class=\"opf-steps\" id=\"opf-steps\"></div></div><div class=\"opf-out\"><div class=\"opf-sec-label\">预设 JSON</div><pre id=\"opf-json-out\">尚未生成</pre></div></div><div id=\"opf-actions\"><button class=\"opf-btn primary\" id=\"opf-btn-run\">▶ 生成初稿</button><button class=\"opf-btn ghost\" id=\"opf-btn-quick\">⚡ 快速初稿</button><button class=\"opf-btn ghost\" id=\"opf-btn-save\">⬇ 导出 .preset.json</button><button class=\"opf-btn ghost\" id=\"opf-btn-copy\">⧉ 复制</button></div>";
 
 function injectStyle(){ if (getEl(NS + "_css")) return; var st = document.createElement("style"); st.id = NS + "_css"; st.textContent = OPF_CSS; document.head.appendChild(st); var st2 = document.createElement("style"); st2.id = NS + "_css_extra"; st2.textContent = EXTRA_CSS; document.head.appendChild(st2); }
-function launcher(){ if (!getEl("opf-launcher")) { var b = document.createElement("div"); b.id = "opf-launcher"; b.title = EXT_TITLE; b.addEventListener("click", togglePanel); var dot = document.createElement("span"); dot.className = "opf-la-dot"; b.appendChild(document.createTextNode("✦")); b.appendChild(dot); document.body.appendChild(b); } return getEl("opf-launcher"); }
+function launcher(){
+  if (!getEl("opf-launcher")) {
+    var b = document.createElement("div");
+    b.id = "opf-launcher";
+    b.title = EXT_TITLE;
+    b.addEventListener("click", function (e) {
+      if (b._suppressClick) { b._suppressClick = false; return; }  // 拖动刚结束，吞掉这次误触
+      togglePanel();
+    });
+    var dot = document.createElement("span");
+    dot.className = "opf-la-dot";
+    b.appendChild(document.createTextNode("✦"));
+    b.appendChild(dot);
+    document.body.appendChild(b);
+    try {
+      if (!getEl("opf_launcher_drag_css")) {
+        var st = document.createElement("style");
+        st.id = "opf_launcher_drag_css";
+        st.textContent = "#opf-launcher{touch-action:none;cursor:grab;-webkit-user-drag:none;user-drag:none}#opf-launcher.dragging{cursor:grabbing;transform:none!important}";
+        document.head.appendChild(st);
+      }
+    } catch (err) { opfErr("launcher drag css", err); }
+    try { makeLauncherDraggable(b); } catch (err) { opfErr("launcher draggable", err); }
+  }
+  return getEl("opf-launcher");
+}
+// 让侧边 ✦ 悬浮入口可拖动（拖动后记住位置；纯点击仍用于开关面板）
+function makeLauncherDraggable(b){
+  if (!b) return;
+  var s = getSettings();
+  if (typeof s.lx === "number" && typeof s.ly === "number") {
+    var vw0 = window.innerWidth || 800, vh0 = window.innerHeight || 600;
+    b.style.right = "auto";
+    b.style.left = clamp(s.lx, 0, Math.max(0, vw0 - (b.offsetWidth || 38))) + "px";
+    b.style.top = clamp(s.ly, 0, Math.max(0, vh0 - (b.offsetHeight || 38))) + "px";
+  }
+  var sx = 0, sy = 0, ox = 0, oy = 0, drag = false, moved = false;
+  b.addEventListener("pointerdown", function (e) {
+    if (e.button !== undefined && e.button !== 0) return;
+    drag = true; moved = false;
+    sx = e.clientX; sy = e.clientY;
+    var r = b.getBoundingClientRect();
+    ox = r.left; oy = r.top;
+    b.style.right = "auto";               // 从 right 定位切到 left 定位
+    b.style.left = Math.round(r.left) + "px";
+    b.style.top = Math.round(r.top) + "px";
+    b.classList.add("dragging");
+    if (b.setPointerCapture) { try { b.setPointerCapture(e.pointerId); } catch (err) {} }
+  });
+  b.addEventListener("pointermove", function (e) {
+    if (!drag) return;
+    var dx = e.clientX - sx, dy = e.clientY - sy;
+    if (Math.abs(dx) + Math.abs(dy) > 4) moved = true;
+    var vw = window.innerWidth || 800, vh = window.innerHeight || 600;
+    var w = b.offsetWidth || 38, h = b.offsetHeight || 38;
+    b.style.left = clamp(ox + dx, 0, Math.max(0, vw - w)) + "px";
+    b.style.top = clamp(oy + dy, 0, Math.max(0, vh - h)) + "px";
+  });
+  function endDrag() {
+    if (!drag) return;
+    drag = false;
+    b.classList.remove("dragging");
+    var r = b.getBoundingClientRect();
+    s.lx = Math.round(r.left);
+    s.ly = Math.round(r.top);
+    saveSettings();
+    if (moved) {
+      b._suppressClick = true;            // 拖动后紧随的 click 应被吞掉
+      setTimeout(function () { b._suppressClick = false; }, 400);
+    }
+  }
+  b.addEventListener("pointerup", endDrag);
+  b.addEventListener("pointercancel", endDrag);
+  function clampLauncherOnResize() {
+    if (!b.style.left || b.style.left === "auto") return;
+    var vw = window.innerWidth || 800, vh = window.innerHeight || 600;
+    var w = b.offsetWidth || 38, h = b.offsetHeight || 38;
+    b.style.left = clamp(parseFloat(b.style.left) || 0, 0, Math.max(0, vw - w)) + "px";
+    b.style.top = clamp(parseFloat(b.style.top) || 0, 0, Math.max(0, vh - h)) + "px";
+  }
+  window.addEventListener("resize", clampLauncherOnResize);
+}
 function showPanel(){ var root = getEl("opf-root"); var s = getSettings(); if (!root) return; root.classList.remove("opf-hidden"); root.classList.add("opf-show"); root.style.display = "flex"; placePanelInView(root); launcher().style.display = "none"; s.visible = true; saveSettings(); }
 function hidePanel(){ var root = getEl("opf-root"); var s = getSettings(); if (!root) return; root.classList.add("opf-hidden"); setTimeout(function(){ if (!s.visible) root.style.display = "none"; }, 200); launcher().style.display = "flex"; s.visible = false; saveSettings(); }
 function togglePanel(){ var s = getSettings(); if (s.visible) hidePanel(); else showPanel(); }
@@ -1328,15 +1411,18 @@ function memoTranscript() {
 }
 
 // 专门适配「网游核心YAML版」的总结系统提示词（{{maxChars}} 在运行时替换）
-// 只记 任务/副本/高难挑战 的进度，输出严格 YAML
+// 站在攻略队伍视角维护记忆：同名副本跨挑战保持一致 + 高难开荒不剧透
 function buildMemoSystem(maxChars) {
   var n = Number(maxChars) || 800;
-  return '你是一个「网游核心YAML版」世界里的攻略记忆压缩器。唯一任务：把对话中最新发生的事，压缩成一段极短的 YAML 状态摘要，供下一次生成时注入提示词，让 AI 不遗忘任务/副本/高难挑战的进度。\n' +
+  return '你是一个「网游核心YAML版」世界里的攻略记忆压缩器，站在攻略队伍的视角维护记忆。唯一任务：把对话中最新发生的事，压缩成一段极短的 YAML 记忆，供下一次生成时注入提示词。\n' +
+    '记忆必须服务于两个目的：\n' +
+    'A) 同名内容保持一致：同一个 任务/副本/高难本 反复出现时，按「名称」归并记忆；已记录过的 怪物分布/BOSS结构 不得被悄悄改写成另一套，只能在其基础上补充推进（同一副本多次挑战时前后要一致）。\n' +
+    'B) 高难开荒不剧透：只记录队伍在战斗中实际看到并确认过的内容；队伍尚未打到的阶段/BOSS机制一律标「未见到/未知」或直接省略，严禁脑补编造后续阶段的机制。\n' +
     '只记录以下三类，其余（玩家属性/等级/职业/装备/物品/货币/剧情文笔）一律不记：\n' +
-    '1) 进行中的任务/副本：名称 + 目标/下一步。\n' +
-    '2) 已通关的任务/副本：名称 + 通关结果/是否全清/关键解锁。\n' +
-    '3) 高难挑战（歼殛战 / 零式大型 / 绝境战）：每个 BOSS 的机制要点，按「阶段」记录（若每阶段是不同 BOSS，就按阶段记各自 BOSS）；并记录各副本的怪物分布（小怪/道中配置）。\n' +
-    '输出必须是一段严格 YAML，固定骨架如下（没有的内容就省略对应节点，不要硬编造）：\n' +
+    '1) 进行中的任务/副本：名称 + 目标/下一步；副本另记 怪物分布 与已见到的首领阶段机制。\n' +
+    '2) 已通关的任务/副本：名称 + 结果；副本作为“可复刷的固定蓝图”保留其 怪物分布 + 首领机制，同一本再进入时按此呈现一致内容。\n' +
+    '3) 高难挑战（歼殛战 / 零式大型 / 绝境战）：开荒中的记 进度（当前打到哪一阶段/灭团几次）、已破解机制（只写队伍已确认掌握的，按阶段），未破解部分明确标「未知」不填内容；已通关的可当固定蓝图完整记录。\n' +
+    '输出必须是一段严格 YAML，参考骨架如下（没有的内容就省略对应节点）：\n' +
     '进行中:\n' +
     '  任务:\n' +
     '    - 名称: ...\n' +
@@ -1344,30 +1430,37 @@ function buildMemoSystem(maxChars) {
     '  副本:\n' +
     '    - 名称: ...\n' +
     '      怪物分布: ...\n' +
+    '      首领机制: ...\n' +
     '已通关:\n' +
     '  任务:\n' +
     '    - 名称: ...\n' +
     '  副本:\n' +
     '    - 名称: ...\n' +
     '      怪物分布: ...\n' +
+    '      首领机制: ...\n' +
     '高难挑战:\n' +
     '  歼殛战:\n' +
     '    - 名称: ...\n' +
-    '      机制:\n' +
+    '      进度: ...        # 例：初见 / 灭3次 / 已见阶段2\n' +
+    '      已破解:\n' +
     '        阶段1: ...\n' +
-    '        阶段2: ...\n' +
+    '      未破解: 阶段2之后未知\n' +
     '  零式大型:\n' +
     '    - 名称: ...\n' +
-    '      机制:\n' +
+    '      进度: ...\n' +
+    '      已破解:\n' +
     '        阶段1: ...\n' +
+    '      未破解: ...\n' +
     '  绝境战:\n' +
     '    - 名称: ...\n' +
-    '      机制:\n' +
+    '      进度: ...\n' +
+    '      已破解:\n' +
     '        阶段1: ...\n' +
+    '      未破解: ...\n' +
     '规则：\n' +
-    '1) 若给了你「已有摘要」，必须在其基础上合并更新（新信息补充、旧信息保留或替换），不得重写丢弃。\n' +
+    '1) 若给了你「已有记忆」，必须合并更新：同一名称条目保留其既有记录，只补充/推进新信息，不得另起炉灶或改动其已记录的怪物分布/BOSS结构。\n' +
     '2) 机制只记关键词/要点（技能名/机制名/处理方式），越短越好，果断舍弃次要细节。\n' +
-    '3) 总字数严格 ≤ ' + n + ' 字。\n' +
+    '3) 总字数严格 ≤ ' + n + ' 字；优先保留：进行中进度、高难开荒进度、可复刷副本的蓝图。\n' +
     '4) 只输出 YAML 本身，不要任何解释、标题或代码块围栏。';
 }
 
