@@ -1073,6 +1073,23 @@ function applyWorldResult(res){
 }
 
 // ============ boot ============
+function ensureLauncherEarly(){
+  try { if (typeof document !== "undefined" && !getEl("opf-launcher")) launcher(); } catch (e) { opfErr("ensureLauncherEarly", e); }
+}
+var _opfErrNet = false;
+function installErrorNet(){
+  if (_opfErrNet || typeof window === "undefined") return;
+  _opfErrNet = true;
+  try {
+    window.addEventListener("error", function(ev){
+      try { ensureLauncherEarly(); } catch (e) {}
+      var msg = (ev && ev.message) || (ev && ev.error && ev.error.message) || "unknown";
+      opfErr("uncaught:", msg);
+      try { toast("始弦·魔法大典 运行错误：" + String(msg).slice(0, 200), "error"); } catch (e2) {}
+    });
+  } catch (e) { opfErr("installErrorNet", e); }
+}
+
 function boot(){
   try { injectStyle(); } catch (e) { opfErr("boot: injectStyle", e); }
   try { buildPanel(); } catch (e) { opfErr("boot: buildPanel", e); try { toast("始弦的魔法大典 初始化出错：" + (e && e.message ? e.message : e), "error"); } catch (e2) {} }
@@ -1082,12 +1099,13 @@ function boot(){
 function tryBoot(tryCount){
   var ok = false;
   try { ok = typeof SillyTavern !== "undefined" && !!SillyTavern.getContext && !!getCtx(); } catch (e) {}
-  if (ok) { try { boot(); } catch (e) { opfErr("boot error", e); } return; }
+  if (ok) { try { ensureLauncherEarly(); } catch (e) { opfErr("pre-launcher", e); } try { boot(); } catch (e) { opfErr("boot error", e); } return; }
   if ((tryCount || 0) > 60) { opfLog("SillyTavern context not ready after wait"); return; }
   setTimeout(function(){ tryBoot((tryCount || 0) + 1); }, 500);
 }
 
 if (typeof document !== "undefined") {
+  installErrorNet();
   if (document.readyState === "loading") { document.addEventListener("DOMContentLoaded", function(){ tryBoot(0); }); }
   else { tryBoot(0); }
 }
