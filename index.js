@@ -256,12 +256,10 @@ function loadWorldFromFile(file) {
 }
 
 function applyWorldResult(res) {
-  if (!res || !res.entries) { ST.worldSource = 'none'; ST.worldInfo = ''; return; }
-  ST.worldSource = res.sourceName;
-  var s = getSettings();
-  ST.worldInfo = entriesToText(res.entries, { cap: s.capChars, constantOnly: s.worldConstantOnly });
-  if (res.fileName) ST.worldSource += ':' + res.fileName;
-  opfLog('世界书文本长度：', ST.worldInfo.length);
+  if (!res || !res.entries || !res.entries.length) { clearWorldbook(); return; }
+  var r = importWorldEntries(res.entries, res.sourceName || 'file', res.fileName || null);
+  opfLog('世界书载入条目数：', r.total, '默认勾选常驻：', r.selConst);
+  try { openWorldSide(); } catch (e) {}
 }
 
 // ============================================================================
@@ -968,12 +966,6 @@ function clearWorldbook(){
   try { renderWorldSide(); } catch (e) {}
   renderMetaStatus();
   toast("已清空世界书条目");
-}
-function applyWorldResult(res){
-  if (!res || !res.entries || !res.entries.length) { clearWorldbook(); return; }
-  var r = importWorldEntries(res.entries, res.sourceName || "file", res.fileName || null);
-  opfLog("世界书载入条目数：", r.total, "默认勾选常驻：", r.selConst);
-  try { openWorldSide(); } catch (e) {}
 }
 function wpkCounts(){
   var wb = ST.wb || { entries: [] }; var selN = 0;
