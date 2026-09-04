@@ -614,7 +614,7 @@ function keepPanelInView(){
   if (r.left < -20 || r.top < -20 || r.right > vw + 20 || r.bottom > vh + 20) placePanelInView(root);
 }
 
-function buildPanel(){ if (getEl("opf-root")) return; var root = document.createElement("div"); root.id = "opf-root"; root.className = "opf-hidden"; root.style.display = "none"; root.innerHTML = OPF_HTML; document.body.appendChild(root); launcher(); bindPanel(root); renderSteps(); syncFromSettings(); addWorkflowUI(root); if (getSettings().visible) showPanel(); }
+function buildPanel(){ if (getEl("opf-root")) return; var root = document.createElement("div"); root.id = "opf-root"; root.className = "opf-hidden"; root.style.display = "none"; root.innerHTML = OPF_HTML; document.body.appendChild(root); launcher(); bindPanel(root); renderSteps(); syncFromSettings(); addWorkflowUI(root); try { buildWorldSideButton(root); } catch (e) { opfErr("side button", e); } if (getSettings().visible) showPanel(); }
 
 function bindPanel(root){
   root.querySelector("#opf-btn-close").addEventListener("click", hidePanel);
@@ -630,10 +630,10 @@ function bindPanel(root){
   root.querySelector("#opf-ck-meta").addEventListener("change", syncFromControl);
   root.querySelector("#opf-cap").addEventListener("change", syncFromControl);
   root.querySelector("#opf-pname").addEventListener("change", syncFromControl);
-  var fi = document.createElement("input"); fi.type = "file"; fi.accept = ".json,application/json";
+  var fi = document.createElement("input"); fi.type = "file"; fi.accept = ".json,application/json"; ST.fileInput = fi;
   fi.addEventListener("change", function(){ var f = fi.files && fi.files[0]; if (!f) return; loadWorldFromFile(f).then(function(res){ applyWorldResult(res); renderMetaStatus(); toast("世界书已从文件载入：" + (res.fileName || "")); }).catch(function(e){ toast("世界书文件解析失败：" + (e && e.message ? e.message : e), "error"); }); fi.value = ""; });
   root.querySelector("#opf-wload").addEventListener("click", function(){ fi.click(); });
-  root.querySelector("#opf-wclear").addEventListener("click", function(){ ST.worldSource = "none"; ST.worldInfo = ""; renderMetaStatus(); toast("已清空世界书上下文"); });
+  root.querySelector("#opf-wclear").addEventListener("click", function(){ clearWorldbook(); });
   makeDraggable(root.querySelector("#opf-head"), root);
   window.addEventListener("resize", keepPanelInView);
 }
@@ -919,6 +919,133 @@ function addWorkflowUI(root){
   if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(sec, anchor.nextSibling);
   go.addEventListener("click", function(){ runFrom("final"); });
   dirsReset();
+}
+
+// ============ 世界书左缘侧栏（懒加载独立浮层，不碰主窗口布局） ============
+var LSIDE_CSS = "#opf-lside{position:fixed;left:0;top:70px;bottom:70px;width:min(320px,82vw);z-index:2147480003;display:flex;flex-direction:column;min-height:0;background:linear-gradient(180deg,rgba(24,4,10,.96),rgba(12,2,6,.97));border:1px solid rgba(255,122,138,.3);border-left:none;border-radius:0 12px 12px 0;box-shadow:6px 0 22px rgba(0,0,0,.4),0 0 18px rgba(255,77,94,.18);transform:translateX(-110%);transition:transform .18s ease;overflow:hidden}#opf-lside.open{transform:translateX(0)}#opf-lside-head{display:flex;align-items:center;gap:6px;padding:8px 10px;font-size:12px;font-weight:600;color:#ffd9de;border-bottom:1px solid rgba(255,122,138,.2);flex:none}#opf-lside-head .t{flex:1}.opf-lside-ico{border:none;background:transparent;color:#ff8a95;cursor:pointer;font-size:12px;padding:2px 6px;border-radius:6px}.opf-lside-ico:hover{background:rgba(255,77,94,.16);color:#fff}#opf-lside-tools{display:flex;gap:4px;padding:6px 8px 2px;flex-wrap:wrap;flex:none}#opf-lside-count{font-size:10px;color:rgba(255,200,208,.7);padding:2px 8px;width:100%}#opf-lside-filter{margin:2px 8px 4px;border-radius:7px;padding:4px 7px;font-size:11px;color:#ffeef1;background:rgba(10,2,5,.55);border:1px solid rgba(255,122,138,.25);outline:none}#opf-lside-list{flex:1 1 auto;overflow-y:auto;padding:2px 6px 8px;min-height:0}.opf-lside-hint{font-size:10.5px;color:rgba(255,200,208,.6);line-height:1.5;padding:10px 12px;white-space:pre-wrap}.opf-wi-row{display:flex;gap:6px;align-items:flex-start;padding:3px 4px;border-radius:6px;cursor:pointer;font-size:10.5px;color:rgba(255,226,230,.88)}.opf-wi-row:hover{background:rgba(255,235,238,.06)}.opf-wi-row input{margin-top:2px;accent-color:#ff4d5e;cursor:pointer}.opf-wi-row .tx{flex:1 1 auto;min-width:0;word-break:break-word;line-height:1.35}.opf-wi-row .ln{flex:none;color:rgba(255,200,208,.42);font-size:9.5px}.opf-wi-row .cst{flex:none;color:#8fd6ff;font-size:9px;padding:0 4px;border:1px solid rgba(120,190,255,.35);border-radius:8px}";
+function wpkNorm(rawList){
+  var out = []; if (!Array.isArray(rawList)) return out;
+  for (var i = 0; i < rawList.length; i++) {
+    var e = rawList[i];
+    if (!e || typeof e.content !== "string" || !e.content.trim()) continue;
+    var keyStr = Array.isArray(e.key) ? e.key.join(" / ") : (typeof e.key === "string" ? e.key : "");
+    out.push({ id: (e.uid != null ? "u" + e.uid : "i" + i), comment: (e.comment || ""), key: keyStr, content: e.content, constant: !!e.constant, sel: false });
+  }
+  return out;
+}
+function importWorldEntries(rawEntries, sourceName, fileName){
+  rawEntries = Array.isArray(rawEntries) ? rawEntries : [];
+  ST.wb = { entries: wpkNorm(rawEntries), source: sourceName || "file", fileName: fileName || null };
+  ST.worldSource = (sourceName || "file") + (fileName ? ":" + fileName : "");
+  var c = 0;
+  ST.wb.entries.forEach(function (e){ if (e.constant) c++; e.sel = !!e.constant; });
+  updateSendText();
+  try { renderWorldSide(); } catch (e) { opfErr("renderWorldSide", e); }
+  renderMetaStatus();
+  return { total: ST.wb.entries.length, selConst: c };
+}
+function updateSendText(){
+  var s = getSettings();
+  var wb = ST.wb || { entries: [] };
+  if (!s.includeWorld || !wb.entries || !wb.entries.length) { ST.worldInfo = ""; return; }
+  var nl2 = String.fromCharCode(10) + String.fromCharCode(10);
+  var parts = []; var total = 0; var cap = s.capChars || 30000;
+  for (var i = 0; i < wb.entries.length; i++) {
+    var e = wb.entries[i];
+    if (!e.sel) continue;
+    if (s.worldConstantOnly && !e.constant) continue;
+    var head = e.comment || e.key || "";
+    var line = (head ? "【" + String(head).slice(0, 60) + "】" : "") + e.content;
+    if (total + line.length > cap) { parts.push("……(超过" + cap + "字注入上限，其余未发送)"); break; }
+    parts.push(line); total += line.length;
+  }
+  ST.worldInfo = parts.join(nl2);
+}
+function clearWorldbook(){
+  ST.wb = { entries: [], source: "none", fileName: null };
+  ST.worldSource = "none";
+  ST.worldInfo = "";
+  try { renderWorldSide(); } catch (e) {}
+  renderMetaStatus();
+  toast("已清空世界书条目");
+}
+function applyWorldResult(res){
+  if (!res || !res.entries || !res.entries.length) { clearWorldbook(); return; }
+  var r = importWorldEntries(res.entries, res.sourceName || "file", res.fileName || null);
+  opfLog("世界书载入条目数：", r.total, "默认勾选常驻：", r.selConst);
+  try { openWorldSide(); } catch (e) {}
+}
+function wpkCounts(){
+  var wb = ST.wb || { entries: [] }; var selN = 0;
+  for (var i = 0; i < wb.entries.length; i++) if (wb.entries[i].sel) selN++;
+  return { selN: selN, total: wb.entries.length, chars: (ST.worldInfo || "").length };
+}
+function renderWorldSide(){
+  var listEl = getEl("opf-lside-list"); if (!listEl) return;
+  var cntEl = getEl("opf-lside-count");
+  var c = wpkCounts();
+  if (cntEl) cntEl.textContent = "已勾选 " + c.selN + "/" + c.total + " 条 · 约 " + c.chars + " 字会发送给 AI";
+  listEl.textContent = "";
+  var wb = ST.wb || { entries: [] };
+  if (!wb.entries || !wb.entries.length) {
+    var d = document.createElement("div"); d.className = "opf-lside-hint";
+    d.textContent = "尚未载入世界书。\n\n点“导入文件”选择世界书 JSON（如 命定之诗与黄昏之歌v4.3 (3).json）；或在“生成初稿”时自动探测酒馆激活世界书。\n载入后此处列出全部条目，勾选的才会发送给 AI（默认只勾选常驻）。";
+    var bt = document.createElement("button"); bt.type = "button"; bt.className = "opf-step-act"; bt.textContent = "导入世界书文件";
+    bt.addEventListener("click", function(){ if (ST.fileInput) ST.fileInput.click(); else { var wb2 = getEl("opf-wload"); if (wb2) wb2.click(); } });
+    d.appendChild(bt);
+    listEl.appendChild(d);
+    return;
+  }
+  var f = (getEl("opf-lside-filter") && getEl("opf-lside-filter").value || "").toLowerCase();
+  var shown = 0;
+  wb.entries.forEach(function (e) {
+    if (f && (e.comment + " " + e.key + " " + e.content).toLowerCase().indexOf(f) < 0) return;
+    shown++;
+    var lab = document.createElement("label"); lab.className = "opf-wi-row";
+    var cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!e.sel;
+    cb.addEventListener("change", function(){ e.sel = !!cb.checked; updateSendText(); renderWorldSide(); renderMetaStatus(); });
+    lab.appendChild(cb);
+    var tx = document.createElement("span"); tx.className = "tx";
+    tx.textContent = e.comment || e.key || e.content.slice(0, 24);
+    tx.title = (e.comment ? e.comment + "\n" : "") + (e.key ? e.key + "\n" : "") + e.content.slice(0, 300);
+    lab.appendChild(tx);
+    var ln = document.createElement("span"); ln.className = "ln"; ln.textContent = e.content.length;
+    lab.appendChild(ln);
+    if (e.constant) { var cst = document.createElement("span"); cst.className = "cst"; cst.textContent = "常驻"; lab.appendChild(cst); }
+    listEl.appendChild(lab);
+  });
+  if (!shown) { var nd = document.createElement("div"); nd.className = "opf-lside-hint"; nd.textContent = "没有匹配的条目。"; listEl.appendChild(nd); }
+}
+function wpkSetAll(v){ var wb = ST.wb; if (!wb) return; wb.entries.forEach(function (e){ e.sel = v; }); updateSendText(); renderWorldSide(); renderMetaStatus(); }
+function wpkSetConst(){ var wb = ST.wb; if (!wb) return; wb.entries.forEach(function (e){ e.sel = !!e.constant; }); updateSendText(); renderWorldSide(); renderMetaStatus(); }
+function buildWorldSide(){
+  if (getEl("opf-lside")) return;
+  var st = document.createElement("style"); st.id = NS + "_css_lside"; st.textContent = LSIDE_CSS; document.head.appendChild(st);
+  var side = document.createElement("div"); side.id = "opf-lside";
+  var head = document.createElement("div"); head.id = "opf-lside-head";
+  var t = document.createElement("span"); t.className = "t"; t.textContent = "世界书条目 · 勾选发送";
+  var hx = document.createElement("button"); hx.type = "button"; hx.className = "opf-lside-ico"; hx.textContent = "✕"; hx.addEventListener("click", closeWorldSide);
+  head.appendChild(t); head.appendChild(hx); side.appendChild(head);
+  var tools = document.createElement("div"); tools.id = "opf-lside-tools";
+  var bAll = document.createElement("button"); bAll.type = "button"; bAll.className = "opf-step-act"; bAll.textContent = "全选"; bAll.addEventListener("click", function(){ wpkSetAll(true); });
+  var bConst = document.createElement("button"); bConst.type = "button"; bConst.className = "opf-step-act"; bConst.textContent = "仅常驻"; bConst.addEventListener("click", wpkSetConst);
+  var bNone = document.createElement("button"); bNone.type = "button"; bNone.className = "opf-step-act"; bNone.textContent = "清空勾选"; bNone.addEventListener("click", function(){ wpkSetAll(false); });
+  var filt = document.createElement("input"); filt.type = "text"; filt.id = "opf-lside-filter"; filt.placeholder = "筛选条目…"; filt.addEventListener("input", function(){ renderWorldSide(); });
+  tools.appendChild(bAll); tools.appendChild(bConst); tools.appendChild(bNone); tools.appendChild(filt); side.appendChild(tools);
+  var cnt = document.createElement("div"); cnt.id = "opf-lside-count"; side.appendChild(cnt);
+  var list = document.createElement("div"); list.id = "opf-lside-list"; side.appendChild(list);
+  document.body.appendChild(side);
+  renderWorldSide();
+}
+function openWorldSide(){ try { buildWorldSide(); } catch (e) { opfErr("buildWorldSide", e); return; } var s = getEl("opf-lside"); if (s) s.classList.add("open"); }
+function closeWorldSide(){ var s = getEl("opf-lside"); if (s) s.classList.remove("open"); }
+function toggleWorldSide(){ var s = getEl("opf-lside"); if (!s) { openWorldSide(); return; } if (s.classList.contains("open")) closeWorldSide(); else openWorldSide(); }
+function buildWorldSideButton(root){
+  if (!root || getEl("opf-wbtn")) return;
+  var btn = document.createElement("button"); btn.type = "button"; btn.className = "opf-step-act"; btn.id = "opf-wbtn"; btn.textContent = "世界书清单"; btn.title = "展开世界书条目侧栏（勾选哪些发送给 AI）";
+  btn.addEventListener("click", toggleWorldSide);
+  var opts = root.querySelectorAll(".opf-opts");
+  if (opts && opts.length) { opts[opts.length - 1].appendChild(btn); } else { root.appendChild(btn); }
 }
 
 // ============ boot ============
