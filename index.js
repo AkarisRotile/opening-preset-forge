@@ -942,17 +942,26 @@ function dlcKind(c){
   return "DLC内容";
 }
 function wpkCategory(e){
-  var c = (e.comment || "") + " " + (e.key || "");
-  if (c.indexOf("[DLC]") >= 0) return dlcKind(c);
-  if (c.indexOf("命定系统") >= 0 || c.indexOf("命运抽卡") >= 0) return "命定系统";
-  var ruleWords = ["[InitVar]","[mvu_update]","变量更新","[世界主设定]","[世界规则]","[角色生成]","[角色辅助指导]","美化规则","审美叙事","正文cot","[战斗协议]","[生产制作协议]","生命层级","世界初始设定","专用预设","禁止"];
-  for (var i = 0; i < ruleWords.length; i++) { if (c.indexOf(ruleWords[i]) >= 0) return "规则·系统"; }
-  if (c.indexOf("种族") >= 0) return "种族";
-  if (c.indexOf("角色") >= 0) return "角色";
-  var heads = ["诺斯加德联盟","精灵王庭","边陲之国","兽族联盟","索伦蒂斯","梵尼亚","瓦伦蒂亚","龙誓骑团","无尽树海","奥古斯提姆帝国","翼民圣国","潮汐王座"];
-  for (var j = 0; j < heads.length; j++) { if (c.indexOf(heads[j]) >= 0) return "地区·地理"; }
-  var geoWords = ["城镇","地块","城区","地区","地图","王国","联盟","王庭","领地","港口","森林","山脉","湖泊","海岸","边境","帝国","圣国","王座","上层区","下城区"];
-  for (var k2 = 0; k2 < geoWords.length; k2++) { if (c.indexOf(geoWords[k2]) >= 0) return "地区·地理"; }
+  var cm = (e.comment || "");
+  var s = cm + " " + (Array.isArray(e.key) ? e.key.join(" / ") : (typeof e.key === "string" ? e.key : ""));
+  if (s.indexOf("[DLC]") >= 0) return dlcKind(s);
+  if (s.indexOf("命定系统") >= 0 || s.indexOf("命运抽卡") >= 0) return "命定系统";
+  var preRule = ["[世界规则]","[世界主设定]","[角色生成]","[角色辅助指导]","[InitVar]","[mvu_update]","美化规则","审美叙事","正文cot","专用预设","禁止","[战斗协议]","[生产制作协议]","生命层级"];
+  for (var p = 0; p < preRule.length; p++) { if (s.indexOf(preRule[p]) >= 0) return "规则·系统"; }
+  if (cm.indexOf("➡️") === 0 || cm.indexOf("概览") >= 0) return "导览开关";
+  if (s.indexOf("种族") >= 0) return "种族";
+  if (s.indexOf("角色") >= 0) return "角色";
+  if (cm.indexOf("节庆") >= 0 || cm.toLowerCase().indexOf("festival") >= 0) return "节庆";
+  var heads = ["诺斯加德联盟","精灵王庭","边陲之国","兽族联盟","索伦蒂斯","梵尼亚","瓦伦蒂亚","龙誓骑团","无尽树海","奥古斯提姆帝国","翼民圣国","潮汐王座","伯伦斯法环","永夜盟约","赛瑞利亚","萨赫拉联邦","碎星群岛","悲鸣沼泽","苍棘之塔","末世星","灾厄之翼","艾琉德雷姆","永冻冰原","克摩什","骸响之都","落星之岛","雾晶港"];
+  for (var h = 0; h < heads.length; h++) { if (cm.indexOf(heads[h]) >= 0) return "地区·地理"; }
+  var geoW = ["冒险区域","大陆","群岛","沼泽","冰原","自治区","地理","地图","城镇","地块","城区","地区","王国","王庭","领地","港口","森林","山脉","湖泊","海岸","边境","帝国","圣国","王座","上层区","下城区","长途移动","云海","空岛","城池","都市","首都"];
+  for (var g = 0; g < geoW.length; g++) { if (s.indexOf(geoW[g]) >= 0) return "地区·地理"; }
+  var orgW = ["公会","协会","商会","教会","骑士团","佣兵团","行会","捕奴队","组织","势力","阴影","信徒","教团","邪教","异神","氏族"];
+  for (var o = 0; o < orgW.length; o++) { if (s.indexOf(orgW[o]) >= 0) return "组织·势力"; }
+  var ruleW = ["炼金","药剂","复活","状态","经验","好感","登神","随机池","智慧生物","数值表","品质效果","variables","output_format","COT","机制","任务","委托","妓女","娼","暗杀","绑架","买凶","人贩","战斗生产","生成规则"];
+  for (var r = 0; r < ruleW.length; r++) { if (s.indexOf(ruleW[r]) >= 0) return "规则·系统"; }
+  var ecoW = ["信贷","借贷","贸易","经济","价格","市场","拍卖","租金","工坊","材料","魔宠","魔导","情报交易","奢侈品","珠宝","服装","锻造与装备","技能书和技能课程","产业链","兑换","奴隶","黑市","灰色产业","娼馆","妓院","异界信徒"];
+  for (var q = 0; q < ecoW.length; q++) { if (s.indexOf(ecoW[q]) >= 0) return "经济·产业"; }
   return "其他";
 }
 function wpkNorm(rawList, idPrefix){
@@ -1037,11 +1046,11 @@ function renderWorldSide(){
     return;
   }
   if (!ST.catOpen) ST.catOpen = {};
-  var defTrue = ["命定系统","规则·系统","种族","角色"];
-  ["命定系统","规则·系统","地区·地理","种族","角色","DLC扩展","DLC事件","DLC内容","其他"].forEach(function (kk){ if (!Object.prototype.hasOwnProperty.call(ST.catOpen, kk)) { ST.catOpen[kk] = defTrue.indexOf(kk) >= 0; } });
+  var defTrue = ["命定系统","规则·系统","导览开关","种族","角色"];
+  ["命定系统","规则·系统","导览开关","地区·地理","种族","角色","组织·势力","经济·产业","节庆","DLC扩展","DLC事件","DLC内容","其他"].forEach(function (kk){ if (!Object.prototype.hasOwnProperty.call(ST.catOpen, kk)) { ST.catOpen[kk] = defTrue.indexOf(kk) >= 0; } });
   var f = (getEl("opf-lside-filter") && getEl("opf-lside-filter").value || "").toLowerCase();
   var catSel = getEl("opf-lside-cat") && getEl("opf-lside-cat").value || "全部";
-  var catOrder = ["命定系统","规则·系统","地区·地理","种族","角色","DLC扩展","DLC事件","DLC内容","其他"];
+  var catOrder = ["命定系统","规则·系统","导览开关","地区·地理","种族","角色","组织·势力","经济·产业","节庆","DLC扩展","DLC事件","DLC内容","其他"];
   var rowsByCat = {};
   wb.entries.forEach(function (e) {
     if (f && (e.comment + " " + e.key + " " + e.content).toLowerCase().indexOf(f) < 0) return;
@@ -1103,7 +1112,7 @@ function buildWorldSide(){
   var bNone = document.createElement("button"); bNone.type = "button"; bNone.className = "opf-step-act"; bNone.textContent = "清空勾选"; bNone.addEventListener("click", function(){ wpkSetAll(false); });
   var filt = document.createElement("input"); filt.type = "text"; filt.id = "opf-lside-filter"; filt.placeholder = "筛选条目…"; filt.addEventListener("input", function(){ renderWorldSide(); });
   var catSel = document.createElement("select"); catSel.id = "opf-lside-cat";
-  ["全部","命定系统","规则·系统","地区·地理","种族","角色","DLC扩展","DLC事件","DLC内容","其他"].forEach(function (v){ var o = document.createElement("option"); o.value = v; o.textContent = v; catSel.appendChild(o); });
+  ["全部","命定系统","规则·系统","导览开关","地区·地理","种族","角色","组织·势力","经济·产业","节庆","DLC扩展","DLC事件","DLC内容","其他"].forEach(function (v){ var o = document.createElement("option"); o.value = v; o.textContent = v; catSel.appendChild(o); });
   catSel.addEventListener("change", function(){ renderWorldSide(); });
   tools.appendChild(bAll); tools.appendChild(bConst); tools.appendChild(bNone); tools.appendChild(filt); tools.appendChild(catSel); side.appendChild(tools);
   var cnt = document.createElement("div"); cnt.id = "opf-lside-count"; side.appendChild(cnt);
