@@ -1,8 +1,8 @@
 {
-  "display_name": "命定·开局预设工坊",
+  "display_name": "始弦的魔法大典",
   "loading_order": 50,
   "js": "index.js",
   "author": "you",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "homePage": ""
 }

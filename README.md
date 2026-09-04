@@ -1,4 +1,4 @@
-# 命定·开局预设工坊（destiny preset forge）
+# 始弦的魔法大典（destiny preset forge）
 
 SillyTavern / 酒馆助手(Tavern Helper) 悬浮窗插件 · v1.0
 为「始弦的魔法大典 + 命定之诗与黄昏之歌」一类角色卡提供**开局预设一键流水线**：
@@ -34,7 +34,7 @@ SillyTavern 网页端的 Extensions ▸ ⬇ Install extension 支持把整个扩
 3. 同目录新建 `manifest.json`：
    ```json
    {
-     "display_name": "命定·开局预设工坊",
+     "display_name": "始弦的魔法大典",
      "js": "index.js",
      "author": "you",
      "version": "1.0.0",
