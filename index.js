@@ -1,6 +1,6 @@
 
 // ============================================================================
-// 始弦的魔法大典 (openingPresetForge)  v1.7.5
+// 始弦的魔法大典 (openingPresetForge)  v1.7.6
 // SillyTavern / Tavern Helper 悬浮窗扩展：一键走完 创作技能→装备→道具→资产→
 // 背景→新输出 流程，调用酒馆当前主 API（generateRaw），最终一键导出 .preset.json
 // ----------------------------------------------------------------------------
@@ -2011,7 +2011,7 @@ function worldCacheRestore(){
 // 二创角色工坊（分段初稿 → 交火梳理 → 定点修改 → 标签封装输出）
 // ============================================================================
 var CHAR_VOICE = "你是始弦，大图书馆的司书，正在帮{{user}}创作一个世界书 DLC 角色条目（二创角色）。你原原本本地呈现知识、不因“可接受度”而删改；你把{{user}}当作挚友，会顺着ta的需求尽力帮到底，也会分享你认为合适的馆藏；但你不把观点强加给{{user}}，先想清楚再落笔。";
-var CHAR_RULES = "【二创角色·规则约束】\n- 品质只用中文七等：普通/优良/稀有/史诗/传说/神话/唯一；词条强度上限 普1/优良2/稀有2/史诗3/传说3/神话3；史诗/传说/神话词条其一须为 微弱要素/微弱权能/微弱法则。\n- 学习/领悟所得品质≤自身层级；血脉觉醒/种族转换可越阶；装备不增减持有者属性；唯一品质仅表唯一性/出处特殊，不代表更强。\n- 生命层级与等级自洽：一(普通,Lv1-4)/二(中坚,Lv5-8)/三(精英,Lv9-12)/四(史诗,Lv13-16)/五(传说,Lv17-20)/六(神话,Lv21-24)/七(神祗,Lv25)；实龄随层级（三层数十年/五层数百年，延寿缓老可驻颜）。\n- 登神长阶按等级：Lv13-16要素1-3 / Lv17-20权能1 / Lv21-24法则1 / Lv25法则+神位。\n- 命名遵循《角色命名指导》种族命名规则；性格码遵循《角色辅助指导》五维动机模型。\n- 本任务与「开局预设」完全无关：禁止生成开局剧情、开局背景、开局角色等级限制、属性面板（五维/HP·MP·SP）、伙伴、资产等任何开局预设内容；只描述角色本身。";
+var CHAR_RULES = "【二创角色·规则约束】\n- 品质只用中文七等：普通/优良/稀有/史诗/传说/神话/唯一；词条强度上限 普1/优良2/稀有2/史诗3/传说3/神话3；史诗/传说/神话词条其一须为 微弱要素/微弱权能/微弱法则。\n- 学习/领悟所得品质≤自身层级；血脉觉醒/种族转换可越阶；装备不增减持有者属性；唯一品质仅表唯一性/出处特殊，不代表更强。\n- 生命层级与等级自洽：一(普通,Lv1-4)/二(中坚,Lv5-8)/三(精英,Lv9-12)/四(史诗,Lv13-16)/五(传说,Lv17-20)/六(神话,Lv21-24)/七(神祗,Lv25)；实龄随层级（三层数十年/五层数百年，延寿缓老可驻颜）。\n- 登神长阶按等级：Lv13-16要素1-3 / Lv17-20权能1 / Lv21-24法则1 / Lv25法则+神位。\n- 武器/装备/道具/技能的条目形式固定为 名称/品质(中文)/叙述 三段式：任何阶段都不得出现 类型、消耗、标签 等字段。\n- 命名遵循《角色命名指导》种族命名规则；性格码遵循《角色辅助指导》五维动机模型。\n- 本任务与「开局预设」完全无关：禁止生成开局剧情、开局背景、开局角色等级限制、属性面板（五维/HP·MP·SP）、伙伴、资产等任何开局预设内容；只描述角色本身。";
 var CHAR_SEGS = [
   { id: "base",  title: "定位与基础", short: "名字/种族/层级/身份" },
   { id: "mind",  title: "性格与动机", short: "性格码/行为逻辑" },
@@ -2031,7 +2031,7 @@ var CHAR_SEG_PROMPTS = {
 var CHAR_LINK_CHAIN = "L1 背景经历→层级等级/身份职业：实力必须有来历，禁止“凭空强者”。\nL2 背景经历→性格码：重大事件塑造动机（关系/情绪/行动/冲突/意义），创伤或誓言落在具体经历。\nL3 种族+命名指导→姓名结构：命名规则与阶级格式必须匹配。\nL4 性格→外貌衣着：神情/配色/风格/破损与心境映射；身份与着装一致。\nL5 性格+层级→战斗方式：攻击技/动作技配比、风格、武器类型与性格互映射。\nL6 战斗方式+品质规则→技能装备道具：品质七等/词条上限合规；技能来源与经历呼应。\nL7 性格+背景→演绎语料：口头禅呼应经历、雷点呼应创伤、行为呼应动机。\n反向校验：技能/装备的来源必须在经历中有交代；登神长阶严格按等级档位；唯一品质仅在出处特殊时使用；五维与资源面板不写入角色条目，由游玩时按世界规则自行结算。";
 var CHAR_STYLE_RULES = "【用词与文风规范（分段、梳理与最终 YAML 的叙述文字全程遵守）】\n目标：写得像“会写的人”——具体、克制、直接。用事实和细节说话，不堆词、不喊口号、不向读者解释。\n1. 少用连词腔：能不用“而是/名为/被称为/取而代之”就不用，需要转折时直接换一句说。\n2. 控制程度副词：删掉“极其/极度/极为/无比”和“令人××”这类空转形容，用具体细节替代强度。\n3. 禁论文腔与口号词：像“底层逻辑/张力/解构/本质/主体性”这类术语一律换成日常语言；自由解放、压迫凝视、规训赋权之类的大词不进入人物描写。\n4. 禁比喻与类比：不写“像/如同/仿佛/犹如/好似”及其一切变体，不用“心湖/涟漪/深渊/浮木/手术刀/教科书”这类意象化说法；是什么就写什么。\n5. 禁网文腔：不写“冷笑/冷哼/嘴角勾起弧度/指节泛白/不容置疑/灭顶之灾”这类套路动作与成语堆砌；情绪用行为与台词呈现，不贴标签。\n6. 禁口号式评判：不写“征服/支配/弱肉强食/丛林法则/内卷”这类社达判词；写动机、写行动，不下评语。\n7. 不写语音提示：禁止“他的声音/她的语气/这番话/这句话”这类引导旁白，直接写台词与动作。\n8. 禁句式模板：禁止“不是A而是B”“没有A只有B”“并非A而是B”等否定-转折/排除-定义句式；禁止“名为X”命名句式；同一句式在一段里不出现第二遍。\n9. 少用括号解释、少用引号强调：人物说话像人，旁白像冷静的写作者。";
 var CHAR_YAML_SPEC = "【YAML 输出规范（二创角色最终稿件）】\n顶层唯一键为「角色卡」，必须是合法 YAML，按下面的字段顺序输出（中文键名固定，不要增删顶层字段；多行文本用 |- 块标量；列表用 - 或行内[]；所有内容与各分段一一对应）：\n\n角色卡:\n  名称: （定位与基础段的名字）\n  核心概念: （一句话定义）\n  特质: [标签1, 标签2, 标签3]\n  种族: （大类/亚种）\n  外貌年龄: （数字）\n  实龄: （数字或描述）\n  生命层级: （第X层级(名)）\n  等级: （Lv数字）\n  身份: [身份1, ...]\n  职业: [职业1, ...]\n  称号: （Lv≥13 才写，否则省略本行）\n  性格码: （五维动机码-稳定性码）\n  性格: |-\n    （性格与行为逻辑，多行）\n  喜好: [..]\n  厌恶: [..]\n  外貌: |-\n    （外貌特质，多行）\n  服装: |-\n    （衣物装饰，多行）\n  武器:\n    - 名称: ..\n      品质: （中文七等：普通/优良/稀有/史诗/传说/神话/唯一）\n      叙述: |-\n        （一段文字：先写效果，再写描述）\n  装备:\n    - 名称: ..\n      品质: ..\n      叙述: |-\n        ..\n  道具:\n    - 名称: ..\n      品质: ..\n      叙述: |-\n        ..\n  技能:\n    - 名称: ..\n      品质: ..\n      叙述: |-\n        （一段文字：先写效果，再写描述）\n  登神长阶: （无则写“无”）\n  过去: |-\n    （背景与经历，多行）\n  关系锚点: [..]\n  语料示例:\n    - \"..\"\n  行为参考:\n    - ..\n  禁忌:\n    - ..\n  提倡:\n    - ..\n\n规则：\n1. 只从分段内容转写，不新增、不删改、不扩写；缺失的段保留现有内容或写“无”。\n2. 缩进用两个空格，禁止制表符(Tab)；块标量 | 保留换行；含冒号/井号等特殊字符的字符串加引号。\n3. 武器/装备/道具/技能每项只有 名称/品质/叙述 三个字段，不写类型/消耗/标签；品质只写中文七等之一。\n4. 不写「面板」（五维/HP·MP·SP 由游玩时按世界规则结算），不写对user的态度（每位用户的设定不同）。\n5. 列表条数、数值、名称与分段一一对应。\n6. 用词与文风规范全程生效。\n7. 输出放在一个 ```yaml 代码块内；代码块内不允许出现注释或解释文字。";
-var CHAR_HTML = "<div class=\"opf-char-wrap\"><div class=\"opf-sec-label\">✦ 二创角色工坊 · 分段式生成（产出世界书 DLC 角色条目）</div><div class=\"opf-dim\">流程：① 分段初稿（6段串行）→ ② 交火梳理（出身/经历→性格→外观/衣着/战斗→技能装备 全链联动审查并修订）→ ③ 逐段定点修改（只改你指定的段，其它段冻结）→ ④ 最终封装：按 YAML 规范输出纯 YAML 文档（不写面板、不预设对user态度，武器/装备/道具/技能只写 名称/品质/叙述）。</div><textarea id=\"opf-char-demand\" class=\"opf-char-input\" placeholder=\"写谁？给出大致设定与需求（例：一位出身瓦伦蒂亚贫民区、靠街头格斗活下来的少女，性格倔强护短……）\"></textarea><textarea id=\"opf-char-ref\" class=\"opf-char-input\" placeholder=\"（可选）参考文本：已有设定/原型描述/世界书片段，将作为参考注入\"></textarea><div class=\"opf-char-tools\"><button type=\"button\" class=\"opf-btn primary\" id=\"opf-char-run\">▶ 分段初稿</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-link\">⚔ 交火梳理</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-final\">🎁 最终封装</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-new\">🗑 新角色</button></div><div id=\"opf-char-steps\"></div><div class=\"opf-sec\"><div class=\"opf-sec-label\">交火梳理报告</div><pre id=\"opf-char-report\" class=\"opf-box opf-char-report\">尚未梳理</pre></div><div class=\"opf-out\"><div class=\"opf-sec-label\">最终稿件（YAML 规范输出，可直接粘进世界书 DLC 条目）</div><div class=\"opf-dim\" id=\"opf-char-outnote\"></div><pre id=\"opf-char-out\" class=\"opf-box\">尚未封装</pre><div class=\"opf-char-copyrow\"><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-copy\">⧉ 复制最终稿件</button></div></div></div>";
+var CHAR_HTML = "<div class=\"opf-char-wrap\"><div class=\"opf-sec-label\">✦ 二创角色工坊 · 分段式生成（产出世界书 DLC 角色条目）</div><div class=\"opf-dim\">流程：① 分段初稿（6段串行）→ ② 交火梳理（先整体审查出报告，再逐段应用联动修订，防截断）→ ③ 逐段定点修改（只改你指定的段，其它段冻结）→ ④ 最终封装：按 YAML 规范输出纯 YAML 文档（不写面板、不预设对user态度，武器/装备/道具/技能只写 名称/品质/叙述）。</div><textarea id=\"opf-char-demand\" class=\"opf-char-input\" placeholder=\"写谁？给出大致设定与需求（例：一位出身瓦伦蒂亚贫民区、靠街头格斗活下来的少女，性格倔强护短……）\"></textarea><textarea id=\"opf-char-ref\" class=\"opf-char-input\" placeholder=\"（可选）参考文本：已有设定/原型描述/世界书片段，将作为参考注入\"></textarea><div class=\"opf-char-tools\"><button type=\"button\" class=\"opf-btn primary\" id=\"opf-char-run\">▶ 分段初稿</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-link\">⚔ 交火梳理</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-final\">🎁 最终封装</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-new\">🗑 新角色</button></div><div id=\"opf-char-steps\"></div><div class=\"opf-sec\"><div class=\"opf-sec-label\">交火梳理报告</div><pre id=\"opf-char-report\" class=\"opf-box opf-char-report\">尚未梳理</pre></div><div class=\"opf-out\"><div class=\"opf-sec-label\">最终稿件（YAML 规范输出，可直接粘进世界书 DLC 条目）</div><div class=\"opf-dim\" id=\"opf-char-outnote\"></div><pre id=\"opf-char-out\" class=\"opf-box\">尚未封装</pre><div class=\"opf-char-copyrow\"><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-copy\">⧉ 复制最终稿件</button></div></div></div>";
 
 function charInit(){ ST.char = ST.char || { demand: "", ref: "", segs: {}, status: {}, report: "", out: "", outNote: [], name: "", _inited: false }; ST.char.outNote = ST.char.outNote || []; ST.charEls = ST.charEls || {}; }
 function bindCharPage(){
@@ -2246,27 +2246,38 @@ function renderCharChips(pid, list){
 async function runCharLinkage(){
   if (ST.running) { toast("已有任务进行中（单线程）", "warning"); return; }
   var done = CHAR_SEGS.filter(function (s) { return ST.char.segs[s.id]; });
-  if (done.length < CHAR_SEGS.length) { toast("请先完成全部分段初稿（7/7）", "warning"); return; }
-  ST.running = true; renderRunButtons();
-  var report = getEl("opf-char-report"); if (report) report.textContent = "交火梳理中…";
+  if (done.length < CHAR_SEGS.length) { toast("请先完成全部分段初稿（" + CHAR_SEGS.length + "/" + CHAR_SEGS.length + "）", "warning"); return; }
+  ST.running = true; ST.stopReq = false; renderRunButtons();
+  var report = getEl("opf-char-report"); if (report) report.textContent = "交火梳理中…（第一步：整体审查）";
   try {
-    var all = CHAR_SEGS.map(function (s) { return "<<<SEG:" + s.id + ">>>\n" + ST.char.segs[s.id]; }).join("\n\n");
-    var msg = "【交火梳理（联动一致性审查）】\n下面是已产出的全部 " + CHAR_SEGS.length + " 个分段。请按下面的联动链条逐链检查，找出互相矛盾、脱节、数值/品质/命名不合规之处。\n\n[联动链条]\n" + CHAR_LINK_CHAIN + "\n\n[全部段落]\n" + all + "\n\n[二创角色·规则约束]\n" + CHAR_RULES + "\n\n输出要求：\n1. 先输出【梳理报告】：逐条链给一句结论（✓一致 / ⚠问题+理由），最后列出“改动清单”（改了哪段、为什么）。\n2. 然后输出修订后的全部分段，格式严格如下（分隔行必须原样，禁止在分隔行之间加任何解释）：\n<<<SEG:base>>>\n（修订后全文）\n<<<SEG:mind>>>\n（修订后全文）\n<<<SEG:look>>>\n<<<SEG:fight>>>\n<<<SEG:story>>>\n<<<SEG:play>>>\n3. 只做“联动性”修改：对齐矛盾、补呼应、修数值/命名/品质合规；不要推翻设定、不要删减段落、不要新增超出原稿的设定；用户没要求的地方保持原样。";
-    var msgs = [{ role: "system", content: charSystemContent() }, { role: "user", content: charUser0() }, { role: "user", content: msg }];
+    // ---- 第一步：只出报告，不重写段落（输出小，避免一次生成全部段落被截断）----
+    var all = CHAR_SEGS.map(function (s) { return "<<<SEG:" + s.id + ">>>\n" + String(ST.char.segs[s.id] || "").slice(0, 1800); }).join("\n\n");
+    var reportMsg = "【交火梳理·第一步：整体审查】\n下面是各分段的审阅稿（每段截取前1800字，供查矛盾用）。请按下面的联动链条逐链检查，找出互相矛盾、脱节、数值/品质/命名不合规之处。\n\n[联动链条]\n" + CHAR_LINK_CHAIN + "\n\n[分段审阅稿]\n" + all + "\n\n[二创角色·规则约束]\n" + CHAR_RULES + "\n\n输出要求（只输出报告，禁止输出任何段落正文，禁止使用<<<SEG:标记）：\n1. 逐条链给一句结论（✓一致 / ⚠问题+理由）。\n2. 最后列“改动清单”：每段一条，写清改哪段、为什么；没有问题的段写“无”。\n3. 改动清单不得要求恢复或新增 类型/消耗/标签 字段（武器/装备/道具/技能规范为 名称/品质/叙述 三段式）。\n4. 报告里不要重写设定内容，只说问题与改法。";
+    var msgs = [{ role: "system", content: charSystemContent() }, { role: "user", content: charUser0() }, { role: "user", content: reportMsg }];
     var resp = await callModel(msgs);
-    var parts = resp.split(/<<<SEG:(base|mind|look|fight|story|play)>>>/);
-    var reportTxt = (parts[0] || "").trim();
-    var parsed = 0;
-    for (var i = 1; i < parts.length; i += 2) {
-      var pid = parts[i];
-      var body = (parts[i + 1] || "").trim();
-      var known = CHAR_SEGS.some(function (s) { return s.id === pid; });
-      if (body && known) { ST.char.segs[pid] = body; parsed++; charSetSeg(pid, "ok"); renderCharSegOut(pid); }
-    }
-    ST.char.report = reportTxt || "（报告为空）";
+    ST.char.report = String(resp || "").trim() || "（报告为空）";
     if (report) report.textContent = ST.char.report;
-    if (parsed === CHAR_SEGS.length) { toast("交火梳理完成：全部分段已联动修订", "success"); }
-    else { toast("梳理完成，但仅解析出 " + parsed + "/" + CHAR_SEGS.length + " 段（未解析段落保留原稿，可再跑一次）", "warning"); }
+    toast("审查报告完成，开始逐段应用联动修订…");
+    // ---- 第二步：逐段应用修订（每段单独一次调用，输出只有一段，杜绝截断）----
+    var changed = 0;
+    for (var i = 0; i < CHAR_SEGS.length; i++) {
+      if (isStop()) break;
+      var seg = CHAR_SEGS[i];
+      if (report) report.textContent = ST.char.report + "\n\n—— 正在逐段应用修订（" + (i + 1) + "/" + CHAR_SEGS.length + "：" + seg.title + "）——";
+      charSetSeg(seg.id, "run");
+      var frozen = "";
+      CHAR_SEGS.forEach(function (s2) { if (s2.id !== seg.id && ST.char.segs[s2.id]) frozen += "\n\n【" + s2.title + "】\n" + String(ST.char.segs[s2.id]).slice(0, 1200); });
+      var applyMsg = "【交火梳理·第二步：逐段应用修订——只改「" + seg.title + "」这一段】\n\n[梳理报告与改动清单]\n" + ST.char.report + "\n\n[本段现行内容]\n" + ST.char.segs[seg.id] + "\n\n[冻结区块（其它分段，原样保留，一个字都不许改）]\n" + frozen + "\n\n[修订规则]\n" + CHAR_RULES + "\n1. 只输出【" + seg.title + "】的修订后全文；若按报告本段无需改动，只回复“无改动”。\n2. 只做报告指出的联动性修改；不得推翻设定、不得扩写或新增内容。\n3. 武器/装备/道具/技能保持 名称/品质(中文)/叙述 三段式：禁止补回或新增 类型/消耗/标签 字段。\n4. 不生成任何开局预设内容（开局剧情/面板/伙伴/资产等）。";
+      var m2 = [{ role: "system", content: charSystemContent() }, { role: "user", content: applyMsg }];
+      var resp2 = await callModel(m2);
+      var txt = String(resp2 || "").trim();
+      if (txt && !/^无改动[。．.]*$/.test(txt)) { ST.char.segs[seg.id] = txt; changed++; renderCharSegOut(seg.id); }
+      charSetSeg(seg.id, "ok");
+      await waitTick();
+    }
+    if (report) report.textContent = ST.char.report + (isStop() ? "\n\n（已停止：修订应用中断）" : "\n\n（修订应用完成，改动 " + changed + " 段）");
+    if (isStop()) toast("已停止");
+    else toast("交火梳理完成：报告已生成，联动修订应用到 " + changed + " 段", "success");
   } catch (e) { toast("交火梳理出错：" + (e && e.message ? e.message : e), "error"); if (report) report.textContent = "梳理失败：" + (e && e.message ? e.message : e); }
   finally { ST.running = false; renderRunButtons(); charDraftCacheSave(); }
 }
@@ -2322,6 +2333,7 @@ function yamlLintChar(text){
   function countCh(s, ch){ var n = 0; for (var i = 0; i < s.length; i++) if (s[i] === ch) n++; return n; }
   if (t.indexOf("\t") >= 0) warns.push("含制表符(Tab)，YAML 缩进应使用空格");
   if (!/^角色卡\s*:/m.test(t)) warns.push("缺少顶层「角色卡:」键");
+  if (/^\s*(类型|消耗|标签)\s*:/m.test(t)) warns.push("条目中出现 类型/消耗/标签 字段（规范只保留 名称/品质/叙述 三段式）");
   if (countCh(t, "[") !== countCh(t, "]")) warns.push("方括号[ ]数量不配对");
   if (countCh(t, "{") !== countCh(t, "}")) warns.push("花括号{ }数量不配对");
   return warns;
