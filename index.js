@@ -1,6 +1,6 @@
 
 // ============================================================================
-// 始弦的魔法大典 (openingPresetForge)  v1.7.0
+// 始弦的魔法大典 (openingPresetForge)  v1.7.1
 // SillyTavern / Tavern Helper 悬浮窗扩展：一键走完 创作技能→装备→道具→资产→
 // 背景→新输出 流程，调用酒馆当前主 API（generateRaw），最终一键导出 .preset.json
 // ----------------------------------------------------------------------------
@@ -2028,9 +2028,10 @@ var CHAR_SEG_PROMPTS = {
   play: "按 DLC 角色卡惯例写演绎层：\n- 语料示例4-6句：口头禅/战斗台词/日常对白，风格与性格码一致，用词呼应出身与经历。\n- 行为参考：日常小动作/战斗偏好/癖好（呼应外貌与战斗方式）。\n- 禁忌（绝不能做/说）与提倡（演绎要点）。\n- 对{{user}}的关系态度一句。只输出本段。"
 };
 var CHAR_LINK_CHAIN = "L1 背景经历→层级等级/身份职业：实力必须有来历，禁止“凭空强者”。\nL2 背景经历→性格码：重大事件塑造动机（关系/情绪/行动/冲突/意义），创伤或誓言落在具体经历。\nL3 种族+命名指导→姓名结构：命名规则与阶级格式必须匹配。\nL4 性格→外貌衣着：神情/配色/风格/破损与心境映射；身份与着装一致。\nL5 性格+层级→战斗方式：攻击技/动作技配比、风格、武器类型与性格互映射。\nL6 战斗方式+品质规则→技能装备道具：词条上限/品质档位/威力资源合规；技能来源与经历呼应。\nL7 属性公式→属性资源：五维=基础+层级+等级额外；HP/MP/SP公式；极值与硬顶20。\nL8 性格+背景→演绎语料：口头禅呼应经历、雷点呼应创伤、行为呼应动机。\n反向校验：技能/装备的来源必须在经历中有交代；登神长阶严格按等级档位；唯一品质仅在出处特殊时使用；五维禁止极端加点。";
-var CHAR_HTML = "<div class=\"opf-char-wrap\"><div class=\"opf-sec-label\">✦ 二创角色工坊 · 分段式生成（产出世界书 DLC 角色条目）</div><div class=\"opf-dim\">流程：① 分段初稿（7段串行）→ ② 交火梳理（出身/经历→性格→外观/衣着/战斗→技能装备→属性 全链联动审查并修订）→ ③ 逐段定点修改（只改你指定的段，其它段冻结）→ ④ 最终封装：始弦的魔法大典提交标签包裹的纯文本。</div><textarea id=\"opf-char-demand\" class=\"opf-char-input\" placeholder=\"写谁？给出大致设定与需求（例：一位出身瓦伦蒂亚贫民区、靠街头格斗活下来的少女，性格倔强护短……）\"></textarea><textarea id=\"opf-char-ref\" class=\"opf-char-input\" placeholder=\"（可选）参考文本：已有设定/原型描述/世界书片段，将作为参考注入\"></textarea><div class=\"opf-char-tools\"><button type=\"button\" class=\"opf-btn primary\" id=\"opf-char-run\">▶ 分段初稿</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-link\">⚔ 交火梳理</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-final\">🎁 最终封装</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-new\">🗑 新角色</button></div><div id=\"opf-char-steps\"></div><div class=\"opf-sec\"><div class=\"opf-sec-label\">交火梳理报告</div><pre id=\"opf-char-report\" class=\"opf-char-report\">尚未梳理</pre></div><div class=\"opf-out\"><div class=\"opf-sec-label\">最终稿件（标签包裹纯文本，可直接粘进世界书 DLC 条目）</div><pre id=\"opf-char-out\">尚未封装</pre><div class=\"opf-char-copyrow\"><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-copy\">⧉ 复制最终稿件</button></div></div></div>";
+var CHAR_YAML_SPEC = "【YAML 输出规范（二创角色最终稿件）】\n顶层唯一键为「角色卡」，必须是合法 YAML，按下面的字段顺序输出（中文键名固定，不要增删顶层字段；多行文本用 |- 块标量；列表用 - 或行内[]；所有内容与各分段一一对应）：\n\n角色卡:\n  名称: （定位与基础段的名字）\n  核心概念: （一句话定义）\n  特质: [标签1, 标签2, 标签3]\n  种族: （大类/亚种）\n  外貌年龄: （数字）\n  实龄: （数字或描述）\n  生命层级: （第X层级(名)）\n  等级: （Lv数字）\n  身份: [身份1, ...]\n  职业: [职业1, ...]\n  称号: （Lv≥13 才写，否则省略本行）\n  性格码: （五维动机码-稳定性码）\n  性格: |-\n    （性格与行为逻辑，多行）\n  喜好: [..]\n  厌恶: [..]\n  外貌: |-\n    （外貌特质，多行）\n  服装: |-\n    （衣物装饰，多行）\n  面板:\n    力量: N\n    敏捷: N\n    体质: N\n    智力: N\n    精神: N\n    HP: N\n    MP: N\n    SP: N\n  武器:\n    - 名称: ..\n      品质: ..\n      效果: |-\n        ..\n      描述: ..\n  装备:\n    - 名称: ..\n      品质: ..\n      效果: |-\n        ..\n      描述: ..\n  道具:\n    - 名称: ..\n      品质: ..\n      效果: |-\n        ..\n      描述: ..\n  技能:\n    - 名称: ..\n      品质: ..\n      类型: （主动/被动）\n      消耗: ..\n      标签: [..]\n      效果: |-\n        ..\n      描述: ..\n  登神长阶: （无则写“无”）\n  过去: |-\n    （背景与经历，多行）\n  关系锚点: [..]\n  语料示例:\n    - \"..\"\n  行为参考:\n    - ..\n  禁忌:\n    - ..\n  提倡:\n    - ..\n  对user态度: ..\n\n规则：\n1. 只从分段内容转写，不新增、不删改、不扩写；缺失的段保留现有内容或写“无”。\n2. 缩进用两个空格，禁止制表符(Tab)；块标量 | 保留换行；含冒号/井号等特殊字符的字符串加引号。\n3. 列表条数、数值、名称与分段一一对应；技能/装备/道具/武器有几条写几条。\n4. 输出放在一个 ```yaml 代码块内；代码块内不允许出现注释或解释文字。";
+var CHAR_HTML = "<div class=\"opf-char-wrap\"><div class=\"opf-sec-label\">✦ 二创角色工坊 · 分段式生成（产出世界书 DLC 角色条目）</div><div class=\"opf-dim\">流程：① 分段初稿（7段串行）→ ② 交火梳理（出身/经历→性格→外观/衣着/战斗→技能装备→属性 全链联动审查并修订）→ ③ 逐段定点修改（只改你指定的段，其它段冻结）→ ④ 最终封装：按 YAML 规范输出纯 YAML 文档。</div><textarea id=\"opf-char-demand\" class=\"opf-char-input\" placeholder=\"写谁？给出大致设定与需求（例：一位出身瓦伦蒂亚贫民区、靠街头格斗活下来的少女，性格倔强护短……）\"></textarea><textarea id=\"opf-char-ref\" class=\"opf-char-input\" placeholder=\"（可选）参考文本：已有设定/原型描述/世界书片段，将作为参考注入\"></textarea><div class=\"opf-char-tools\"><button type=\"button\" class=\"opf-btn primary\" id=\"opf-char-run\">▶ 分段初稿</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-link\">⚔ 交火梳理</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-final\">🎁 最终封装</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-new\">🗑 新角色</button></div><div id=\"opf-char-steps\"></div><div class=\"opf-sec\"><div class=\"opf-sec-label\">交火梳理报告</div><pre id=\"opf-char-report\" class=\"opf-char-report\">尚未梳理</pre></div><div class=\"opf-out\"><div class=\"opf-sec-label\">最终稿件（YAML 规范输出，可直接粘进世界书 DLC 条目）</div><div class=\"opf-dim\" id=\"opf-char-outnote\"></div><pre id=\"opf-char-out\">尚未封装</pre><div class=\"opf-char-copyrow\"><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-copy\">⧉ 复制最终稿件</button></div></div></div>";
 
-function charInit(){ ST.char = ST.char || { demand: "", ref: "", segs: {}, status: {}, report: "", out: "", name: "", _inited: false }; ST.charEls = ST.charEls || {}; }
+function charInit(){ ST.char = ST.char || { demand: "", ref: "", segs: {}, status: {}, report: "", out: "", outNote: [], name: "", _inited: false }; ST.char.outNote = ST.char.outNote || []; ST.charEls = ST.charEls || {}; }
 function bindCharPage(){
   charInit();
   var run = getEl("opf-char-run"); if (!run || run._b) return; run._b = true;
@@ -2120,6 +2121,8 @@ function renderCharPage(){
     var r = getEl("opf-char-ref"); if (r && !r.value) r.value = ST.char.ref || "";
   }
   var out = getEl("opf-char-out"); if (out && out.textContent === "封装中…") return; if (out) out.textContent = ST.char.out || "尚未封装";
+  var note = getEl("opf-char-outnote");
+  if (note && out && out.textContent !== "尚未封装") note.textContent = (ST.char.outNote && ST.char.outNote.length) ? "⚠ " + ST.char.outNote.join("；") : "✓ 已按 YAML 规范输出";
   var rep = getEl("opf-char-report"); if (rep && rep.textContent !== "交火梳理中…") rep.textContent = ST.char.report || "尚未梳理";
   CHAR_SEGS.forEach(function (s) { renderCharSegOut(s.id); charSetSegUi(s.id, ST.char.status[s.id] || "wait"); });
 }
@@ -2277,21 +2280,53 @@ async function finalizeChar(){
   if (!done.length) { toast("还没有角色稿件，请先「分段初稿」", "warning"); return; }
   ST.running = true; renderRunButtons();
   var outEl = getEl("opf-char-out"); if (outEl) outEl.textContent = "封装中…";
+  var noteEl = getEl("opf-char-outnote"); if (noteEl) noteEl.textContent = "";
   try {
     var all = CHAR_SEGS.map(function (s) { return "【" + s.title + "】\n" + (ST.char.segs[s.id] || "（无）"); }).join("\n\n");
     var name = charNameGuess();
-    var msg = "【最终封装】\n请以“始弦的魔法大典”的身份，把下面的分段内容整理为一份可直接用作世界书 DLC 角色条目的纯文本。\n\n[全部段落]\n" + all + "\n\n[封装格式（严格照此标签与结构）]\n<" + name + "角色概览>\n（按 DLC 惯例组织小节：人物/外貌/服装/性格/过去/职业·层级·等级·面板/武器/技能/道具等）\n</" + name + "角色概览>\n<" + name + "语言参考>\n1. ……（语料，呼应性格与经历）\n</" + name + "语言参考>\n<" + name + "行为参考>\n- ……（日常行为/战斗偏好/演绎禁忌与提倡）\n</" + name + "行为参考>\n\n[要求]\n1. 只做整合与排版，不新增、不删改、不扩写任何设定内容；数值与名称原样保留。\n2. 若某段缺失，保留其现有内容即可，禁止补写。\n3. 角色名以「定位与基础」段为准；没有名字则用“未命名角色”占位。\n4. 输出纯文本，不要用代码块（不要加三个反引号）包裹。";
+    var msg = "【最终封装（YAML）】\n请以“始弦的魔法大典”的身份，把下面的分段内容整理为一份可直接用作世界书 DLC 角色条目的 YAML 文档。\n\n[全部段落]\n" + all + "\n\n" + CHAR_YAML_SPEC + "\n\n角色名以「定位与基础」段为准；没有名字则「名称」写“未命名角色”。";
     var msgs = [{ role: "system", content: charSystemContent() }, { role: "user", content: msg }];
     var resp = await callModel(msgs);
-    ST.char.out = resp;
-    if (outEl) outEl.textContent = resp;
-    toast("最终稿件已封装（可复制，粘进世界书 DLC 条目）", "success");
+    var y = extractYamlChar(resp);
+    if (!y.ok) { toast("未能从回复中提取 YAML 代码块（已用原文兜底，可重试一次）", "warning"); }
+    var warns = yamlLintChar(y.text);
+    ST.char.out = y.text;
+    ST.char.outNote = warns;
+    if (outEl) outEl.textContent = y.text;
+    if (noteEl) noteEl.textContent = warns.length ? "⚠ " + warns.join("；") : "✓ 已按 YAML 规范输出";
+    if (y.ok && !warns.length) toast("已按 YAML 规范封装完成（可复制，粘进世界书 DLC 条目）", "success");
+    else toast("已封装" + (warns.length ? "（" + warns.length + " 条 YAML 提示，见输出区上方）" : ""), "warning");
   } catch (e) { toast("最终封装出错：" + (e && e.message ? e.message : e), "error"); }
   finally { ST.running = false; renderRunButtons(); charDraftCacheSave(); }
 }
+// 从回复中提取 ```yaml 代码块（找不到围栏则原文兜底）
+function extractYamlChar(text){
+  var F = fence();
+  var t = String(text || "");
+  var idx = t.indexOf(F + "yaml");
+  if (idx < 0) idx = t.indexOf(F);
+  if (idx < 0) return { ok: false, text: t.trim() };
+  var start = t.indexOf("\n", idx);
+  if (start < 0) return { ok: false, text: t.trim() };
+  var end = t.indexOf(F, start + 1);
+  var body = end > start ? t.slice(start + 1, end) : t.slice(start + 1);
+  body = body.replace(/^\n+/, "").replace(/\s+$/, "");
+  return { ok: !!body, text: body };
+}
+// 轻量 YAML 规范自检（仅提示，不拦截）
+function yamlLintChar(text){
+  var warns = [];
+  var t = String(text || "");
+  function countCh(s, ch){ var n = 0; for (var i = 0; i < s.length; i++) if (s[i] === ch) n++; return n; }
+  if (t.indexOf("\t") >= 0) warns.push("含制表符(Tab)，YAML 缩进应使用空格");
+  if (!/^角色卡\s*:/m.test(t)) warns.push("缺少顶层「角色卡:」键");
+  if (countCh(t, "[") !== countCh(t, "]")) warns.push("方括号[ ]数量不配对");
+  if (countCh(t, "{") !== countCh(t, "}")) warns.push("花括号{ }数量不配对");
+  return warns;
+}
 function clearChar(){
   if (!window.confirm("清空当前二创角色（分段/报告/最终稿件）？此操作不可撤销。")) return;
-  ST.char = { demand: "", ref: "", segs: {}, status: {}, report: "", out: "", name: "", _inited: false };
+  ST.char = { demand: "", ref: "", segs: {}, status: {}, report: "", out: "", outNote: [], name: "", _inited: false };
   var d = getEl("opf-char-demand"); if (d) d.value = "";
   var r = getEl("opf-char-ref"); if (r) r.value = "";
   charDraftCacheSave();
@@ -2307,7 +2342,7 @@ function copyCharOut(){
 function charDraftCacheSave(){
   if (charDraftCacheSave._t) clearTimeout(charDraftCacheSave._t);
   charDraftCacheSave._t = setTimeout(function () {
-    lsSet(LS_CHAR_KEY, { demand: ST.char.demand, ref: ST.char.ref, segs: ST.char.segs, status: ST.char.status, report: ST.char.report, out: ST.char.out });
+    lsSet(LS_CHAR_KEY, { demand: ST.char.demand, ref: ST.char.ref, segs: ST.char.segs, status: ST.char.status, report: ST.char.report, out: ST.char.out, outNote: ST.char.outNote });
   }, 500);
 }
 function charDraftRestore(){
@@ -2315,7 +2350,7 @@ function charDraftRestore(){
   var c = lsGet(LS_CHAR_KEY); if (!c || typeof c !== "object") return;
   ST.char.demand = c.demand || ""; ST.char.ref = c.ref || "";
   ST.char.segs = c.segs || {}; ST.char.status = c.status || {};
-  ST.char.report = c.report || ""; ST.char.out = c.out || "";
+  ST.char.report = c.report || ""; ST.char.out = c.out || ""; ST.char.outNote = c.outNote || [];
   try { renderCharSteps(); renderCharPage(); } catch (e) { opfErr("charDraftRestore render", e); }
 }
 
