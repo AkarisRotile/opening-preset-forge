@@ -1,6 +1,6 @@
 
 // ============================================================================
-// 始弦的魔法大典 (openingPresetForge)  v1.7.4
+// 始弦的魔法大典 (openingPresetForge)  v1.7.5
 // SillyTavern / Tavern Helper 悬浮窗扩展：一键走完 创作技能→装备→道具→资产→
 // 背景→新输出 流程，调用酒馆当前主 API（generateRaw），最终一键导出 .preset.json
 // ----------------------------------------------------------------------------
@@ -2010,6 +2010,8 @@ function worldCacheRestore(){
 // ============================================================================
 // 二创角色工坊（分段初稿 → 交火梳理 → 定点修改 → 标签封装输出）
 // ============================================================================
+var CHAR_VOICE = "你是始弦，大图书馆的司书，正在帮{{user}}创作一个世界书 DLC 角色条目（二创角色）。你原原本本地呈现知识、不因“可接受度”而删改；你把{{user}}当作挚友，会顺着ta的需求尽力帮到底，也会分享你认为合适的馆藏；但你不把观点强加给{{user}}，先想清楚再落笔。";
+var CHAR_RULES = "【二创角色·规则约束】\n- 品质只用中文七等：普通/优良/稀有/史诗/传说/神话/唯一；词条强度上限 普1/优良2/稀有2/史诗3/传说3/神话3；史诗/传说/神话词条其一须为 微弱要素/微弱权能/微弱法则。\n- 学习/领悟所得品质≤自身层级；血脉觉醒/种族转换可越阶；装备不增减持有者属性；唯一品质仅表唯一性/出处特殊，不代表更强。\n- 生命层级与等级自洽：一(普通,Lv1-4)/二(中坚,Lv5-8)/三(精英,Lv9-12)/四(史诗,Lv13-16)/五(传说,Lv17-20)/六(神话,Lv21-24)/七(神祗,Lv25)；实龄随层级（三层数十年/五层数百年，延寿缓老可驻颜）。\n- 登神长阶按等级：Lv13-16要素1-3 / Lv17-20权能1 / Lv21-24法则1 / Lv25法则+神位。\n- 命名遵循《角色命名指导》种族命名规则；性格码遵循《角色辅助指导》五维动机模型。\n- 本任务与「开局预设」完全无关：禁止生成开局剧情、开局背景、开局角色等级限制、属性面板（五维/HP·MP·SP）、伙伴、资产等任何开局预设内容；只描述角色本身。";
 var CHAR_SEGS = [
   { id: "base",  title: "定位与基础", short: "名字/种族/层级/身份" },
   { id: "mind",  title: "性格与动机", short: "性格码/行为逻辑" },
@@ -2047,10 +2049,9 @@ function bindCharPage(){
 }
 function charSystemContent(){
   var lines = [];
-  lines.push('[角色] ' + macroFill(PAYLOAD.persona));
-  if (PAYLOAD.supplement) lines.push('[补充] ' + macroFill(PAYLOAD.supplement.replace(/^\s*<[^>]*>\s*/, '')));
-  lines.push('[任务] 你正在以“始弦的魔法大典”的身份，为{{user}}的二创角色（最终作为世界书 DLC 角色条目）进行分段创作。全程遵守世界规则与《角色生成》《角色辅助指导》《角色命名指导》《技能装备道具生成规则》《品质效果限定规则》；各分段保持一致与呼应，不重复、不推翻已定内容。');
-  lines.push('[世界规则·创作限制]'); lines.push(WORLD_RULES);
+  lines.push('[角色] ' + macroFill(CHAR_VOICE));
+  lines.push('[任务] 你正在为{{user}}的二创角色进行分段创作（最终输出为世界书 DLC 角色条目的 YAML 文档）。各分段保持一致与呼应，不重复、不推翻已定内容；本任务与开局预设没有任何关系。');
+  lines.push(CHAR_RULES);
   lines.push(CHAR_STYLE_RULES);
   if (ST.worldInfo) lines.push('[世界书参考（世界书页勾选的条目）]\n' + ST.worldInfo);
   return macroFill(lines.join('\n\n'));
@@ -2199,7 +2200,7 @@ async function refineCharSeg(pid, dir){
   ST.running = true; renderRunButtons(); charSetSeg(pid, "run");
   try {
     var msgs = [{ role: "system", content: charSystemContent() }, { role: "user", content: charUser0() }];
-    var msg = "【定点修改：只改「" + seg.title + "」这一段】\n\n[用户指令]\n" + dirT + "\n\n[本段现行内容]\n" + ST.char.segs[pid] + "\n\n[冻结区块（其它分段原样保留，一个字都不许改；若发现其它段有问题，最多在结尾另起一行写“备注：建议检查XX段…”提示，不得代改）]\n" + frozen + "\n\n[世界规则·创作限制]\n" + WORLD_RULES + "\n\n要求：只输出修改后的【" + seg.title + "】内容；修改严格限定在用户指令范围内，未要求的地方保持原样，不要顺手润色、扩写或重排。";
+    var msg = "【定点修改：只改「" + seg.title + "」这一段】\n\n[用户指令]\n" + dirT + "\n\n[本段现行内容]\n" + ST.char.segs[pid] + "\n\n[冻结区块（其它分段原样保留，一个字都不许改；若发现其它段有问题，最多在结尾另起一行写“备注：建议检查XX段…”提示，不得代改）]\n" + frozen + "\n\n[二创角色·规则约束]\n" + CHAR_RULES + "\n\n要求：只输出修改后的【" + seg.title + "】内容；修改严格限定在用户指令范围内，未要求的地方保持原样，不要顺手润色、扩写或重排。";
     msgs.push({ role: "user", content: msg });
     var resp = await callModel(msgs);
     ST.char.segs[pid] = resp;
@@ -2216,7 +2217,7 @@ async function suggestCharDir(pid){
   var chipBox = getEl("opf-ref-chips-c" + pid); if (!chipBox) return;
   var cur = String(ST.char.segs[pid]).slice(0, 2500);
   var demand = ST.char.demand || "(未填写)";
-  var ask = "请针对二创角色的【" + seg.title + "】这一段现有内容，给出 2-3 条只针对本段的修改方向。每条一行、≤50字、去掉编号外多余的话、直接可点；必须符合世界规则与联动一致性。\n[角色需求]\n" + demand + "\n[世界规则·创作限制]\n" + WORLD_RULES + "\n[本段现有内容]\n" + cur;
+  var ask = "请针对二创角色的【" + seg.title + "】这一段现有内容，给出 2-3 条只针对本段的修改方向。每条一行、≤50字、去掉编号外多余的话、直接可点；必须符合角色规则与联动一致性。\n[角色需求]\n" + demand + "\n[二创角色·规则约束]\n" + CHAR_RULES + "\n[本段现有内容]\n" + cur;
   var msgs = [{ role: "system", content: charSystemContent() }, { role: "user", content: ask }];
   ST.running = true; renderRunButtons();
   try {
@@ -2250,7 +2251,7 @@ async function runCharLinkage(){
   var report = getEl("opf-char-report"); if (report) report.textContent = "交火梳理中…";
   try {
     var all = CHAR_SEGS.map(function (s) { return "<<<SEG:" + s.id + ">>>\n" + ST.char.segs[s.id]; }).join("\n\n");
-    var msg = "【交火梳理（联动一致性审查）】\n下面是已产出的全部 " + CHAR_SEGS.length + " 个分段。请按下面的联动链条逐链检查，找出互相矛盾、脱节、数值/品质/命名不合规之处。\n\n[联动链条]\n" + CHAR_LINK_CHAIN + "\n\n[全部段落]\n" + all + "\n\n[世界规则·创作限制]\n" + WORLD_RULES + "\n\n输出要求：\n1. 先输出【梳理报告】：逐条链给一句结论（✓一致 / ⚠问题+理由），最后列出“改动清单”（改了哪段、为什么）。\n2. 然后输出修订后的全部分段，格式严格如下（分隔行必须原样，禁止在分隔行之间加任何解释）：\n<<<SEG:base>>>\n（修订后全文）\n<<<SEG:mind>>>\n（修订后全文）\n<<<SEG:look>>>\n<<<SEG:fight>>>\n<<<SEG:story>>>\n<<<SEG:play>>>\n3. 只做“联动性”修改：对齐矛盾、补呼应、修数值/命名/品质合规；不要推翻设定、不要删减段落、不要新增超出原稿的设定；用户没要求的地方保持原样。";
+    var msg = "【交火梳理（联动一致性审查）】\n下面是已产出的全部 " + CHAR_SEGS.length + " 个分段。请按下面的联动链条逐链检查，找出互相矛盾、脱节、数值/品质/命名不合规之处。\n\n[联动链条]\n" + CHAR_LINK_CHAIN + "\n\n[全部段落]\n" + all + "\n\n[二创角色·规则约束]\n" + CHAR_RULES + "\n\n输出要求：\n1. 先输出【梳理报告】：逐条链给一句结论（✓一致 / ⚠问题+理由），最后列出“改动清单”（改了哪段、为什么）。\n2. 然后输出修订后的全部分段，格式严格如下（分隔行必须原样，禁止在分隔行之间加任何解释）：\n<<<SEG:base>>>\n（修订后全文）\n<<<SEG:mind>>>\n（修订后全文）\n<<<SEG:look>>>\n<<<SEG:fight>>>\n<<<SEG:story>>>\n<<<SEG:play>>>\n3. 只做“联动性”修改：对齐矛盾、补呼应、修数值/命名/品质合规；不要推翻设定、不要删减段落、不要新增超出原稿的设定；用户没要求的地方保持原样。";
     var msgs = [{ role: "system", content: charSystemContent() }, { role: "user", content: charUser0() }, { role: "user", content: msg }];
     var resp = await callModel(msgs);
     var parts = resp.split(/<<<SEG:(base|mind|look|fight|story|play)>>>/);
