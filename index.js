@@ -1,6 +1,6 @@
 
 // ============================================================================
-// 始弦的魔法大典 (openingPresetForge)  v1.7.2
+// 始弦的魔法大典 (openingPresetForge)  v1.7.3
 // SillyTavern / Tavern Helper 悬浮窗扩展：一键走完 创作技能→装备→道具→资产→
 // 背景→新输出 流程，调用酒馆当前主 API（generateRaw），最终一键导出 .preset.json
 // ----------------------------------------------------------------------------
@@ -2011,7 +2011,6 @@ function worldCacheRestore(){
 // ============================================================================
 var CHAR_SEGS = [
   { id: "base",  title: "定位与基础", short: "名字/种族/层级/身份" },
-  { id: "stat",  title: "属性与资源", short: "五维/HP·MP·SP" },
   { id: "mind",  title: "性格与动机", short: "性格码/行为逻辑" },
   { id: "look",  title: "外貌与衣着", short: "外貌特质/衣物" },
   { id: "fight", title: "战斗配置", short: "技能/装备/道具" },
@@ -2019,17 +2018,17 @@ var CHAR_SEGS = [
   { id: "play",  title: "演绎与语料", short: "语料/行为/禁忌" }
 ];
 var CHAR_SEG_PROMPTS = {
-  base: "为二创角色敲定“身份底座”，并在本段开头先定下【名称】（后续所有分段沿用这个名字，禁止再改）：\n- 命名：按《角色命名指导》确定风格→语言→音素种子转写；种族命名规则——人类:底层无姓/强者贵族有姓/顶层有中间名；精灵:{音译名}·{自然意象音译}；翼民:{音译名}·{音译姓}(古典庄重)；兽族:底层仅名、贵族带{氏族名}；血族:{名字}·{中间名}·{氏族名}；巨龙:凡世名+真名+史诗称号；矮人:{名字}·{氏族名意译}；半身人:{名字}·{家族姓氏意译}；巨人仅名字；妖精/花灵:诗意短语≤8字；亡灵保留生前名、高阶可用称号。\n- 核心概念：一句话定义（例：“未竟的破晓之星”）+ 特质标签3个。\n- 种族（大类/亚种，从世界书种族条目中选）；外貌年龄与实龄（实龄按生命层级自洽：三层数十年/五层数百年，延寿缓老可驻颜）。\n- 生命层级(一~七)与等级Lv(1-25)自洽；身份/职业数量不限；社会称号/尊号仅 Lv≥13。\n- 只输出本段内容，简洁列出，不写后续分段内容。",
-  stat: "按属性公式计算角色面板并列出算式：\n- 五维 = 天赋基础B(每项0-6，总和0-25，参照天赋档：平凡6-10/正常11-15/优良16-20/异禀21-25) + 层级点(T-1) + 等级额外D(总和=Lv-1)。\n- 五维单值≤所在层级极值(一8/二10/三12/四14/五16/六18/七20)，单项逻辑上限20。\n- HP = 体质×100×HP乘数+五维总和；MP = (智力+精神)×50×MP/SP乘数；SP = (力量+敏捷)×50×MP/SP乘数（乘数查阅世界书《核心数值总表》层级乘数表）。\n- 只输出本段（面板+算式），不要写技能/装备等后续内容。",
+  base: "为二创角色敲定“身份底座”，并在本段开头先定下【名称】（后续所有分段沿用这个名字，禁止再改）：\n- 命名：按《角色命名指导》确定风格→语言→音素种子转写；种族命名规则——人类:底层无姓/强者贵族有姓/顶层有中间名；精灵:{音译名}·{自然意象音译}；翼民:{音译名}·{音译姓}(古典庄重)；兽族:底层仅名、贵族带{氏族名}；血族:{名字}·{中间名}·{氏族名}；巨龙:凡世名+真名+史诗称号；矮人:{名字}·{氏族名意译}；半身人:{名字}·{家族姓氏意译}；巨人仅名字；妖精/花灵:诗意短语≤8字；亡灵保留生前名、高阶可用称号。\n- 核心概念：一句话定义（例：“未竟的破晓之星”）+ 特质标签3个。\n- 种族（大类/亚种，从世界书种族条目中选）；外貌年龄与实龄（实龄按生命层级自洽：三层数十年/五层数百年，延寿缓老可驻颜）。\n- 生命层级(一~七)与等级Lv(1-25)自洽；身份/职业数量不限；社会称号/尊号仅 Lv≥13。\n- 注意：不写属性面板（五维/HP·MP·SP），这些留给游玩时按世界规则结算。\n- 只输出本段内容，简洁列出，不写后续分段内容。",
   mind: "按《角色辅助指导》性格码为角色定型：\n- 五维动机模型：[关系动机Rc/Rr/Rh/Rf]-[情绪定位Eu/Ed/Et/Ep]-[行动触发Ap/Ac/Ai/Aw]-[冲突核心Cp/Cr/Ct/Cm]-[意义安置Pf/Pw/Pv/Ps]-[稳定性Sk/Sm/Sf]，写出完整码并解释每维选择理由。\n- 禁止按种族/身份/职业套用刻板印象；从性格池顺取或按需求定码，与出身经历呼应。\n- 行为逻辑：日常/战斗/雷点；喜好与厌恶。\n- 只输出本段，外貌、战斗配置留给后续分段。",
   look: "按《角色辅助指导》毛色瞳色指导写外观：魔法世界毛发/羽毛/眼瞳颜色与形态可多样化（混色/渐变/流光/竖瞳/重瞳/星型/十字/发光/多眼），可体现元素亲和。\n- 外貌特质：外观年龄/实龄/身高/身体细节（头到脚趾、种族特征）/生理特征/身体改造（可选）。\n- 衣物装饰：全部衣着（材质/颜色/款式/破损程度）——外衣/内衬/内衣裤/鞋袜/饰品。\n- 必须与性格、种族、出身、身份一致（如配色映衬性格、风格匹配身份）。只输出本段。",
-  fight: "按《技能装备道具生成规则》《品质效果限定规则》配置战斗：\n- 品质七等 普通/优良/稀有/史诗/传说/神话 + 唯一；词条上限：普1/优良2/稀有2/史诗3/传说3/神话3；史诗三词条其一须为“微弱要素”效果、传说“微弱权能”、神话“微弱法则”。\n- 技能数量 = 基础(0-1)+ceil((层级-1)/2)+额外(0-3)；攻击技(消耗[攻击]、即时伤害)与动作技(消耗[动作]、禁即时伤害与威力、可含DoT)区分；标签[关联属性][目标类型][核心功能][威力][特性][可选机制]；核心功能“伤害”仅攻击技、威力攻击技必填动作技禁用；学习/领悟所得品质≤自身层级，血脉觉醒/种族转换可越阶。\n- 装备：武器0-2/防具饰品0-3；[攻击:XXX]/[防御:XXX]/[徽记:XXX]；装备不增减持有者属性。道具0-2。\n- 战斗风格一句话：与性格互映射。\n- 登神长阶：Lv1-12无；13-16要素1-3；17-20权能1；21-24法则1；Lv25法则+神位——按等级填，未达不写。只输出本段。",
-  story: "写背景与经历，与层级/等级/属性/技能品质/性格全链自洽：\n- 起源（家庭/家乡/时代）→ 转折事件（塑造性格与技能来源）→ 现状与未来。\n- 实力来源必须交代清楚：为什么是这个层级/等级、为什么拥有这些品质的技能装备（学习/领悟≤自身层级；血脉觉醒/种族转换可越阶）。\n- 关系锚点1-2个：定位/共鸣/冲突，为后续演绎提供张力。\n- 只输出本段。",
-  play: "按 DLC 角色卡惯例写演绎层：\n- 语料示例4-6句：口头禅/战斗台词/日常对白，风格与性格码一致，用词呼应出身与经历。\n- 行为参考：日常小动作/战斗偏好/癖好（呼应外貌与战斗方式）。\n- 禁忌（绝不能做/说）与提倡（演绎要点）。\n- 对{{user}}的关系态度一句。只输出本段。"
+  fight: "按《技能装备道具生成规则》《品质效果限定规则》配置战斗：\n- 品质写中文七等：普通/优良/稀有/史诗/传说/神话/唯一；词条强度上限：普1/优良2/稀有2/史诗3/传说3/神话3；史诗三词条其一须为“微弱要素”效果、传说“微弱权能”、神话“微弱法则”；学习/领悟所得品质≤自身层级，血脉觉醒/种族转换可越阶。\n- 技能数量 = 基础(0-1)+ceil((层级-1)/2)+额外(0-3)；攻击技（消耗[攻击]、即时伤害）与动作技（消耗[动作]、禁即时伤害与威力、可含DoT）自然区分；武器0-2/防具饰品0-3/道具0-2。\n- 输出形式（重要）：每件武器/装备/道具/技能只写三条——名称、品质（中文七等）、叙述（一段文字，先写效果、再写描述；效果写清伤害/增益/机制即可，不单独列类型、消耗、标签这些字段）。\n- 装备不增减持有者属性。\n- 战斗风格一句话：与性格互映射。\n- 登神长阶：Lv1-12无；13-16要素1-3；17-20权能1；21-24法则1；Lv25法则+神位——按等级填，未达不写。\n- 不写属性面板（五维/HP·MP·SP）。只输出本段。",
+  story: "写背景与经历，与层级/等级/技能品质/性格全链自洽：\n- 起源（家庭/家乡/时代）→ 转折事件（塑造性格与技能来源）→ 现状与未来。\n- 实力来源必须交代清楚：为什么是这个层级/等级、为什么拥有这些品质的技能装备（学习/领悟≤自身层级；血脉觉醒/种族转换可越阶）。\n- 关系锚点1-2个：定位/共鸣/冲突，为后续演绎提供张力。\n- 只输出本段。",
+  play: "按 DLC 角色卡惯例写演绎层：\n- 语料示例4-6句：口头禅/战斗台词/日常对白，风格与性格码一致，用词呼应出身与经历。\n- 行为参考：日常小动作/战斗偏好/癖好（呼应外貌与战斗方式）。\n- 禁忌（绝不能做/说）与提倡（演绎要点）。\n- 不预设对特定{{user}}的态度——每位用户的设定不同，只写角色自身的互动方式。只输出本段。"
 };
-var CHAR_LINK_CHAIN = "L1 背景经历→层级等级/身份职业：实力必须有来历，禁止“凭空强者”。\nL2 背景经历→性格码：重大事件塑造动机（关系/情绪/行动/冲突/意义），创伤或誓言落在具体经历。\nL3 种族+命名指导→姓名结构：命名规则与阶级格式必须匹配。\nL4 性格→外貌衣着：神情/配色/风格/破损与心境映射；身份与着装一致。\nL5 性格+层级→战斗方式：攻击技/动作技配比、风格、武器类型与性格互映射。\nL6 战斗方式+品质规则→技能装备道具：词条上限/品质档位/威力资源合规；技能来源与经历呼应。\nL7 属性公式→属性资源：五维=基础+层级+等级额外；HP/MP/SP公式；极值与硬顶20。\nL8 性格+背景→演绎语料：口头禅呼应经历、雷点呼应创伤、行为呼应动机。\n反向校验：技能/装备的来源必须在经历中有交代；登神长阶严格按等级档位；唯一品质仅在出处特殊时使用；五维禁止极端加点。";
-var CHAR_YAML_SPEC = "【YAML 输出规范（二创角色最终稿件）】\n顶层唯一键为「角色卡」，必须是合法 YAML，按下面的字段顺序输出（中文键名固定，不要增删顶层字段；多行文本用 |- 块标量；列表用 - 或行内[]；所有内容与各分段一一对应）：\n\n角色卡:\n  名称: （定位与基础段的名字）\n  核心概念: （一句话定义）\n  特质: [标签1, 标签2, 标签3]\n  种族: （大类/亚种）\n  外貌年龄: （数字）\n  实龄: （数字或描述）\n  生命层级: （第X层级(名)）\n  等级: （Lv数字）\n  身份: [身份1, ...]\n  职业: [职业1, ...]\n  称号: （Lv≥13 才写，否则省略本行）\n  性格码: （五维动机码-稳定性码）\n  性格: |-\n    （性格与行为逻辑，多行）\n  喜好: [..]\n  厌恶: [..]\n  外貌: |-\n    （外貌特质，多行）\n  服装: |-\n    （衣物装饰，多行）\n  面板:\n    力量: N\n    敏捷: N\n    体质: N\n    智力: N\n    精神: N\n    HP: N\n    MP: N\n    SP: N\n  武器:\n    - 名称: ..\n      品质: ..\n      效果: |-\n        ..\n      描述: ..\n  装备:\n    - 名称: ..\n      品质: ..\n      效果: |-\n        ..\n      描述: ..\n  道具:\n    - 名称: ..\n      品质: ..\n      效果: |-\n        ..\n      描述: ..\n  技能:\n    - 名称: ..\n      品质: ..\n      类型: （主动/被动）\n      消耗: ..\n      标签: [..]\n      效果: |-\n        ..\n      描述: ..\n  登神长阶: （无则写“无”）\n  过去: |-\n    （背景与经历，多行）\n  关系锚点: [..]\n  语料示例:\n    - \"..\"\n  行为参考:\n    - ..\n  禁忌:\n    - ..\n  提倡:\n    - ..\n  对user态度: ..\n\n规则：\n1. 只从分段内容转写，不新增、不删改、不扩写；缺失的段保留现有内容或写“无”。\n2. 缩进用两个空格，禁止制表符(Tab)；块标量 | 保留换行；含冒号/井号等特殊字符的字符串加引号。\n3. 列表条数、数值、名称与分段一一对应；技能/装备/道具/武器有几条写几条。\n4. 输出放在一个 ```yaml 代码块内；代码块内不允许出现注释或解释文字。";
-var CHAR_HTML = "<div class=\"opf-char-wrap\"><div class=\"opf-sec-label\">✦ 二创角色工坊 · 分段式生成（产出世界书 DLC 角色条目）</div><div class=\"opf-dim\">流程：① 分段初稿（7段串行）→ ② 交火梳理（出身/经历→性格→外观/衣着/战斗→技能装备→属性 全链联动审查并修订）→ ③ 逐段定点修改（只改你指定的段，其它段冻结）→ ④ 最终封装：按 YAML 规范输出纯 YAML 文档。</div><textarea id=\"opf-char-demand\" class=\"opf-char-input\" placeholder=\"写谁？给出大致设定与需求（例：一位出身瓦伦蒂亚贫民区、靠街头格斗活下来的少女，性格倔强护短……）\"></textarea><textarea id=\"opf-char-ref\" class=\"opf-char-input\" placeholder=\"（可选）参考文本：已有设定/原型描述/世界书片段，将作为参考注入\"></textarea><div class=\"opf-char-tools\"><button type=\"button\" class=\"opf-btn primary\" id=\"opf-char-run\">▶ 分段初稿</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-link\">⚔ 交火梳理</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-final\">🎁 最终封装</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-new\">🗑 新角色</button></div><div id=\"opf-char-steps\"></div><div class=\"opf-sec\"><div class=\"opf-sec-label\">交火梳理报告</div><pre id=\"opf-char-report\" class=\"opf-box opf-char-report\">尚未梳理</pre></div><div class=\"opf-out\"><div class=\"opf-sec-label\">最终稿件（YAML 规范输出，可直接粘进世界书 DLC 条目）</div><div class=\"opf-dim\" id=\"opf-char-outnote\"></div><pre id=\"opf-char-out\" class=\"opf-box\">尚未封装</pre><div class=\"opf-char-copyrow\"><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-copy\">⧉ 复制最终稿件</button></div></div></div>";
+var CHAR_LINK_CHAIN = "L1 背景经历→层级等级/身份职业：实力必须有来历，禁止“凭空强者”。\nL2 背景经历→性格码：重大事件塑造动机（关系/情绪/行动/冲突/意义），创伤或誓言落在具体经历。\nL3 种族+命名指导→姓名结构：命名规则与阶级格式必须匹配。\nL4 性格→外貌衣着：神情/配色/风格/破损与心境映射；身份与着装一致。\nL5 性格+层级→战斗方式：攻击技/动作技配比、风格、武器类型与性格互映射。\nL6 战斗方式+品质规则→技能装备道具：品质七等/词条上限合规；技能来源与经历呼应。\nL7 性格+背景→演绎语料：口头禅呼应经历、雷点呼应创伤、行为呼应动机。\n反向校验：技能/装备的来源必须在经历中有交代；登神长阶严格按等级档位；唯一品质仅在出处特殊时使用；五维与资源面板不写入角色条目，由游玩时按世界规则自行结算。";
+var CHAR_STYLE_RULES = "【用词与文风规范（分段、梳理与最终 YAML 的叙述文字全程遵守）】\n目标：写得像“会写的人”——具体、克制、直接。用事实和细节说话，不堆词、不喊口号、不向读者解释。\n1. 少用连词腔：能不用“而是/名为/被称为/取而代之”就不用，需要转折时直接换一句说。\n2. 控制程度副词：删掉“极其/极度/极为/无比”和“令人××”这类空转形容，用具体细节替代强度。\n3. 禁论文腔与口号词：像“底层逻辑/张力/解构/本质/主体性”这类术语一律换成日常语言；自由解放、压迫凝视、规训赋权之类的大词不进入人物描写。\n4. 禁比喻与类比：不写“像/如同/仿佛/犹如/好似”及其一切变体，不用“心湖/涟漪/深渊/浮木/手术刀/教科书”这类意象化说法；是什么就写什么。\n5. 禁网文腔：不写“冷笑/冷哼/嘴角勾起弧度/指节泛白/不容置疑/灭顶之灾”这类套路动作与成语堆砌；情绪用行为与台词呈现，不贴标签。\n6. 禁口号式评判：不写“征服/支配/弱肉强食/丛林法则/内卷”这类社达判词；写动机、写行动，不下评语。\n7. 不写语音提示：禁止“他的声音/她的语气/这番话/这句话”这类引导旁白，直接写台词与动作。\n8. 禁句式模板：禁止“不是A而是B”“没有A只有B”“并非A而是B”等否定-转折/排除-定义句式；禁止“名为X”命名句式；同一句式在一段里不出现第二遍。\n9. 少用括号解释、少用引号强调：人物说话像人，旁白像冷静的写作者。";
+var CHAR_YAML_SPEC = "【YAML 输出规范（二创角色最终稿件）】\n顶层唯一键为「角色卡」，必须是合法 YAML，按下面的字段顺序输出（中文键名固定，不要增删顶层字段；多行文本用 |- 块标量；列表用 - 或行内[]；所有内容与各分段一一对应）：\n\n角色卡:\n  名称: （定位与基础段的名字）\n  核心概念: （一句话定义）\n  特质: [标签1, 标签2, 标签3]\n  种族: （大类/亚种）\n  外貌年龄: （数字）\n  实龄: （数字或描述）\n  生命层级: （第X层级(名)）\n  等级: （Lv数字）\n  身份: [身份1, ...]\n  职业: [职业1, ...]\n  称号: （Lv≥13 才写，否则省略本行）\n  性格码: （五维动机码-稳定性码）\n  性格: |-\n    （性格与行为逻辑，多行）\n  喜好: [..]\n  厌恶: [..]\n  外貌: |-\n    （外貌特质，多行）\n  服装: |-\n    （衣物装饰，多行）\n  武器:\n    - 名称: ..\n      品质: （中文七等：普通/优良/稀有/史诗/传说/神话/唯一）\n      叙述: |-\n        （一段文字：先写效果，再写描述）\n  装备:\n    - 名称: ..\n      品质: ..\n      叙述: |-\n        ..\n  道具:\n    - 名称: ..\n      品质: ..\n      叙述: |-\n        ..\n  技能:\n    - 名称: ..\n      品质: ..\n      叙述: |-\n        （一段文字：先写效果，再写描述）\n  登神长阶: （无则写“无”）\n  过去: |-\n    （背景与经历，多行）\n  关系锚点: [..]\n  语料示例:\n    - \"..\"\n  行为参考:\n    - ..\n  禁忌:\n    - ..\n  提倡:\n    - ..\n\n规则：\n1. 只从分段内容转写，不新增、不删改、不扩写；缺失的段保留现有内容或写“无”。\n2. 缩进用两个空格，禁止制表符(Tab)；块标量 | 保留换行；含冒号/井号等特殊字符的字符串加引号。\n3. 武器/装备/道具/技能每项只有 名称/品质/叙述 三个字段，不写类型/消耗/标签；品质只写中文七等之一。\n4. 不写「面板」（五维/HP·MP·SP 由游玩时按世界规则结算），不写对user的态度（每位用户的设定不同）。\n5. 列表条数、数值、名称与分段一一对应。\n6. 用词与文风规范全程生效。\n7. 输出放在一个 ```yaml 代码块内；代码块内不允许出现注释或解释文字。";
+var CHAR_HTML = "<div class=\"opf-char-wrap\"><div class=\"opf-sec-label\">✦ 二创角色工坊 · 分段式生成（产出世界书 DLC 角色条目）</div><div class=\"opf-dim\">流程：① 分段初稿（6段串行）→ ② 交火梳理（出身/经历→性格→外观/衣着/战斗→技能装备 全链联动审查并修订）→ ③ 逐段定点修改（只改你指定的段，其它段冻结）→ ④ 最终封装：按 YAML 规范输出纯 YAML 文档（不写面板、不预设对user态度，武器/装备/道具/技能只写 名称/品质/叙述）。</div><textarea id=\"opf-char-demand\" class=\"opf-char-input\" placeholder=\"写谁？给出大致设定与需求（例：一位出身瓦伦蒂亚贫民区、靠街头格斗活下来的少女，性格倔强护短……）\"></textarea><textarea id=\"opf-char-ref\" class=\"opf-char-input\" placeholder=\"（可选）参考文本：已有设定/原型描述/世界书片段，将作为参考注入\"></textarea><div class=\"opf-char-tools\"><button type=\"button\" class=\"opf-btn primary\" id=\"opf-char-run\">▶ 分段初稿</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-link\">⚔ 交火梳理</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-final\">🎁 最终封装</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-new\">🗑 新角色</button></div><div id=\"opf-char-steps\"></div><div class=\"opf-sec\"><div class=\"opf-sec-label\">交火梳理报告</div><pre id=\"opf-char-report\" class=\"opf-box opf-char-report\">尚未梳理</pre></div><div class=\"opf-out\"><div class=\"opf-sec-label\">最终稿件（YAML 规范输出，可直接粘进世界书 DLC 条目）</div><div class=\"opf-dim\" id=\"opf-char-outnote\"></div><pre id=\"opf-char-out\" class=\"opf-box\">尚未封装</pre><div class=\"opf-char-copyrow\"><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-copy\">⧉ 复制最终稿件</button></div></div></div>";
 
 function charInit(){ ST.char = ST.char || { demand: "", ref: "", segs: {}, status: {}, report: "", out: "", outNote: [], name: "", _inited: false }; ST.char.outNote = ST.char.outNote || []; ST.charEls = ST.charEls || {}; }
 function bindCharPage(){
@@ -2051,6 +2050,7 @@ function charSystemContent(){
   if (PAYLOAD.supplement) lines.push('[补充] ' + macroFill(PAYLOAD.supplement.replace(/^\s*<[^>]*>\s*/, '')));
   lines.push('[任务] 你正在以“始弦的魔法大典”的身份，为{{user}}的二创角色（最终作为世界书 DLC 角色条目）进行分段创作。全程遵守世界规则与《角色生成》《角色辅助指导》《角色命名指导》《技能装备道具生成规则》《品质效果限定规则》；各分段保持一致与呼应，不重复、不推翻已定内容。');
   lines.push('[世界规则·创作限制]'); lines.push(WORLD_RULES);
+  lines.push(CHAR_STYLE_RULES);
   if (ST.worldInfo) lines.push('[世界书参考（世界书页勾选的条目）]\n' + ST.worldInfo);
   return macroFill(lines.join('\n\n'));
 }
@@ -2058,7 +2058,7 @@ function charUser0(){
   var lines = [];
   lines.push('[本次二创需求] ' + (ST.char.demand || ""));
   if (ST.char.ref) lines.push('[参考文本]\n' + ST.char.ref);
-  lines.push('[工作方式] 我将分 7 个分段依次生成：定位与基础→属性与资源→性格与动机→外貌与衣着→战斗配置→背景与经历→演绎与语料。每段只完成该段内容；已生成段落为既有设定，必须一致；禁止预写后面段落。');
+  lines.push('[工作方式] 我将分 ' + CHAR_SEGS.length + ' 个分段依次生成：定位与基础→性格与动机→外貌与衣着→战斗配置→背景与经历→演绎与语料。每段只完成该段内容；已生成段落为既有设定，必须一致；禁止预写后面段落。');
   return lines.join('\n\n');
 }
 function charSetSeg(pid, st){ ST.char.status[pid] = st; charSetSegUi(pid, st); }
@@ -2149,7 +2149,7 @@ async function runCharSeg(seg, msgs, idx){
   charSetSeg(seg.id, "run");
   var prev = "";
   for (var k = 0; k < idx; k++) { var ps = CHAR_SEGS[k]; if (ST.char.segs[ps.id]) prev += "\n\n【" + ps.title + "】\n" + ST.char.segs[ps.id]; }
-  var userMsg = { role: "user", content: "【分段" + (idx + 1) + "/7：" + seg.title + "】\n" + macroFill(CHAR_SEG_PROMPTS[seg.id] || "") + (prev ? "\n\n[此前已定分段（既有设定，必须一致，禁止改动）]\n" + prev : "") };
+  var userMsg = { role: "user", content: "【分段" + (idx + 1) + "/" + CHAR_SEGS.length + "：" + seg.title + "】\n" + macroFill(CHAR_SEG_PROMPTS[seg.id] || "") + (prev ? "\n\n[此前已定分段（既有设定，必须一致，禁止改动）]\n" + prev : "") };
   msgs.push(userMsg);
   try {
     var resp = await callModel(msgs);
@@ -2174,7 +2174,7 @@ async function runCharFrom(pid){
     for (var k = 0; k < start; k++) {
       var ph = CHAR_SEGS[k];
       if (!ST.char.segs[ph.id]) { toast("前面分段尚未完成，请先「分段初稿」", "warning"); ST.running = false; renderRunButtons(); return; }
-      msgs.push({ role: "user", content: "【分段" + (k + 1) + "/7：" + ph.title + "】\n" + macroFill(CHAR_SEG_PROMPTS[ph.id] || "") });
+      msgs.push({ role: "user", content: "【分段" + (k + 1) + "/" + CHAR_SEGS.length + "：" + ph.title + "】\n" + macroFill(CHAR_SEG_PROMPTS[ph.id] || "") });
       msgs.push({ role: "assistant", content: ST.char.segs[ph.id] });
     }
     for (var j = start; j < CHAR_SEGS.length; j++) {
@@ -2249,10 +2249,10 @@ async function runCharLinkage(){
   var report = getEl("opf-char-report"); if (report) report.textContent = "交火梳理中…";
   try {
     var all = CHAR_SEGS.map(function (s) { return "<<<SEG:" + s.id + ">>>\n" + ST.char.segs[s.id]; }).join("\n\n");
-    var msg = "【交火梳理（联动一致性审查）】\n下面是已产出的全部 7 个分段。请按下面的联动链条逐链检查，找出互相矛盾、脱节、数值/品质/命名不合规之处。\n\n[联动链条]\n" + CHAR_LINK_CHAIN + "\n\n[全部段落]\n" + all + "\n\n[世界规则·创作限制]\n" + WORLD_RULES + "\n\n输出要求：\n1. 先输出【梳理报告】：逐条链给一句结论（✓一致 / ⚠问题+理由），最后列出“改动清单”（改了哪段、为什么）。\n2. 然后输出修订后的全部分段，格式严格如下（分隔行必须原样，禁止在分隔行之间加任何解释）：\n<<<SEG:base>>>\n（修订后全文）\n<<<SEG:stat>>>\n（修订后全文）\n<<<SEG:mind>>>\n<<<SEG:look>>>\n<<<SEG:fight>>>\n<<<SEG:story>>>\n<<<SEG:play>>>\n3. 只做“联动性”修改：对齐矛盾、补呼应、修数值/命名/品质合规；不要推翻设定、不要删减段落、不要新增超出原稿的设定；用户没要求的地方保持原样。";
+    var msg = "【交火梳理（联动一致性审查）】\n下面是已产出的全部 " + CHAR_SEGS.length + " 个分段。请按下面的联动链条逐链检查，找出互相矛盾、脱节、数值/品质/命名不合规之处。\n\n[联动链条]\n" + CHAR_LINK_CHAIN + "\n\n[全部段落]\n" + all + "\n\n[世界规则·创作限制]\n" + WORLD_RULES + "\n\n输出要求：\n1. 先输出【梳理报告】：逐条链给一句结论（✓一致 / ⚠问题+理由），最后列出“改动清单”（改了哪段、为什么）。\n2. 然后输出修订后的全部分段，格式严格如下（分隔行必须原样，禁止在分隔行之间加任何解释）：\n<<<SEG:base>>>\n（修订后全文）\n<<<SEG:mind>>>\n（修订后全文）\n<<<SEG:look>>>\n<<<SEG:fight>>>\n<<<SEG:story>>>\n<<<SEG:play>>>\n3. 只做“联动性”修改：对齐矛盾、补呼应、修数值/命名/品质合规；不要推翻设定、不要删减段落、不要新增超出原稿的设定；用户没要求的地方保持原样。";
     var msgs = [{ role: "system", content: charSystemContent() }, { role: "user", content: charUser0() }, { role: "user", content: msg }];
     var resp = await callModel(msgs);
-    var parts = resp.split(/<<<SEG:(base|stat|mind|look|fight|story|play)>>>/);
+    var parts = resp.split(/<<<SEG:(base|mind|look|fight|story|play)>>>/);
     var reportTxt = (parts[0] || "").trim();
     var parsed = 0;
     for (var i = 1; i < parts.length; i += 2) {
@@ -2264,7 +2264,7 @@ async function runCharLinkage(){
     ST.char.report = reportTxt || "（报告为空）";
     if (report) report.textContent = ST.char.report;
     if (parsed === CHAR_SEGS.length) { toast("交火梳理完成：全部分段已联动修订", "success"); }
-    else { toast("梳理完成，但仅解析出 " + parsed + "/7 段（未解析段落保留原稿，可再跑一次）", "warning"); }
+    else { toast("梳理完成，但仅解析出 " + parsed + "/" + CHAR_SEGS.length + " 段（未解析段落保留原稿，可再跑一次）", "warning"); }
   } catch (e) { toast("交火梳理出错：" + (e && e.message ? e.message : e), "error"); if (report) report.textContent = "梳理失败：" + (e && e.message ? e.message : e); }
   finally { ST.running = false; renderRunButtons(); charDraftCacheSave(); }
 }
