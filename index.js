@@ -1,6 +1,6 @@
 
 // ============================================================================
-// 始弦的魔法大典 (openingPresetForge)  v1.7.3
+// 始弦的魔法大典 (openingPresetForge)  v1.7.4
 // SillyTavern / Tavern Helper 悬浮窗扩展：一键走完 创作技能→装备→道具→资产→
 // 背景→新输出 流程，调用酒馆当前主 API（generateRaw），最终一键导出 .preset.json
 // ----------------------------------------------------------------------------
@@ -286,6 +286,7 @@ function buildSystemContent() {
   lines.push('[任务] 你正在帮{{user}}为即将开启新世界旅程的开局角色配置“开局预设”。接下来会分阶段收到 技能→装备→道具→资产→背景→最终汇总 的创作请求；每一阶段都顺着本对话已产出的内容继续创作，不要重复或推翻先前内容；栏目品质、消耗、世界观必须与本对话给出的规则保持一致。');
   lines.push('[世界规则·创作限制]');
   lines.push(WORLD_RULES);
+  lines.push(CHAR_STYLE_RULES);
   if (s.modelNote && s.modelNote.trim()) lines.push('[额外叮嘱] ' + s.modelNote.trim());
   if (ST.contextText) lines.push('[角色卡参考]\n' + ST.contextText);
   if (ST.worldInfo) lines.push('[世界书参考]\n' + ST.worldInfo);
