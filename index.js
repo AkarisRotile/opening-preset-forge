@@ -1,6 +1,6 @@
 
 // ============================================================================
-// 始弦的魔法大典 (openingPresetForge)  v1.6.0
+// 始弦的魔法大典 (openingPresetForge)  v1.7.0
 // SillyTavern / Tavern Helper 悬浮窗扩展：一键走完 创作技能→装备→道具→资产→
 // 背景→新输出 流程，调用酒馆当前主 API（generateRaw），最终一键导出 .preset.json
 // ----------------------------------------------------------------------------
@@ -33,6 +33,7 @@ var DEFAULT_SETTINGS = {
   capCardChars: 12000,       // 角色卡最多注入字符
   metaMode: 'full',          // 'full' 导出含 name/createdAt/updatedAt；'core' 只含 character 起
   autoCompliance: true,      // 生成初稿/重汇总后自动按《技能装备道具生成规则》自检修复
+  activePage: 'preset',      // 全屏壳当前页：preset | world | char | p4..p6
   modelNote: ''              // 附加一句给模型的叮嘱
 };
 
@@ -263,7 +264,7 @@ function applyWorldResult(res) {
   if (!res || !res.entries || !res.entries.length) { clearWorldbook(); return; }
   var r = importWorldEntries(res.entries, res.sourceName || 'file', res.fileName || null);
   opfLog('世界书载入条目数：', r.total, '默认勾选常驻：', r.selConst);
-  try { openWorldSide(); } catch (e) {}
+  try { if (!getEl("opf-lside")) buildWorldSide(); } catch (e) {}
 }
 
 // ============================================================================
@@ -673,37 +674,13 @@ function makeLauncherDraggable(b){
   }
   window.addEventListener("resize", clampLauncherOnResize);
 }
-function showPanel(){ var root = getEl("opf-root"); var s = getSettings(); if (!root) return; root.classList.remove("opf-hidden"); root.classList.add("opf-show"); root.style.display = "flex"; placePanelInView(root); launcher().style.display = "none"; s.visible = true; saveSettings(); }
-function hidePanel(){ var root = getEl("opf-root"); var s = getSettings(); if (!root) return; root.classList.add("opf-hidden"); setTimeout(function(){ if (!s.visible) root.style.display = "none"; }, 200); launcher().style.display = "flex"; s.visible = false; saveSettings(); }
+function showPanel(){ var shell = getEl("opf-shell"); var s = getSettings(); if (!shell) return; shell.classList.remove("opf-shell-hidden"); document.body.classList.add("opf-shell-open"); launcher().style.display = "none"; s.visible = true; saveSettings(); switchPage(s.activePage || "preset", true); }
+function hidePanel(){ var shell = getEl("opf-shell"); var s = getSettings(); if (!shell) return; shell.classList.add("opf-shell-hidden"); document.body.classList.remove("opf-shell-open"); launcher().style.display = "flex"; s.visible = false; saveSettings(); }
 function togglePanel(){ var s = getSettings(); if (s.visible) hidePanel(); else showPanel(); }
-function placePanelInView(root){
-  if (!root) return;
-  var s = getSettings();
-  var w = root.offsetWidth || 392;
-  var h = root.offsetHeight || 560;
-  var vw = window.innerWidth || document.documentElement.clientWidth || 800;
-  var vh = window.innerHeight || document.documentElement.clientHeight || 600;
-  if (typeof s.x === "number" && typeof s.y === "number" && s.x >= -40 && s.x <= vw - 60 && s.y >= -40 && s.y <= vh - 40) {
-    root.style.left = s.x + "px";
-    root.style.top = s.y + "px";
-    return;
-  }
-  var left = Math.max(8, Math.min(Math.round((vw - w) / 2), Math.max(8, vw - w - 8)));
-  var top = Math.max(8, Math.min(Math.round((vh - h) / 2), Math.max(8, vh - h - 8)));
-  root.style.left = left + "px";
-  root.style.top = top + "px";
-  s.x = left; s.y = top;
-  saveSettings();
-}
-function keepPanelInView(){
-  var root = getEl("opf-root"); if (!root) return;
-  var s = getSettings(); if (!s.visible) return;
-  var r = root.getBoundingClientRect();
-  var vw = window.innerWidth || 0, vh = window.innerHeight || 0;
-  if (r.left < -20 || r.top < -20 || r.right > vw + 20 || r.bottom > vh + 20) placePanelInView(root);
-}
+function placePanelInView(){ /* 全屏壳：无需定位，保留空实现兼容旧调用 */ }
+function keepPanelInView(){ /* 全屏壳：无需视口修正 */ }
 
-function buildPanel(){ if (getEl("opf-root")) return; var root = document.createElement("div"); root.id = "opf-root"; root.className = "opf-hidden"; root.style.display = "none"; root.innerHTML = OPF_HTML; document.body.appendChild(root); launcher(); bindPanel(root); renderSteps(); syncFromSettings(); addWorkflowUI(root); try { buildWorldSideButton(root); } catch (e) { opfErr("side button", e); } try { addComplianceToggle(root); } catch (e) { opfErr("compliance toggle", e); } try { addMemoUI(root); } catch (e) { opfErr("memo ui", e); } if (getSettings().visible) showPanel(); }
+function buildPanel(){ if (getEl("opf-shell")) return; buildShell(); }
 
 function bindPanel(root){
   root.querySelector("#opf-btn-close").addEventListener("click", hidePanel);
@@ -720,7 +697,7 @@ function bindPanel(root){
   root.querySelector("#opf-cap").addEventListener("change", syncFromControl);
   root.querySelector("#opf-pname").addEventListener("change", syncFromControl);
   var fi = document.createElement("input"); fi.type = "file"; fi.accept = ".json,application/json"; ST.fileInput = fi;
-  fi.addEventListener("change", function(){ var f = fi.files && fi.files[0]; if (!f) return; loadWorldFromFile(f).then(function(res){ applyWorldResult(res); renderMetaStatus(); toast("世界书已从文件载入：" + (res.fileName || "")); }).catch(function(e){ toast("世界书文件解析失败：" + (e && e.message ? e.message : e), "error"); }); fi.value = ""; });
+  fi.addEventListener("change", function(){ var f = fi.files && fi.files[0]; if (!f) return; loadWorldFromFile(f).then(function(res){ applyWorldResult(res); renderMetaStatus(); toast("世界书已从文件载入：" + (res.fileName || "")); try { switchPage("world"); } catch (e) {} }).catch(function(e){ toast("世界书文件解析失败：" + (e && e.message ? e.message : e), "error"); }); fi.value = ""; });
   root.querySelector("#opf-wload").addEventListener("click", function(){ fi.click(); });
   root.querySelector("#opf-wclear").addEventListener("click", function(){ clearWorldbook(); });
   makeDraggable(root.querySelector("#opf-head"), root);
@@ -822,6 +799,11 @@ function renderRunButtons(){
   if (run) { run.disabled = !!ST.running; run.textContent = ST.running ? "■ 运行中…" : "▶ 生成初稿"; }
   if (qk) { qk.disabled = !!ST.running; if (!ST.running) qk.textContent = "⚡ 快速初稿"; }
   if (la) { if (ST.running) la.classList.add("running"); else la.classList.remove("running"); }
+  var cRun = getEl("opf-char-run"); var cLink = getEl("opf-char-link"); var cFin = getEl("opf-char-final");
+  if (cRun) { cRun.disabled = !!ST.running; cRun.textContent = ST.running ? "■ 运行中…" : "▶ 分段初稿"; }
+  if (cLink) cLink.disabled = !!ST.running;
+  if (cFin) cFin.disabled = !!ST.running;
+  CHAR_SEGS.forEach(function (s) { charSetSegUi(s.id, ST.char && ST.char.status[s.id] || "wait"); });
 }
 
 function runFlow(quick){
@@ -1123,9 +1105,16 @@ function importWorldEntries(rawEntries, sourceName, fileName){
   var old = ST.wb.entries || [];
   var oldSel = {};
   old.forEach(function (o){ if (o.srcKey === key) oldSel[o.id] = o.sel; });
+  // 跨会话缓存勾选：按 comment 匹配（同一本书重复导入/刷新时保留上次勾选，即使 uid 变化）
+  var cacheSel = worldCacheGetSel(fileName || null, key);
   var fresh = wpkNorm(rawEntries, key + ":");
   var c = 0;
-  fresh.forEach(function (e){ e.sel = Object.prototype.hasOwnProperty.call(oldSel, e.id) ? !!oldSel[e.id] : !!e.constant; if (e.sel) c++; });
+  fresh.forEach(function (e){
+    if (Object.prototype.hasOwnProperty.call(oldSel, e.id)) e.sel = !!oldSel[e.id];
+    else if (cacheSel && Object.prototype.hasOwnProperty.call(cacheSel, e.comment)) e.sel = !!cacheSel[e.comment];
+    else e.sel = !!e.constant;
+    if (e.sel) c++;
+  });
   ST.wb.entries = old.filter(function (o){ return o.srcKey !== key; }).concat(fresh);
   ST.wb.books = ST.wb.books || [];
   ST.wb.bookOf = ST.wb.bookOf || {}; ST.wb.bookOf[key] = label;
@@ -1133,6 +1122,7 @@ function importWorldEntries(rawEntries, sourceName, fileName){
   ST.worldSource = (ST.wb.books.length > 1) ? "multi" : (fileName ? "file:" + fileName : (sourceName === "st" ? "st" : "file"));
   ST.catOpen = null; ST.regionOpen = null;
   ST.worldInfo = "";
+  worldCacheSave(fileName, key, fresh);
   updateSendText();
   try { renderWorldSide(); } catch (e) { opfErr("renderWorldSide", e); }
   renderMetaStatus();
@@ -1154,6 +1144,7 @@ function updateSendText(){
     parts.push(line); total += line.length;
   }
   ST.worldInfo = parts.join(nl2);
+  worldCachePersistSel();
 }
 function clearWorldbook(){
   ST.wb = { entries: [], books: [], loaded: {}, bookOf: {}, source: "none", fileName: null };
@@ -1161,6 +1152,7 @@ function clearWorldbook(){
   ST.regionOpen = null;
   ST.worldSource = "none";
   ST.worldInfo = "";
+  worldCacheClearSel();
   try { renderWorldSide(); } catch (e) {}
   renderMetaStatus();
   toast("已清空世界书条目");
@@ -1264,7 +1256,7 @@ function buildWorldSide(){
   var side = document.createElement("div"); side.id = "opf-lside";
   var head = document.createElement("div"); head.id = "opf-lside-head";
   var t = document.createElement("span"); t.className = "t"; t.textContent = "世界书条目 · 勾选发送";
-  var hx = document.createElement("button"); hx.type = "button"; hx.className = "opf-lside-ico"; hx.textContent = "✕"; hx.addEventListener("click", closeWorldSide);
+  var hx = document.createElement("button"); hx.type = "button"; hx.className = "opf-lside-ico"; hx.textContent = "✕"; hx.addEventListener("click", function(){ switchPage("preset"); });
   head.appendChild(t); head.appendChild(hx); side.appendChild(head);
   var tools = document.createElement("div"); tools.id = "opf-lside-tools";
   var bAll = document.createElement("button"); bAll.type = "button"; bAll.className = "opf-step-act"; bAll.textContent = "全选"; bAll.addEventListener("click", function(){ wpkSetAll(true); });
@@ -1277,15 +1269,16 @@ function buildWorldSide(){
   tools.appendChild(bAll); tools.appendChild(bConst); tools.appendChild(bNone); tools.appendChild(filt); tools.appendChild(catSel); side.appendChild(tools);
   var cnt = document.createElement("div"); cnt.id = "opf-lside-count"; side.appendChild(cnt);
   var list = document.createElement("div"); list.id = "opf-lside-list"; side.appendChild(list);
-  document.body.appendChild(side);
+  var host = getEl("opf-page-world") || document.body;
+  host.appendChild(side);
   renderWorldSide();
 }
-function openWorldSide(){ try { buildWorldSide(); } catch (e) { opfErr("buildWorldSide", e); return; } var s = getEl("opf-lside"); if (s) s.classList.add("open"); }
-function closeWorldSide(){ var s = getEl("opf-lside"); if (s) s.classList.remove("open"); }
-function toggleWorldSide(){ var s = getEl("opf-lside"); if (!s) { openWorldSide(); return; } if (s.classList.contains("open")) closeWorldSide(); else openWorldSide(); }
+function openWorldSide(){ try { buildWorldSide(); } catch (e) { opfErr("buildWorldSide", e); return; } try { switchPage("world"); } catch (e) {} }
+function closeWorldSide(){ try { switchPage("preset"); } catch (e) {} }
+function toggleWorldSide(){ var s = getSettings(); if (s.activePage === "world") { closeWorldSide(); } else { openWorldSide(); } }
 function buildWorldSideButton(root){
   if (!root || getEl("opf-wbtn")) return;
-  var btn = document.createElement("button"); btn.type = "button"; btn.className = "opf-step-act"; btn.id = "opf-wbtn"; btn.textContent = "世界书清单"; btn.title = "展开世界书条目侧栏（勾选哪些发送给 AI）";
+  var btn = document.createElement("button"); btn.type = "button"; btn.className = "opf-step-act"; btn.id = "opf-wbtn"; btn.textContent = "世界书清单"; btn.title = "打开「世界书」页（勾选哪些条目发送给 AI；勾选与导入自动缓存）";
   btn.addEventListener("click", toggleWorldSide);
   var opts = root.querySelectorAll(".opf-opts");
   if (opts && opts.length) { opts[opts.length - 1].appendChild(btn); } else { root.appendChild(btn); }
@@ -1845,11 +1838,494 @@ function addMemoUI(root) {
   renderMemoSummary();
 }
 
+// ============================================================================
+// v1.7.0 全屏分页壳 + 本地缓存 + 二创角色工坊
+// ============================================================================
+var PAGE_DEFS = [
+  { id: "preset", label: "① 开局预设" },
+  { id: "world",  label: "② 世界书" },
+  { id: "char",   label: "③ 二创角色" },
+  { id: "p4",     label: "④ DLC剧情", ph: true },
+  { id: "p5",     label: "⑤ DLC物品", ph: true },
+  { id: "p6",     label: "⑥ 更多功能", ph: true }
+];
+
+var SHELL_CSS = "#opf-shell{position:fixed;inset:0;height:100vh;height:100dvh;z-index:2147480002;display:flex;flex-direction:column;color:#fdeef0;font-family:'Noto Sans SC','Microsoft YaHei',sans-serif;letter-spacing:.3px;background:linear-gradient(180deg,#18040b 0%,#0d0206 55%,#0a0105 100%);border:none;transition:opacity .16s ease,transform .16s ease}#opf-shell.opf-shell-hidden{opacity:0;pointer-events:none;transform:translateY(12px)}#opf-shell *{box-sizing:border-box}#opf-shell-head{position:relative;display:flex;align-items:center;gap:10px;padding:8px 12px;flex:none;background:rgba(46,6,14,.6);border-bottom:1px solid rgba(255,122,138,.28)}#opf-shell-head::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#ff4d5e 18%,#ffd9a8 50%,#c8102e 82%,transparent);box-shadow:0 0 12px rgba(255,90,100,.8)}#opf-shell-title{font-size:15px;font-weight:600;color:#ffd9de;text-shadow:0 0 10px rgba(255,77,94,.35);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#opf-shell-close{margin-left:auto;flex:none;border:1px solid rgba(255,122,138,.35);background:rgba(255,77,94,.14);color:#ff8a95;width:40px;height:40px;min-width:40px;border-radius:10px;font-size:16px;cursor:pointer}#opf-shell-close:hover{background:rgba(255,77,94,.3);color:#fff}#opf-nav{display:flex;gap:5px;padding:8px 10px 0;overflow-x:auto;overflow-y:hidden;flex:none;scrollbar-width:thin;scrollbar-color:rgba(255,122,138,.4) transparent}.opf-tab{flex:none;border:1px solid rgba(255,122,138,.26);background:rgba(255,235,238,.05);color:#ffc9cf;border-radius:10px 10px 0 0;padding:9px 13px;font-size:12.5px;line-height:1.2;cursor:pointer;white-space:nowrap;min-height:40px}.opf-tab.active{background:linear-gradient(180deg,rgba(255,77,94,.26),rgba(255,77,94,.07));color:#fff;border-color:rgba(255,150,165,.65);box-shadow:inset 0 2px 0 #ff4d5e}.opf-tab.placeholder{opacity:.6;border-style:dashed}#opf-pages{flex:1;min-height:0;position:relative}.opf-page{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;padding:10px 12px 14px;display:none;scrollbar-width:thin}.opf-page.active{display:block}.opf-page-ph{padding:32px 16px;text-align:center;color:rgba(255,200,208,.55);font-size:13.5px;line-height:2.2;white-space:pre-line}#opf-shell #opf-root{position:static;width:100%;max-width:100%;height:auto;min-height:100%;max-height:none;margin:0;border:none;border-radius:0;box-shadow:none;background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none}#opf-shell #opf-root.opf-hidden{opacity:1;pointer-events:auto;transform:none}#opf-shell #opf-root::before{display:none}#opf-shell #opf-lside{position:static;transform:none;width:100%;max-width:none;height:100%;top:auto;bottom:auto;left:auto;border:none;border-radius:0;box-shadow:none;background:transparent}#opf-shell #opf-lside.open{transform:none}.opf-char-wrap{display:flex;flex-direction:column;gap:8px;max-width:860px;margin:0 auto}.opf-char-input{width:100%;border-radius:8px;padding:8px 10px;font-size:12.5px;color:#ffeef1;background:rgba(10,2,5,.55);border:1px solid rgba(255,122,138,.25);outline:none;resize:vertical}.opf-char-input:focus{border-color:rgba(255,110,125,.6);box-shadow:0 0 6px rgba(255,77,94,.25)}#opf-char-demand{min-height:56px}#opf-char-ref{min-height:48px;font-size:12px}.opf-char-tools{display:flex;gap:6px;flex-wrap:wrap}.opf-char-tools .opf-btn{flex:1 1 130px;min-height:44px;font-size:13px}.opf-char-report{white-space:pre-wrap;max-height:260px;overflow-y:auto}.opf-char-copyrow{margin-top:6px}@media (max-width:760px){#opf-shell-head{padding:6px 8px}#opf-shell-title{font-size:13px}#opf-shell-close{width:40px;height:40px}.opf-tab{padding:8px 10px;font-size:11.5px;min-height:40px}.opf-page{padding:8px 8px 12px}#opf-shell #opf-root{font-size:13px}.opf-page .opf-btn{min-height:44px}.opf-char-tools .opf-btn{min-height:46px}.opf-wi-row{min-height:40px}.opf-wi-row input{width:18px;height:18px}#opf-lside-tools{gap:6px}#opf-lside-tools .opf-step-act{min-height:40px;font-size:12px}}";
+
+function buildShell(){
+  if (getEl("opf-shell")) return;
+  try { if (!getEl(NS + "_css_shell")) { var st = document.createElement("style"); st.id = NS + "_css_shell"; st.textContent = SHELL_CSS; document.head.appendChild(st); } } catch (e) { opfErr("shell css", e); }
+  var shell = document.createElement("div"); shell.id = "opf-shell"; shell.className = "opf-shell-hidden";
+  var head = document.createElement("div"); head.id = "opf-shell-head";
+  var title = document.createElement("div"); title.id = "opf-shell-title"; title.textContent = "✦ 始弦的魔法大典 · 多功能工坊";
+  var close = document.createElement("button"); close.type = "button"; close.id = "opf-shell-close"; close.title = "关闭"; close.textContent = "✕";
+  close.addEventListener("click", hidePanel);
+  head.appendChild(title); head.appendChild(close); shell.appendChild(head);
+  var nav = document.createElement("nav"); nav.id = "opf-nav";
+  PAGE_DEFS.forEach(function (p) {
+    var t = document.createElement("button"); t.type = "button"; t.id = "opf-tab-" + p.id; t.className = "opf-tab" + (p.ph ? " placeholder" : "");
+    t.textContent = p.label; t.title = p.ph ? "占位页 · 留给后续功能" : p.label;
+    t.addEventListener("click", function () { switchPage(p.id); });
+    nav.appendChild(t);
+  });
+  shell.appendChild(nav);
+  var pages = document.createElement("div"); pages.id = "opf-pages";
+  PAGE_DEFS.forEach(function (p) {
+    var d = document.createElement("div"); d.id = "opf-page-" + p.id; d.className = "opf-page";
+    if (p.id === "preset") {
+      var root = document.createElement("div"); root.id = "opf-root"; root.className = ""; root.style.display = "flex"; root.innerHTML = OPF_HTML;
+      d.appendChild(root);
+    } else if (p.id === "char") {
+      d.innerHTML = CHAR_HTML;
+    } else if (p.id === "world") {
+      /* 世界书侧栏由 buildWorldSide 挂载到本页 */
+    } else {
+      var hint = document.createElement("div"); hint.className = "opf-page-ph";
+      hint.textContent = "（占位页）\n" + p.label + "\n\n此页留给后续功能，敬请期待。";
+      d.appendChild(hint);
+    }
+    pages.appendChild(d);
+  });
+  shell.appendChild(pages);
+  document.body.appendChild(shell);
+  launcher();
+  var root = getEl("opf-root");
+  bindPanel(root);
+  renderSteps(); syncFromSettings(); addWorkflowUI(root);
+  try { buildWorldSideButton(root); } catch (e) { opfErr("side button", e); }
+  try { addComplianceToggle(root); } catch (e) { opfErr("compliance toggle", e); }
+  try { addMemoUI(root); } catch (e) { opfErr("memo ui", e); }
+  try { bindCharPage(); } catch (e) { opfErr("char page", e); }
+  try { buildWorldSide(); } catch (e) { opfErr("buildWorldSide", e); }
+  if (getSettings().visible) showPanel();
+}
+function switchPage(id, force){
+  var s = getSettings();
+  if (!force && s.activePage === id) return;
+  s.activePage = id; saveSettings();
+  var pages = getEl("opf-pages"); if (!pages) return;
+  [].forEach.call(pages.children, function (d) { d.classList.toggle("active", d.id === "opf-page-" + id); });
+  var nav = getEl("opf-nav");
+  if (nav) [].forEach.call(nav.children, function (t) { t.classList.toggle("active", t.id === "opf-tab-" + id); });
+  if (id === "world") { try { buildWorldSide(); renderWorldSide(); } catch (e) {} }
+  if (id === "char") { try { renderCharPage(); } catch (e) {} }
+}
+function currentPage(){ return getSettings().activePage || "preset"; }
+
+// ---------------- 本地缓存（localStorage，跨会话保留） ----------------
+var LS_WORLD_KEY = NS + "_worldcache_v1";
+var LS_CHAR_KEY = NS + "_chardraft_v1";
+var WORLD_CACHE_MAX = 4.5 * 1024 * 1024; // 缓存 JSON 序列化上限（字节）
+function lsGet(k){ try { if (typeof localStorage !== "undefined") { var v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } } catch (e) {} return null; }
+function lsSet(k, v){ try { if (typeof localStorage !== "undefined") { localStorage.setItem(k, JSON.stringify(v)); return true; } } catch (e) { opfErr("lsSet", k, e); return false; } }
+function worldCacheGet(){ var c = lsGet(LS_WORLD_KEY); if (!c || typeof c !== "object") c = { books: {} }; if (!c.books || typeof c.books !== "object") c.books = {}; return c; }
+function worldCacheGetSel(fileName, srcKey){
+  var c = worldCacheGet(); var b = null;
+  if (fileName && c.books[fileName]) b = c.books[fileName];
+  if (!b) { for (var k in c.books) { if (c.books[k] && c.books[k].srcKey === srcKey) { b = c.books[k]; break; } } }
+  if (!b || !Array.isArray(b.sel)) return null;
+  var m = {}; b.sel.forEach(function (cm) { m[cm] = true; });
+  return m;
+}
+function worldCacheSave(fileName, srcKey, fresh){
+  if (!fileName && srcKey.indexOf("file:") !== 0) return; // 只缓存文件导入的书（酒馆激活书随会话变化）
+  var bKey = fileName || srcKey.replace(/^file:/, "");
+  var c = worldCacheGet();
+  var entries = fresh.map(function (e) { return { uid: e.uid, comment: e.comment, key: e.key, constant: e.constant, content: e.content }; });
+  var sel = fresh.filter(function (e) { return e.sel; }).map(function (e) { return e.comment; });
+  c.books[bKey] = { srcKey: srcKey, name: fileName || bKey, entries: entries, sel: sel, savedAt: Date.now() };
+  var txt = JSON.stringify(c);
+  if (txt.length > WORLD_CACHE_MAX) {
+    for (var k in c.books) {
+      var b = c.books[k];
+      b.entries.forEach(function (en) { if (b.sel.indexOf(en.comment) < 0) { en.content = ""; en.trimmed = true; } });
+    }
+    txt = JSON.stringify(c);
+    if (txt.length > WORLD_CACHE_MAX) {
+      var keys = Object.keys(c.books).sort(function (x, y) { return (c.books[x].savedAt || 0) - (c.books[y].savedAt || 0); });
+      while (keys.length && JSON.stringify(c).length > WORLD_CACHE_MAX) { delete c.books[keys.shift()]; }
+    }
+    toast("世界书缓存过大：已精简未勾选条目内容（勾选条目完整保留，可重新导入文件刷新）", "warning");
+  }
+  lsSet(LS_WORLD_KEY, c);
+}
+function worldCachePersistSel(){
+  if (worldCachePersistSel._t) clearTimeout(worldCachePersistSel._t);
+  worldCachePersistSel._t = setTimeout(function () {
+    var c = worldCacheGet(); var wb = ST.wb || { entries: [] };
+    var touched = {};
+    wb.entries.forEach(function (e) {
+      var bKey = e.srcKey && e.srcKey.indexOf("file:") === 0 ? e.srcKey.replace(/^file:/, "") : null;
+      if (!bKey || !c.books[bKey] || touched[bKey]) return;
+      touched[bKey] = true;
+      c.books[bKey].sel = wb.entries.filter(function (x) { return x.srcKey === e.srcKey && x.sel; }).map(function (x) { return x.comment; });
+    });
+    lsSet(LS_WORLD_KEY, c);
+  }, 400);
+}
+function worldCacheClearSel(){
+  var c = worldCacheGet();
+  for (var k in c.books) c.books[k].sel = [];
+  lsSet(LS_WORLD_KEY, c);
+}
+function worldCacheRestore(){
+  var c = lsGet(LS_WORLD_KEY); if (!c || !c.books) return;
+  var keys = Object.keys(c.books);
+  if (!keys.length) return;
+  var restored = 0;
+  keys.forEach(function (k) {
+    var b = c.books[k];
+    if (!b || !Array.isArray(b.entries) || !b.entries.length) return;
+    var srcKey = b.srcKey || ("file:" + b.name);
+    var selMap = {}; (b.sel || []).forEach(function (cm) { selMap[cm] = true; });
+    var raw = b.entries.map(function (en) { return { uid: en.uid, comment: en.comment, key: en.key, constant: en.constant, content: en.content || "" }; });
+    var fresh = raw.map(function (en, i) {
+      var keyStr = Array.isArray(en.key) ? en.key.join(" / ") : (typeof en.key === "string" ? en.key : "");
+      var cv = wpkCategory({ comment: en.comment, key: en.key });
+      return { id: srcKey + ":" + (en.uid != null ? "u" + en.uid : "i" + i), srcKey: srcKey, comment: en.comment || "", key: keyStr, content: en.content || "", constant: !!en.constant, sel: !!selMap[en.comment], cat: cv, region: (cv === "地区·地理" ? wpkRegion(en.comment || "") : ""), trimmed: !!en.trimmed };
+    });
+    var selN = 0; fresh.forEach(function (e) { if (e.sel && e.content) selN++; });
+    ST.wb = ST.wb || { entries: [], books: [], loaded: {}, bookOf: {} };
+    var old = ST.wb.entries || [];
+    ST.wb.entries = old.filter(function (o) { return o.srcKey !== srcKey; }).concat(fresh);
+    ST.wb.books = ST.wb.books || [];
+    ST.wb.bookOf = ST.wb.bookOf || {}; ST.wb.bookOf[srcKey] = b.name ? String(b.name).replace(/\.json$/i, "") : k;
+    var label = ST.wb.bookOf[srcKey];
+    if (ST.wb.books.indexOf(label) < 0) ST.wb.books.push(label);
+    restored++;
+  });
+  if (restored) {
+    var wkeys = Object.keys(ST.wb.bookOf || {});
+    ST.worldSource = ST.wb.books.length > 1 ? "multi" : (wkeys.length ? "file:" + wkeys[0] : "file");
+    ST.catOpen = null; ST.regionOpen = null;
+    updateSendText();
+    try { renderWorldSide(); } catch (e) {}
+    renderMetaStatus();
+    opfLog("世界书缓存已恢复", restored, "本");
+    toast("已从本地缓存恢复 " + restored + " 本世界书及上次勾选（重新导入同名文件会刷新内容并保留勾选）");
+  }
+}
+
+// ============================================================================
+// 二创角色工坊（分段初稿 → 交火梳理 → 定点修改 → 标签封装输出）
+// ============================================================================
+var CHAR_SEGS = [
+  { id: "base",  title: "定位与基础", short: "名字/种族/层级/身份" },
+  { id: "stat",  title: "属性与资源", short: "五维/HP·MP·SP" },
+  { id: "mind",  title: "性格与动机", short: "性格码/行为逻辑" },
+  { id: "look",  title: "外貌与衣着", short: "外貌特质/衣物" },
+  { id: "fight", title: "战斗配置", short: "技能/装备/道具" },
+  { id: "story", title: "背景与经历", short: "出身/经历/关系" },
+  { id: "play",  title: "演绎与语料", short: "语料/行为/禁忌" }
+];
+var CHAR_SEG_PROMPTS = {
+  base: "为二创角色敲定“身份底座”，并在本段开头先定下【名称】（后续所有分段沿用这个名字，禁止再改）：\n- 命名：按《角色命名指导》确定风格→语言→音素种子转写；种族命名规则——人类:底层无姓/强者贵族有姓/顶层有中间名；精灵:{音译名}·{自然意象音译}；翼民:{音译名}·{音译姓}(古典庄重)；兽族:底层仅名、贵族带{氏族名}；血族:{名字}·{中间名}·{氏族名}；巨龙:凡世名+真名+史诗称号；矮人:{名字}·{氏族名意译}；半身人:{名字}·{家族姓氏意译}；巨人仅名字；妖精/花灵:诗意短语≤8字；亡灵保留生前名、高阶可用称号。\n- 核心概念：一句话定义（例：“未竟的破晓之星”）+ 特质标签3个。\n- 种族（大类/亚种，从世界书种族条目中选）；外貌年龄与实龄（实龄按生命层级自洽：三层数十年/五层数百年，延寿缓老可驻颜）。\n- 生命层级(一~七)与等级Lv(1-25)自洽；身份/职业数量不限；社会称号/尊号仅 Lv≥13。\n- 只输出本段内容，简洁列出，不写后续分段内容。",
+  stat: "按属性公式计算角色面板并列出算式：\n- 五维 = 天赋基础B(每项0-6，总和0-25，参照天赋档：平凡6-10/正常11-15/优良16-20/异禀21-25) + 层级点(T-1) + 等级额外D(总和=Lv-1)。\n- 五维单值≤所在层级极值(一8/二10/三12/四14/五16/六18/七20)，单项逻辑上限20。\n- HP = 体质×100×HP乘数+五维总和；MP = (智力+精神)×50×MP/SP乘数；SP = (力量+敏捷)×50×MP/SP乘数（乘数查阅世界书《核心数值总表》层级乘数表）。\n- 只输出本段（面板+算式），不要写技能/装备等后续内容。",
+  mind: "按《角色辅助指导》性格码为角色定型：\n- 五维动机模型：[关系动机Rc/Rr/Rh/Rf]-[情绪定位Eu/Ed/Et/Ep]-[行动触发Ap/Ac/Ai/Aw]-[冲突核心Cp/Cr/Ct/Cm]-[意义安置Pf/Pw/Pv/Ps]-[稳定性Sk/Sm/Sf]，写出完整码并解释每维选择理由。\n- 禁止按种族/身份/职业套用刻板印象；从性格池顺取或按需求定码，与出身经历呼应。\n- 行为逻辑：日常/战斗/雷点；喜好与厌恶。\n- 只输出本段，外貌、战斗配置留给后续分段。",
+  look: "按《角色辅助指导》毛色瞳色指导写外观：魔法世界毛发/羽毛/眼瞳颜色与形态可多样化（混色/渐变/流光/竖瞳/重瞳/星型/十字/发光/多眼），可体现元素亲和。\n- 外貌特质：外观年龄/实龄/身高/身体细节（头到脚趾、种族特征）/生理特征/身体改造（可选）。\n- 衣物装饰：全部衣着（材质/颜色/款式/破损程度）——外衣/内衬/内衣裤/鞋袜/饰品。\n- 必须与性格、种族、出身、身份一致（如配色映衬性格、风格匹配身份）。只输出本段。",
+  fight: "按《技能装备道具生成规则》《品质效果限定规则》配置战斗：\n- 品质七等 普通/优良/稀有/史诗/传说/神话 + 唯一；词条上限：普1/优良2/稀有2/史诗3/传说3/神话3；史诗三词条其一须为“微弱要素”效果、传说“微弱权能”、神话“微弱法则”。\n- 技能数量 = 基础(0-1)+ceil((层级-1)/2)+额外(0-3)；攻击技(消耗[攻击]、即时伤害)与动作技(消耗[动作]、禁即时伤害与威力、可含DoT)区分；标签[关联属性][目标类型][核心功能][威力][特性][可选机制]；核心功能“伤害”仅攻击技、威力攻击技必填动作技禁用；学习/领悟所得品质≤自身层级，血脉觉醒/种族转换可越阶。\n- 装备：武器0-2/防具饰品0-3；[攻击:XXX]/[防御:XXX]/[徽记:XXX]；装备不增减持有者属性。道具0-2。\n- 战斗风格一句话：与性格互映射。\n- 登神长阶：Lv1-12无；13-16要素1-3；17-20权能1；21-24法则1；Lv25法则+神位——按等级填，未达不写。只输出本段。",
+  story: "写背景与经历，与层级/等级/属性/技能品质/性格全链自洽：\n- 起源（家庭/家乡/时代）→ 转折事件（塑造性格与技能来源）→ 现状与未来。\n- 实力来源必须交代清楚：为什么是这个层级/等级、为什么拥有这些品质的技能装备（学习/领悟≤自身层级；血脉觉醒/种族转换可越阶）。\n- 关系锚点1-2个：定位/共鸣/冲突，为后续演绎提供张力。\n- 只输出本段。",
+  play: "按 DLC 角色卡惯例写演绎层：\n- 语料示例4-6句：口头禅/战斗台词/日常对白，风格与性格码一致，用词呼应出身与经历。\n- 行为参考：日常小动作/战斗偏好/癖好（呼应外貌与战斗方式）。\n- 禁忌（绝不能做/说）与提倡（演绎要点）。\n- 对{{user}}的关系态度一句。只输出本段。"
+};
+var CHAR_LINK_CHAIN = "L1 背景经历→层级等级/身份职业：实力必须有来历，禁止“凭空强者”。\nL2 背景经历→性格码：重大事件塑造动机（关系/情绪/行动/冲突/意义），创伤或誓言落在具体经历。\nL3 种族+命名指导→姓名结构：命名规则与阶级格式必须匹配。\nL4 性格→外貌衣着：神情/配色/风格/破损与心境映射；身份与着装一致。\nL5 性格+层级→战斗方式：攻击技/动作技配比、风格、武器类型与性格互映射。\nL6 战斗方式+品质规则→技能装备道具：词条上限/品质档位/威力资源合规；技能来源与经历呼应。\nL7 属性公式→属性资源：五维=基础+层级+等级额外；HP/MP/SP公式；极值与硬顶20。\nL8 性格+背景→演绎语料：口头禅呼应经历、雷点呼应创伤、行为呼应动机。\n反向校验：技能/装备的来源必须在经历中有交代；登神长阶严格按等级档位；唯一品质仅在出处特殊时使用；五维禁止极端加点。";
+var CHAR_HTML = "<div class=\"opf-char-wrap\"><div class=\"opf-sec-label\">✦ 二创角色工坊 · 分段式生成（产出世界书 DLC 角色条目）</div><div class=\"opf-dim\">流程：① 分段初稿（7段串行）→ ② 交火梳理（出身/经历→性格→外观/衣着/战斗→技能装备→属性 全链联动审查并修订）→ ③ 逐段定点修改（只改你指定的段，其它段冻结）→ ④ 最终封装：始弦的魔法大典提交标签包裹的纯文本。</div><textarea id=\"opf-char-demand\" class=\"opf-char-input\" placeholder=\"写谁？给出大致设定与需求（例：一位出身瓦伦蒂亚贫民区、靠街头格斗活下来的少女，性格倔强护短……）\"></textarea><textarea id=\"opf-char-ref\" class=\"opf-char-input\" placeholder=\"（可选）参考文本：已有设定/原型描述/世界书片段，将作为参考注入\"></textarea><div class=\"opf-char-tools\"><button type=\"button\" class=\"opf-btn primary\" id=\"opf-char-run\">▶ 分段初稿</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-link\">⚔ 交火梳理</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-final\">🎁 最终封装</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-new\">🗑 新角色</button></div><div id=\"opf-char-steps\"></div><div class=\"opf-sec\"><div class=\"opf-sec-label\">交火梳理报告</div><pre id=\"opf-char-report\" class=\"opf-char-report\">尚未梳理</pre></div><div class=\"opf-out\"><div class=\"opf-sec-label\">最终稿件（标签包裹纯文本，可直接粘进世界书 DLC 条目）</div><pre id=\"opf-char-out\">尚未封装</pre><div class=\"opf-char-copyrow\"><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-copy\">⧉ 复制最终稿件</button></div></div></div>";
+
+function charInit(){ ST.char = ST.char || { demand: "", ref: "", segs: {}, status: {}, report: "", out: "", name: "", _inited: false }; ST.charEls = ST.charEls || {}; }
+function bindCharPage(){
+  charInit();
+  var run = getEl("opf-char-run"); if (!run || run._b) return; run._b = true;
+  run.addEventListener("click", function(){ if (ST.running) { ST.stopReq = true; toast("正在停止…"); return; } runCharDraft(); });
+  getEl("opf-char-link").addEventListener("click", function(){ runCharLinkage(); });
+  getEl("opf-char-final").addEventListener("click", function(){ finalizeChar(); });
+  getEl("opf-char-new").addEventListener("click", function(){ clearChar(); });
+  getEl("opf-char-copy").addEventListener("click", function(){ copyCharOut(); });
+  getEl("opf-char-demand").addEventListener("input", function(){ ST.char.demand = this.value; charDraftCacheSave(); });
+  getEl("opf-char-ref").addEventListener("input", function(){ ST.char.ref = this.value; charDraftCacheSave(); });
+  renderCharSteps();
+  renderCharPage();
+}
+function charSystemContent(){
+  var lines = [];
+  lines.push('[角色] ' + macroFill(PAYLOAD.persona));
+  if (PAYLOAD.supplement) lines.push('[补充] ' + macroFill(PAYLOAD.supplement.replace(/^\s*<[^>]*>\s*/, '')));
+  lines.push('[任务] 你正在以“始弦的魔法大典”的身份，为{{user}}的二创角色（最终作为世界书 DLC 角色条目）进行分段创作。全程遵守世界规则与《角色生成》《角色辅助指导》《角色命名指导》《技能装备道具生成规则》《品质效果限定规则》；各分段保持一致与呼应，不重复、不推翻已定内容。');
+  lines.push('[世界规则·创作限制]'); lines.push(WORLD_RULES);
+  if (ST.worldInfo) lines.push('[世界书参考（世界书页勾选的条目）]\n' + ST.worldInfo);
+  return macroFill(lines.join('\n\n'));
+}
+function charUser0(){
+  var lines = [];
+  lines.push('[本次二创需求] ' + (ST.char.demand || ""));
+  if (ST.char.ref) lines.push('[参考文本]\n' + ST.char.ref);
+  lines.push('[工作方式] 我将分 7 个分段依次生成：定位与基础→属性与资源→性格与动机→外貌与衣着→战斗配置→背景与经历→演绎与语料。每段只完成该段内容；已生成段落为既有设定，必须一致；禁止预写后面段落。');
+  return lines.join('\n\n');
+}
+function charSetSeg(pid, st){ ST.char.status[pid] = st; charSetSegUi(pid, st); }
+function charSetSegUi(pid, st){
+  var row = getEl("opf-cph-" + pid); if (!row) return;
+  row.setAttribute("data-st", st);
+  var dot = row.querySelector(".opf-dot");
+  if (dot) dot.textContent = st === "run" ? "◌" : (st === "ok" ? "✓" : (st === "err" ? "✕" : "·"));
+  var has = !!ST.char.segs[pid];
+  var inp = row.querySelector(".opf-ref-input"); var b1 = row.querySelector(".opf-ref-do"); var b2 = row.querySelector(".opf-ref-sug");
+  if (inp) inp.disabled = !has || !!ST.running;
+  if (b1) b1.disabled = !has || !!ST.running;
+  if (b2) b2.disabled = !has || !!ST.running;
+  var tag = row.querySelector(".opf-ref-tag");
+  if (tag) tag.textContent = has ? "可定点修改（其它分段冻结）" : "先跑出本段后可精修";
+}
+function renderCharSegOut(pid){ var pre = ST.charEls && ST.charEls[pid]; if (pre) pre.textContent = ST.char.segs[pid] || "（本段内容显示在这里，点击标题展开/收起）"; }
+function renderCharSteps(){
+  var box = getEl("opf-char-steps"); if (!box) return;
+  box.textContent = "";
+  CHAR_SEGS.forEach(function (s, i) {
+    var row = document.createElement("div"); row.className = "opf-step"; row.setAttribute("data-st", ST.char.status[s.id] || "wait"); row.id = "opf-cph-" + s.id;
+    var head = document.createElement("div"); head.className = "opf-step-head";
+    var idx = document.createElement("span"); idx.className = "opf-idx"; idx.textContent = String(i + 1);
+    var dot = document.createElement("span"); dot.className = "opf-dot"; dot.textContent = "·";
+    var ttl = document.createElement("span"); ttl.className = "opf-step-title"; ttl.textContent = s.title;
+    var sub = document.createElement("span"); sub.className = "opf-step-sub"; sub.textContent = s.short;
+    var btn = document.createElement("button"); btn.className = "opf-step-act"; btn.type = "button"; btn.textContent = "重跑本段及后续"; btn.title = "从本段重新生成到结尾（覆盖本段及后续内容）";
+    btn.addEventListener("click", function (ev) { ev.stopPropagation(); runCharFrom(s.id); });
+    head.appendChild(idx); head.appendChild(dot); head.appendChild(ttl); head.appendChild(sub); head.appendChild(btn);
+    head.addEventListener("click", function () { row.classList.toggle("open"); });
+    row.appendChild(head);
+    var body = document.createElement("div"); body.className = "opf-step-body";
+    var pre = document.createElement("pre"); pre.textContent = "（本段内容显示在这里，点击标题展开/收起）";
+    body.appendChild(pre);
+    ST.charEls[s.id] = pre;
+    row.appendChild(body);
+    var ref = document.createElement("div"); ref.className = "opf-step-ref";
+    var tag = document.createElement("span"); tag.className = "opf-ref-tag"; tag.id = "opf-ref-tag-c" + s.id; tag.textContent = "先跑出本段后可精修";
+    var chips = document.createElement("div"); chips.id = "opf-ref-chips-c" + s.id;
+    var r1 = document.createElement("div"); r1.className = "opf-step-ref-row";
+    var inp = document.createElement("input"); inp.type = "text"; inp.className = "opf-ref-input"; inp.placeholder = "定点修改指令（只改这一段）…"; inp.disabled = true;
+    var doB = document.createElement("button"); doB.type = "button"; doB.className = "opf-step-act opf-ref-do"; doB.textContent = "定点修改本段"; doB.disabled = true;
+    var sug = document.createElement("button"); sug.type = "button"; sug.className = "opf-step-act opf-ref-sug"; sug.textContent = "该段建议"; sug.disabled = true;
+    doB.addEventListener("click", function (ev) { ev.stopPropagation(); refineCharSeg(s.id, inp.value); });
+    sug.addEventListener("click", function (ev) { ev.stopPropagation(); suggestCharDir(s.id); });
+    r1.appendChild(inp); r1.appendChild(doB); r1.appendChild(sug);
+    ref.appendChild(tag); ref.appendChild(chips); ref.appendChild(r1);
+    row.appendChild(ref);
+    box.appendChild(row);
+    if (ST.char.segs[s.id]) { renderCharSegOut(s.id); charSetSegUi(s.id, ST.char.status[s.id] || "ok"); }
+  });
+}
+function renderCharPage(){
+  charInit();
+  if (!getEl("opf-char-wrap")) return;
+  if (!ST.char._inited) {
+    ST.char._inited = true;
+    var d = getEl("opf-char-demand"); if (d && !d.value) d.value = ST.char.demand || "";
+    var r = getEl("opf-char-ref"); if (r && !r.value) r.value = ST.char.ref || "";
+  }
+  var out = getEl("opf-char-out"); if (out && out.textContent === "封装中…") return; if (out) out.textContent = ST.char.out || "尚未封装";
+  var rep = getEl("opf-char-report"); if (rep && rep.textContent !== "交火梳理中…") rep.textContent = ST.char.report || "尚未梳理";
+  CHAR_SEGS.forEach(function (s) { renderCharSegOut(s.id); charSetSegUi(s.id, ST.char.status[s.id] || "wait"); });
+}
+async function runCharDraft(){
+  if (ST.running) { toast("已有任务进行中（单线程）", "warning"); return; }
+  var d = getEl("opf-char-demand"); var r = getEl("opf-char-ref");
+  ST.char.demand = (d && d.value || "").trim();
+  ST.char.ref = (r && r.value || "").trim();
+  if (!ST.char.demand) { toast("请先填写角色需求", "warning"); return; }
+  ST.running = true; ST.stopReq = false; renderRunButtons();
+  var msgs = [{ role: "system", content: charSystemContent() }, { role: "user", content: charUser0() }];
+  try {
+    for (var i = 0; i < CHAR_SEGS.length; i++) {
+      if (isStop()) break;
+      await runCharSeg(CHAR_SEGS[i], msgs, i);
+      await waitTick();
+    }
+    if (isStop()) toast("已停止");
+    else toast("分段初稿完成：可继续「⚔ 交火梳理」", "success");
+  } catch (e) { toast("分段生成出错：" + (e && e.message ? e.message : e), "error"); }
+  finally { ST.running = false; renderRunButtons(); charDraftCacheSave(); }
+}
+async function runCharSeg(seg, msgs, idx){
+  charSetSeg(seg.id, "run");
+  var prev = "";
+  for (var k = 0; k < idx; k++) { var ps = CHAR_SEGS[k]; if (ST.char.segs[ps.id]) prev += "\n\n【" + ps.title + "】\n" + ST.char.segs[ps.id]; }
+  var userMsg = { role: "user", content: "【分段" + (idx + 1) + "/7：" + seg.title + "】\n" + macroFill(CHAR_SEG_PROMPTS[seg.id] || "") + (prev ? "\n\n[此前已定分段（既有设定，必须一致，禁止改动）]\n" + prev : "") };
+  msgs.push(userMsg);
+  try {
+    var resp = await callModel(msgs);
+    ST.char.segs[seg.id] = resp;
+    msgs.push({ role: "assistant", content: resp });
+    while (msgs.length > 3 && !systemCtxBudgetOk(msgs)) { if (msgs[2] && msgs[2].role === "assistant") msgs.splice(2, 2); else break; }
+    charSetSeg(seg.id, "ok");
+    renderCharSegOut(seg.id);
+  } catch (e) { charSetSeg(seg.id, "err"); throw e; }
+}
+async function runCharFrom(pid){
+  if (ST.running) return;
+  var start = -1;
+  CHAR_SEGS.forEach(function (s, i) { if (s.id === pid) start = i; });
+  if (start < 0) return;
+  var d = getEl("opf-char-demand"); var r = getEl("opf-char-ref");
+  ST.char.demand = (d && d.value || "").trim(); ST.char.ref = (r && r.value || "").trim();
+  if (!ST.char.demand) { toast("请先填写角色需求", "warning"); return; }
+  ST.running = true; ST.stopReq = false; renderRunButtons();
+  var msgs = [{ role: "system", content: charSystemContent() }, { role: "user", content: charUser0() }];
+  try {
+    for (var k = 0; k < start; k++) {
+      var ph = CHAR_SEGS[k];
+      if (!ST.char.segs[ph.id]) { toast("前面分段尚未完成，请先「分段初稿」", "warning"); ST.running = false; renderRunButtons(); return; }
+      msgs.push({ role: "user", content: "【分段" + (k + 1) + "/7：" + ph.title + "】\n" + macroFill(CHAR_SEG_PROMPTS[ph.id] || "") });
+      msgs.push({ role: "assistant", content: ST.char.segs[ph.id] });
+    }
+    for (var j = start; j < CHAR_SEGS.length; j++) {
+      if (isStop()) break;
+      await runCharSeg(CHAR_SEGS[j], msgs, j);
+      await waitTick();
+    }
+    if (isStop()) toast("已停止");
+  } catch (e) { toast("生成出错：" + (e && e.message ? e.message : e), "error"); }
+  finally { ST.running = false; renderRunButtons(); charDraftCacheSave(); }
+}
+async function refineCharSeg(pid, dir){
+  if (ST.running) { toast("已有任务进行中（单线程）", "warning"); return; }
+  var seg = null;
+  CHAR_SEGS.forEach(function (s) { if (s.id === pid) seg = s; });
+  if (!seg || !ST.char.segs[pid]) { toast("该段还没有内容，请先生成", "warning"); return; }
+  var dirT = (dir || "").trim();
+  if (!dirT) dirT = "修正本段内部矛盾与格式问题，使其与其它段落一致；不新增设定。";
+  var frozen = "";
+  CHAR_SEGS.forEach(function (s2) { if (s2.id !== pid && ST.char.segs[s2.id]) frozen += "\n\n【" + s2.title + "】\n" + ST.char.segs[s2.id]; });
+  ST.running = true; renderRunButtons(); charSetSeg(pid, "run");
+  try {
+    var msgs = [{ role: "system", content: charSystemContent() }, { role: "user", content: charUser0() }];
+    var msg = "【定点修改：只改「" + seg.title + "」这一段】\n\n[用户指令]\n" + dirT + "\n\n[本段现行内容]\n" + ST.char.segs[pid] + "\n\n[冻结区块（其它分段原样保留，一个字都不许改；若发现其它段有问题，最多在结尾另起一行写“备注：建议检查XX段…”提示，不得代改）]\n" + frozen + "\n\n[世界规则·创作限制]\n" + WORLD_RULES + "\n\n要求：只输出修改后的【" + seg.title + "】内容；修改严格限定在用户指令范围内，未要求的地方保持原样，不要顺手润色、扩写或重排。";
+    msgs.push({ role: "user", content: msg });
+    var resp = await callModel(msgs);
+    ST.char.segs[pid] = resp;
+    charSetSeg(pid, "ok"); renderCharSegOut(pid);
+    toast("已修改【" + seg.title + "】（其余分段未动）");
+  } catch (e) { charSetSeg(pid, "err"); toast("定点修改出错：" + (e && e.message ? e.message : e), "error"); }
+  finally { ST.running = false; renderRunButtons(); charDraftCacheSave(); }
+}
+async function suggestCharDir(pid){
+  if (ST.running) { toast("已有任务进行中（单线程）", "warning"); return; }
+  var seg = null;
+  CHAR_SEGS.forEach(function (s) { if (s.id === pid) seg = s; });
+  if (!seg || !ST.char.segs[pid]) { toast("该段还没有内容", "warning"); return; }
+  var chipBox = getEl("opf-ref-chips-c" + pid); if (!chipBox) return;
+  var cur = String(ST.char.segs[pid]).slice(0, 2500);
+  var demand = ST.char.demand || "(未填写)";
+  var ask = "请针对二创角色的【" + seg.title + "】这一段现有内容，给出 2-3 条只针对本段的修改方向。每条一行、≤50字、去掉编号外多余的话、直接可点；必须符合世界规则与联动一致性。\n[角色需求]\n" + demand + "\n[世界规则·创作限制]\n" + WORLD_RULES + "\n[本段现有内容]\n" + cur;
+  var msgs = [{ role: "system", content: charSystemContent() }, { role: "user", content: ask }];
+  ST.running = true; renderRunButtons();
+  try {
+    var resp = await callModel(msgs);
+    var list = [];
+    String(resp).split(/\r?\n/).forEach(function (ln) {
+      var t = String(ln).replace(/^\s*(?:[-*•]|\d+[.、)])\s*/, "").trim();
+      if (t && t.length >= 4 && t.length <= 70 && list.indexOf(t) < 0) list.push(t);
+    });
+    if (!list.length) list = ["让本段与其它段落更咬合", "补充细节/删除冗余", "让数值与格式更合规"];
+    renderCharChips(pid, list.slice(0, 3));
+  } catch (e) { toast("该段建议生成失败：" + (e && e.message ? e.message : e), "error"); }
+  finally { ST.running = false; renderRunButtons(); }
+}
+function renderCharChips(pid, list){
+  var box = getEl("opf-ref-chips-c" + pid); if (!box) return;
+  box.textContent = "";
+  list.forEach(function (t) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "opf-dir-chip";
+    b.textContent = "▶ " + t;
+    b.addEventListener("click", function () { refineCharSeg(pid, t); });
+    box.appendChild(b);
+  });
+}
+async function runCharLinkage(){
+  if (ST.running) { toast("已有任务进行中（单线程）", "warning"); return; }
+  var done = CHAR_SEGS.filter(function (s) { return ST.char.segs[s.id]; });
+  if (done.length < CHAR_SEGS.length) { toast("请先完成全部分段初稿（7/7）", "warning"); return; }
+  ST.running = true; renderRunButtons();
+  var report = getEl("opf-char-report"); if (report) report.textContent = "交火梳理中…";
+  try {
+    var all = CHAR_SEGS.map(function (s) { return "<<<SEG:" + s.id + ">>>\n" + ST.char.segs[s.id]; }).join("\n\n");
+    var msg = "【交火梳理（联动一致性审查）】\n下面是已产出的全部 7 个分段。请按下面的联动链条逐链检查，找出互相矛盾、脱节、数值/品质/命名不合规之处。\n\n[联动链条]\n" + CHAR_LINK_CHAIN + "\n\n[全部段落]\n" + all + "\n\n[世界规则·创作限制]\n" + WORLD_RULES + "\n\n输出要求：\n1. 先输出【梳理报告】：逐条链给一句结论（✓一致 / ⚠问题+理由），最后列出“改动清单”（改了哪段、为什么）。\n2. 然后输出修订后的全部分段，格式严格如下（分隔行必须原样，禁止在分隔行之间加任何解释）：\n<<<SEG:base>>>\n（修订后全文）\n<<<SEG:stat>>>\n（修订后全文）\n<<<SEG:mind>>>\n<<<SEG:look>>>\n<<<SEG:fight>>>\n<<<SEG:story>>>\n<<<SEG:play>>>\n3. 只做“联动性”修改：对齐矛盾、补呼应、修数值/命名/品质合规；不要推翻设定、不要删减段落、不要新增超出原稿的设定；用户没要求的地方保持原样。";
+    var msgs = [{ role: "system", content: charSystemContent() }, { role: "user", content: charUser0() }, { role: "user", content: msg }];
+    var resp = await callModel(msgs);
+    var parts = resp.split(/<<<SEG:(base|stat|mind|look|fight|story|play)>>>/);
+    var reportTxt = (parts[0] || "").trim();
+    var parsed = 0;
+    for (var i = 1; i < parts.length; i += 2) {
+      var pid = parts[i];
+      var body = (parts[i + 1] || "").trim();
+      var known = CHAR_SEGS.some(function (s) { return s.id === pid; });
+      if (body && known) { ST.char.segs[pid] = body; parsed++; charSetSeg(pid, "ok"); renderCharSegOut(pid); }
+    }
+    ST.char.report = reportTxt || "（报告为空）";
+    if (report) report.textContent = ST.char.report;
+    if (parsed === CHAR_SEGS.length) { toast("交火梳理完成：全部分段已联动修订", "success"); }
+    else { toast("梳理完成，但仅解析出 " + parsed + "/7 段（未解析段落保留原稿，可再跑一次）", "warning"); }
+  } catch (e) { toast("交火梳理出错：" + (e && e.message ? e.message : e), "error"); if (report) report.textContent = "梳理失败：" + (e && e.message ? e.message : e); }
+  finally { ST.running = false; renderRunButtons(); charDraftCacheSave(); }
+}
+function charNameGuess(){
+  var base = ST.char.segs.base || "";
+  var m = base.match(/名称[:：]\s*(.+)/) || base.match(/姓名[:：]\s*(.+)/);
+  if (m) return String(m[1]).trim().split(/[，,。\s·]/)[0].slice(0, 20);
+  return "未命名角色";
+}
+async function finalizeChar(){
+  if (ST.running) { toast("已有任务进行中（单线程）", "warning"); return; }
+  var done = CHAR_SEGS.filter(function (s) { return ST.char.segs[s.id]; });
+  if (!done.length) { toast("还没有角色稿件，请先「分段初稿」", "warning"); return; }
+  ST.running = true; renderRunButtons();
+  var outEl = getEl("opf-char-out"); if (outEl) outEl.textContent = "封装中…";
+  try {
+    var all = CHAR_SEGS.map(function (s) { return "【" + s.title + "】\n" + (ST.char.segs[s.id] || "（无）"); }).join("\n\n");
+    var name = charNameGuess();
+    var msg = "【最终封装】\n请以“始弦的魔法大典”的身份，把下面的分段内容整理为一份可直接用作世界书 DLC 角色条目的纯文本。\n\n[全部段落]\n" + all + "\n\n[封装格式（严格照此标签与结构）]\n<" + name + "角色概览>\n（按 DLC 惯例组织小节：人物/外貌/服装/性格/过去/职业·层级·等级·面板/武器/技能/道具等）\n</" + name + "角色概览>\n<" + name + "语言参考>\n1. ……（语料，呼应性格与经历）\n</" + name + "语言参考>\n<" + name + "行为参考>\n- ……（日常行为/战斗偏好/演绎禁忌与提倡）\n</" + name + "行为参考>\n\n[要求]\n1. 只做整合与排版，不新增、不删改、不扩写任何设定内容；数值与名称原样保留。\n2. 若某段缺失，保留其现有内容即可，禁止补写。\n3. 角色名以「定位与基础」段为准；没有名字则用“未命名角色”占位。\n4. 输出纯文本，不要用代码块（不要加三个反引号）包裹。";
+    var msgs = [{ role: "system", content: charSystemContent() }, { role: "user", content: msg }];
+    var resp = await callModel(msgs);
+    ST.char.out = resp;
+    if (outEl) outEl.textContent = resp;
+    toast("最终稿件已封装（可复制，粘进世界书 DLC 条目）", "success");
+  } catch (e) { toast("最终封装出错：" + (e && e.message ? e.message : e), "error"); }
+  finally { ST.running = false; renderRunButtons(); charDraftCacheSave(); }
+}
+function clearChar(){
+  if (!window.confirm("清空当前二创角色（分段/报告/最终稿件）？此操作不可撤销。")) return;
+  ST.char = { demand: "", ref: "", segs: {}, status: {}, report: "", out: "", name: "", _inited: false };
+  var d = getEl("opf-char-demand"); if (d) d.value = "";
+  var r = getEl("opf-char-ref"); if (r) r.value = "";
+  charDraftCacheSave();
+  renderCharSteps(); renderCharPage();
+  toast("已清空，可以开始新角色");
+}
+function copyCharOut(){
+  var txt = ST.char.out || "";
+  if (!txt) { toast("还没有最终稿件，请先「最终封装」", "warning"); return; }
+  function fallback(){ var ta = document.createElement("textarea"); ta.value = txt; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); toast("已复制到剪贴板"); } catch (e) { toast("复制失败，请手动复制"); } ta.remove(); }
+  if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(txt).then(function () { toast("已复制到剪贴板"); }, fallback); } else fallback();
+}
+function charDraftCacheSave(){
+  if (charDraftCacheSave._t) clearTimeout(charDraftCacheSave._t);
+  charDraftCacheSave._t = setTimeout(function () {
+    lsSet(LS_CHAR_KEY, { demand: ST.char.demand, ref: ST.char.ref, segs: ST.char.segs, status: ST.char.status, report: ST.char.report, out: ST.char.out });
+  }, 500);
+}
+function charDraftRestore(){
+  charInit();
+  var c = lsGet(LS_CHAR_KEY); if (!c || typeof c !== "object") return;
+  ST.char.demand = c.demand || ""; ST.char.ref = c.ref || "";
+  ST.char.segs = c.segs || {}; ST.char.status = c.status || {};
+  ST.char.report = c.report || ""; ST.char.out = c.out || "";
+  try { renderCharSteps(); renderCharPage(); } catch (e) { opfErr("charDraftRestore render", e); }
+}
+
 // ============ boot ============
 function boot(){
   injectStyle();
   buildPanel();
   renderRunButtons();
+  try { worldCacheRestore(); } catch (e) { opfErr("worldCacheRestore", e); }
+  try { charDraftRestore(); } catch (e) { opfErr("charDraftRestore", e); }
   initMemo();
   opfLog("loaded. context ready:", !!getCtx());
 }
