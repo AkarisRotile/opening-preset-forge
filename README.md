@@ -1,6 +1,6 @@
 # 始弦的魔法大典 · destiny 开局预设工坊
 
-SillyTavern（酒馆）/ Tavern Helper 浏览器扩展「悬浮窗」· 当前版本 **v1.10.7**
+SillyTavern（酒馆）/ Tavern Helper 浏览器扩展「悬浮窗」· 当前版本 **v1.10.8**
 
 为「始弦的魔法大典 + 命定之诗与黄昏之歌」一类角色卡提供**开局预设一键流水线**：
 
@@ -296,6 +296,26 @@ SillyTavern（酒馆）/ Tavern Helper 浏览器扩展「悬浮窗」· 当前�
 
 **🚀 生成传输：默认零配置（v1.10.7）**
 
+**为什么"酒馆里明明都是流式"、插件却撞 524？**（v1.10.8 把它查到了请求体那一层）
+
+```js
+// public/scripts/openai.js
+L2724:  const stream = settings.stream_openai && type !== 'quiet' && !isO1 && ...;
+L2751:  'stream': stream,      // 直接进请求体，发给 /api/backends/chat-completions/generate
+```
+
+| 路径 | type | 请求体里的 stream | 表现 |
+| --- | --- | --- | --- |
+| 酒馆正常聊天 `Generate('normal')` | `normal` | **true** | **流式**（你在酒馆看到的就是这条） |
+| 插件的 `generateRaw` | `quiet` | **false** | 非流式：中转必须等整段回包，长输出撞 100 秒墙 |
+
+两条是不同的代码路径，所以"酒馆里全是流式"和"插件非流式"同时成立。
+
+**所以流式档现在几乎不用手打**：点「📋 用酒馆的反代设置」——插件直接从酒馆设置面板读 `#openai_reverse_proxy` 与 `#openai_proxy_password`
+（依据 ST 1.18.0 `openai.js` L363/L372 的字段绑定，以及 L2788-2791 正是把这两项塞进 `generate_data` 的地方），
+自动填好地址与密码、顺手切到流式档，并立刻去拉模型列表。
+
+
 默认档就是 **「酒馆主 API（零配置·推荐）」**：**不选流式传输时，地址/密钥/模型名这些字段完全不出现**，也不需要填任何东西——
 模型与采样参数就是你现在聊天用的那套。自定义字段采用**渐进披露**：只有你主动选了流式档才会显示，状态行会直接告诉你还缺哪一项。
 主 API 路径还额外用 `responseLength` 按每段预算硬顶输出长度（防跑飞）；
@@ -380,6 +400,7 @@ body: { chat_completion_source:'makersuite', reverse_proxy:'<你的中转>',
 ## 九、版本历史（简）
 | 版本 | 内容 |
 | --- | --- |
+| v1.10.8 | 查明「酒馆里都是流式、插件却非流式」的原因：`openai.js` L2724 的 `stream = settings.stream_openai && type !== 'quiet'`，正常聊天 type=normal 为 true，而 `generateRaw` 走 type=quiet 恒为 false（请求体里就是 `"stream": false`）；新增「📋 用酒馆的反代设置」一键从 `#openai_reverse_proxy` / `#openai_proxy_password` 读取地址与密码并自动切到流式档、自动拉模型列表 |
 | v1.10.7 | 生成传输默认改为「酒馆主 API（零配置·推荐）」：不选流式档就**完全不显示**地址/密钥/模型字段，无需任何配置；自定义字段渐进披露 + 状态行提示缺项；主 API 路径用 `responseLength` 按段预算硬顶输出；配置不完整时不再静默改写用户设置，仅本次生成降级并提示 |
 | v1.10.6 | 模型列表改双通道合并：ST `/status`（会被 `supportedGenerationMethods` 过滤掉新版 Gemini 模型）+ **直接向反代要原始 `/v1beta/models`**（不过滤，CORS 被拦则跳过）；手填模型名自动记住并进入下拉；状态行报告「原始 N / ST 过滤后 M / 自定义 K」与失败通道原因 |
 | v1.10.5 | 提速：流式传输下「设计基调 + 并发 3 路生成样式块 + 实时预览」；流停顿止损（20 秒无新字节即判停并保留已收内容、4 分钟绝对上限、maxChars/maxTokens 按段预算硬顶）；状态行 5 秒心跳；非流式路径保持原顺序小段策略 |

@@ -3617,7 +3617,7 @@ function rxExtractHtml(text) {
   return (end > start ? t.slice(start + 1, end) : t.slice(start + 1)).replace(/^\n+/, '').replace(/\s+$/, '');
 }
 // ---------- 页面 ----------
-var RX_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">✦ 正则工坊 · 命定系统对话美化</div><div class="opf-dim">流程：粘贴核心全文（或从 ④ 页带入）→ 解析语言格式 → 勾选要美化的格式 → 选用途与预算档位 → 匹配式由插件确定生成、替换体由模型产出 → 实时预览 → 自检 → 导出 JSON。字段名与你现有 4 条正则一致，可直接粘进预设的 regex_scripts。</div><textarea id="opf-rx-core" class="opf-char-input" placeholder="把命定系统核心条目全文粘在这里（必须含「语言格式」节）"></textarea><div class="opf-char-tools"><button type="button" class="opf-btn ghost" id="opf-rx-pull">⬅ 从 ④ 页带入</button><button type="button" class="opf-btn primary" id="opf-rx-parse">🔍 解析语言格式（AI）</button><button type="button" class="opf-btn ghost" id="opf-rx-parse2">⚙ 脚本解析（离线）</button><button type="button" class="opf-btn ghost" id="opf-rx-gen">🎨 生成替换体</button><button type="button" class="opf-btn ghost" id="opf-rx-check">🔎 自检</button><button type="button" class="opf-btn ghost" id="opf-rx-copy1">⧉ 复制单条 JSON</button><button type="button" class="opf-btn ghost" id="opf-rx-copyall">⧉ 复制 JSON 数组</button><button type="button" class="opf-btn ghost" id="opf-rx-new">🗑 清空</button><button type="button" class="opf-btn ghost" id="opf-rx-ping">🩺 连通性自检</button></div><div class="opf-shx-cfg"><label class="opf-opt">生成传输<select id="opf-rx-transport" class="opf-ref-input"><option value="st">酒馆主 API（零配置·推荐）</option><option value="server">经酒馆服务端转发 + 流式（需自填反代）</option><option value="direct">浏览器直连 + 流式（需自填接口）</option></select></label><span class="opf-dim" id="opf-rx-txnote"></span></div><div class="opf-shx-cfg" id="opf-rx-cfg-server" style="display:none"><label class="opf-opt">协议源<select id="opf-rx-source" class="opf-ref-input"><option value="makersuite">Google AI Studio (makersuite)</option><option value="vertexai">Vertex AI (vertexai)</option></select></label><label class="opf-opt">中转/反代地址<input id="opf-rx-reverse" class="opf-ref-input" placeholder="https://你的中转域名"></label><label class="opf-opt">代理密码/密钥<input id="opf-rx-proxypass" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">模型名<input id="opf-rx-model" class="opf-ref-input" list="opf-rx-modellist" placeholder="点右侧按钮获取；也可直接手填，填过会记住"><datalist id="opf-rx-modellist"></datalist></label><button type="button" class="opf-btn ghost" id="opf-rx-models">🔌 获取模型列表</button></div><div class="opf-shx-cfg" id="opf-rx-cfg-direct" style="display:none"><label class="opf-opt">直连协议<select id="opf-rx-proto" class="opf-ref-input"><option value="openai">OpenAI 兼容 (/chat/completions)</option><option value="gemini">Google 原生 (:streamGenerateContent)</option></select></label><label class="opf-opt">直连地址<input id="opf-rx-base" class="opf-ref-input" placeholder="https://api.example.com/v1"></label><label class="opf-opt">直连密钥<input id="opf-rx-key" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">直连模型<input id="opf-rx-chatmodel" class="opf-ref-input" placeholder="留空则用上面的模型名"></label></div><div class="opf-dim" id="opf-rx-statusline">就绪</div><div class="opf-sec"><div class="opf-sec-label">语言格式解析结果（只读核对）</div><pre id="opf-rx-parsed" class="opf-box opf-char-report">尚未解析</pre></div><div id="opf-rx-items"></div><div class="opf-sec"><div class="opf-sec-label">自检</div><pre id="opf-rx-issues" class="opf-box opf-char-report">尚未自检</pre></div></div>';
+var RX_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">✦ 正则工坊 · 命定系统对话美化</div><div class="opf-dim">流程：粘贴核心全文（或从 ④ 页带入）→ 解析语言格式 → 勾选要美化的格式 → 选用途与预算档位 → 匹配式由插件确定生成、替换体由模型产出 → 实时预览 → 自检 → 导出 JSON。字段名与你现有 4 条正则一致，可直接粘进预设的 regex_scripts。</div><textarea id="opf-rx-core" class="opf-char-input" placeholder="把命定系统核心条目全文粘在这里（必须含「语言格式」节）"></textarea><div class="opf-char-tools"><button type="button" class="opf-btn ghost" id="opf-rx-pull">⬅ 从 ④ 页带入</button><button type="button" class="opf-btn primary" id="opf-rx-parse">🔍 解析语言格式（AI）</button><button type="button" class="opf-btn ghost" id="opf-rx-parse2">⚙ 脚本解析（离线）</button><button type="button" class="opf-btn ghost" id="opf-rx-gen">🎨 生成替换体</button><button type="button" class="opf-btn ghost" id="opf-rx-check">🔎 自检</button><button type="button" class="opf-btn ghost" id="opf-rx-copy1">⧉ 复制单条 JSON</button><button type="button" class="opf-btn ghost" id="opf-rx-copyall">⧉ 复制 JSON 数组</button><button type="button" class="opf-btn ghost" id="opf-rx-new">🗑 清空</button><button type="button" class="opf-btn ghost" id="opf-rx-ping">🩺 连通性自检</button></div><div class="opf-shx-cfg"><label class="opf-opt">生成传输<select id="opf-rx-transport" class="opf-ref-input"><option value="st">酒馆主 API（零配置·推荐）</option><option value="server">经酒馆服务端转发 + 流式（需自填反代）</option><option value="direct">浏览器直连 + 流式（需自填接口）</option></select></label><span class="opf-dim" id="opf-rx-txnote"></span></div><div class="opf-shx-cfg" id="opf-rx-cfg-server" style="display:none"><button type="button" class="opf-btn ghost" id="opf-rx-pulltavern">📋 用酒馆的反代设置</button><label class="opf-opt">协议源<select id="opf-rx-source" class="opf-ref-input"><option value="makersuite">Google AI Studio (makersuite)</option><option value="vertexai">Vertex AI (vertexai)</option></select></label><label class="opf-opt">中转/反代地址<input id="opf-rx-reverse" class="opf-ref-input" placeholder="https://你的中转域名"></label><label class="opf-opt">代理密码/密钥<input id="opf-rx-proxypass" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">模型名<input id="opf-rx-model" class="opf-ref-input" list="opf-rx-modellist" placeholder="点右侧按钮获取；也可直接手填，填过会记住"><datalist id="opf-rx-modellist"></datalist></label><button type="button" class="opf-btn ghost" id="opf-rx-models">🔌 获取模型列表</button></div><div class="opf-shx-cfg" id="opf-rx-cfg-direct" style="display:none"><label class="opf-opt">直连协议<select id="opf-rx-proto" class="opf-ref-input"><option value="openai">OpenAI 兼容 (/chat/completions)</option><option value="gemini">Google 原生 (:streamGenerateContent)</option></select></label><label class="opf-opt">直连地址<input id="opf-rx-base" class="opf-ref-input" placeholder="https://api.example.com/v1"></label><label class="opf-opt">直连密钥<input id="opf-rx-key" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">直连模型<input id="opf-rx-chatmodel" class="opf-ref-input" placeholder="留空则用上面的模型名"></label></div><div class="opf-dim" id="opf-rx-statusline">就绪</div><div class="opf-sec"><div class="opf-sec-label">语言格式解析结果（只读核对）</div><pre id="opf-rx-parsed" class="opf-box opf-char-report">尚未解析</pre></div><div id="opf-rx-items"></div><div class="opf-sec"><div class="opf-sec-label">自检</div><pre id="opf-rx-issues" class="opf-box opf-char-report">尚未自检</pre></div></div>';
 
 function rxInit() {
   ST.rx = ST.rx || { core: '', coreName: '', parsed: null, items: [], _inited: false };
@@ -3650,6 +3650,9 @@ function bindRxPage() {
   getEl('opf-rx-new').addEventListener('click', function(){ rxClear(); });
   getEl('opf-rx-ping').addEventListener('click', function(){ rxPing(); });
   getEl('opf-rx-models').addEventListener('click', function(){ rxDoFetchModels(this); });
+  getEl('opf-rx-pulltavern').addEventListener('click', function(){
+    if (rxPullFromTavern()) rxDoFetchModels(getEl('opf-rx-models'));
+  });
   // 换了传输/反代/密码后，若模型名还是空的就自动拉一次
   ['opf-rx-transport', 'opf-rx-reverse', 'opf-rx-proxypass', 'opf-rx-source'].forEach(function (id) {
     var el = getEl(id); if (!el) return;
@@ -4080,6 +4083,31 @@ function rxStreamCall(messages, onNote, opts) {
   }, 5000);
   var p = (cfg.transport === 'server' ? rxServerStream(messages, onDelta, o) : rxDirectStream(messages, onDelta, o));
   return p.then(function (res) { clearInterval(timer); return res; }, function (e) { clearInterval(timer); throw e; });
+}
+// 从酒馆自己的设置里读反代地址与代理密码（省得手打）
+// DOM id 依据 ST 1.18.0 public/scripts/openai.js L363/L372 与 public/index.html L2978/L2994：
+//   reverse_proxy: ['#openai_reverse_proxy', 'reverse_proxy', …]
+//   proxy_password: ['#openai_proxy_password', 'proxy_password', …]
+// 且 ST 生成请求时正是 generate_data.reverse_proxy / proxy_password（openai.js L2788-2791）
+function rxPullFromTavern() {
+  var cfg = rxCfg();
+  var urlEl = getEl('openai_reverse_proxy'), pwEl = getEl('openai_proxy_password');
+  var url = urlEl ? String(urlEl.value || '').trim() : '';
+  var pw = pwEl ? String(pwEl.value || '').trim() : '';
+  var got = [];
+  if (url) { cfg.reverseProxy = url; got.push('反代地址'); }
+  if (pw) { cfg.proxyPassword = pw; got.push('代理密码'); }
+  if (!got.length) {
+    toast('没读到酒馆的反代设置。请确认酒馆主 API 面板里已填好 Reverse Proxy（Google AI Studio 那栏的代理地址），或手动填写下方字段', 'warning');
+    return false;
+  }
+  cfg.transport = 'server';   // 既然是反代场景，顺手切到流式档（这才是能绕开 524 的那条路）
+  var tEl = getEl('opf-rx-transport'); if (tEl) tEl.value = 'server';
+  var rEl = getEl('opf-rx-reverse'); if (rEl) rEl.value = cfg.reverseProxy || '';
+  var pEl = getEl('opf-rx-proxypass'); if (pEl) pEl.value = cfg.proxyPassword || '';
+  rxSyncTransportUi(); rxCacheSave();
+  toast('已从酒馆读取：' + got.join('、') + '｜正在自动获取模型列表…');
+  return true;
 }
 // 模型列表：双通道合并 + 自定义名永久保留
 // 通道① ST 服务端 /status —— 但 ST 会按 supportedGenerationMethods.includes('generateContent') 过滤，
