@@ -3622,7 +3622,7 @@ function rxExtractHtml(text) {
   return (end > start ? t.slice(start + 1, end) : t.slice(start + 1)).replace(/^\n+/, '').replace(/\s+$/, '');
 }
 // ---------- 页面 ----------
-var RX_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">✦ 正则工坊 · 命定系统对话美化</div><div class="opf-dim">流程：粘贴核心全文（或从 ④ 页带入）→ 解析语言格式 → 勾选要美化的格式 → 选用途与预算档位 → 匹配式由插件确定生成、替换体由模型产出 → 实时预览 → 自检 → 导出 JSON。字段名与你现有 4 条正则一致，可直接粘进预设的 regex_scripts。</div><textarea id="opf-rx-core" class="opf-char-input" placeholder="把命定系统核心条目全文粘在这里（必须含「语言格式」节）"></textarea><div class="opf-char-tools"><button type="button" class="opf-btn ghost" id="opf-rx-pull">⬅ 从 ④ 页带入</button><button type="button" class="opf-btn primary" id="opf-rx-parse">🔍 解析语言格式（AI）</button><button type="button" class="opf-btn ghost" id="opf-rx-parse2">⚙ 脚本解析（离线）</button><button type="button" class="opf-btn ghost" id="opf-rx-gen">🎨 生成替换体</button><button type="button" class="opf-btn ghost" id="opf-rx-check">🔎 自检</button><button type="button" class="opf-btn ghost" id="opf-rx-fix">🔧 自动修复</button><button type="button" class="opf-btn ghost" id="opf-rx-copy1">⧉ 复制单条 JSON</button><button type="button" class="opf-btn ghost" id="opf-rx-copyall">⧉ 复制 JSON 数组</button><button type="button" class="opf-btn ghost" id="opf-rx-new">🗑 清空</button><button type="button" class="opf-btn ghost" id="opf-rx-ping">🩺 连通性自检</button></div><div class="opf-shx-cfg"><label class="opf-opt">生成传输<select id="opf-rx-transport" class="opf-ref-input"><option value="st">酒馆主 API（零配置·推荐）</option><option value="server">经酒馆服务端转发 + 流式（需自填反代）</option><option value="direct">浏览器直连 + 流式（需自填接口）</option></select></label><span class="opf-dim" id="opf-rx-txnote"></span></div><div class="opf-shx-cfg" id="opf-rx-cfg-server" style="display:none"><button type="button" class="opf-btn ghost" id="opf-rx-pulltavern">📋 用酒馆的反代设置</button><label class="opf-opt">协议源<select id="opf-rx-source" class="opf-ref-input"><option value="makersuite">Google AI Studio (makersuite)</option><option value="vertexai">Vertex AI (vertexai)</option></select></label><label class="opf-opt">中转/反代地址<input id="opf-rx-reverse" class="opf-ref-input" placeholder="https://你的中转域名"></label><label class="opf-opt">代理密码/密钥<input id="opf-rx-proxypass" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">模型名<input id="opf-rx-model" class="opf-ref-input" list="opf-rx-modellist" placeholder="点右侧按钮获取；也可直接手填，填过会记住"><datalist id="opf-rx-modellist"></datalist></label><button type="button" class="opf-btn ghost" id="opf-rx-models">🔌 获取模型列表</button></div><div class="opf-shx-cfg" id="opf-rx-cfg-direct" style="display:none"><label class="opf-opt">直连协议<select id="opf-rx-proto" class="opf-ref-input"><option value="openai">OpenAI 兼容 (/chat/completions)</option><option value="gemini">Google 原生 (:streamGenerateContent)</option></select></label><label class="opf-opt">直连地址<input id="opf-rx-base" class="opf-ref-input" placeholder="https://api.example.com/v1"></label><label class="opf-opt">直连密钥<input id="opf-rx-key" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">直连模型<input id="opf-rx-chatmodel" class="opf-ref-input" placeholder="留空则用上面的模型名"></label></div><div class="opf-dim" id="opf-rx-statusline">就绪</div><div class="opf-sec"><div class="opf-sec-label">语言格式解析结果（只读核对）</div><pre id="opf-rx-parsed" class="opf-box opf-char-report">尚未解析</pre></div><div id="opf-rx-items"></div><div class="opf-sec"><div class="opf-sec-label">自检</div><pre id="opf-rx-issues" class="opf-box opf-char-report">尚未自检</pre></div></div>';
+var RX_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">✦ 正则工坊 · 命定系统对话美化</div><div class="opf-dim">流程：粘贴核心全文（或从 ④ 页带入）→ 解析语言格式 → 勾选要美化的格式 → 选用途与预算档位 → 匹配式由插件确定生成、替换体由模型产出 → 实时预览 → 自检 → 导出 JSON。字段名与你现有 4 条正则一致，可直接粘进预设的 regex_scripts。</div><textarea id="opf-rx-core" class="opf-char-input" placeholder="把命定系统核心条目全文粘在这里（必须含「语言格式」节）"></textarea><div class="opf-char-tools"><button type="button" class="opf-btn ghost" id="opf-rx-pull">⬅ 从 ④ 页带入</button><button type="button" class="opf-btn primary" id="opf-rx-parse">🔍 解析语言格式（AI）</button><button type="button" class="opf-btn ghost" id="opf-rx-parse2">⚙ 脚本解析（离线）</button><button type="button" class="opf-btn ghost" id="opf-rx-gen">🎨 生成替换体</button><button type="button" class="opf-btn ghost" id="opf-rx-check">🔎 自检</button><button type="button" class="opf-btn ghost" id="opf-rx-fix">🔧 自动修复</button><button type="button" class="opf-btn ghost" id="opf-rx-copy1">⧉ 复制单条 JSON</button><button type="button" class="opf-btn ghost" id="opf-rx-copyall">⧉ 复制 JSON 数组</button><button type="button" class="opf-btn ghost" id="opf-rx-new">🗑 清空</button><button type="button" class="opf-btn ghost" id="opf-rx-ping">🩺 连通性自检</button><button type="button" class="opf-btn ghost" id="opf-rx-last">📄 上次返回</button></div><pre id="opf-rx-lastraw" class="opf-box opf-char-report" style="display:none">尚未调用</pre><div class="opf-shx-cfg"><label class="opf-opt">生成传输<select id="opf-rx-transport" class="opf-ref-input"><option value="st">酒馆主 API（零配置·推荐）</option><option value="server">经酒馆服务端转发 + 流式（需自填反代）</option><option value="direct">浏览器直连 + 流式（需自填接口）</option></select></label><span class="opf-dim" id="opf-rx-txnote"></span></div><div class="opf-shx-cfg" id="opf-rx-cfg-server" style="display:none"><button type="button" class="opf-btn ghost" id="opf-rx-pulltavern">📋 用酒馆的反代设置</button><label class="opf-opt">协议源<select id="opf-rx-source" class="opf-ref-input"><option value="makersuite">Google AI Studio (makersuite)</option><option value="vertexai">Vertex AI (vertexai)</option></select></label><label class="opf-opt">中转/反代地址<input id="opf-rx-reverse" class="opf-ref-input" placeholder="https://你的中转域名"></label><label class="opf-opt">代理密码/密钥<input id="opf-rx-proxypass" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">模型名<input id="opf-rx-model" class="opf-ref-input" list="opf-rx-modellist" placeholder="点右侧按钮获取；也可直接手填，填过会记住"><datalist id="opf-rx-modellist"></datalist></label><button type="button" class="opf-btn ghost" id="opf-rx-models">🔌 获取模型列表</button></div><div class="opf-shx-cfg" id="opf-rx-cfg-direct" style="display:none"><label class="opf-opt">直连协议<select id="opf-rx-proto" class="opf-ref-input"><option value="openai">OpenAI 兼容 (/chat/completions)</option><option value="gemini">Google 原生 (:streamGenerateContent)</option></select></label><label class="opf-opt">直连地址<input id="opf-rx-base" class="opf-ref-input" placeholder="https://api.example.com/v1"></label><label class="opf-opt">直连密钥<input id="opf-rx-key" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">直连模型<input id="opf-rx-chatmodel" class="opf-ref-input" placeholder="留空则用上面的模型名"></label></div><div class="opf-dim" id="opf-rx-statusline">就绪</div><div class="opf-sec"><div class="opf-sec-label">语言格式解析结果（只读核对）</div><pre id="opf-rx-parsed" class="opf-box opf-char-report">尚未解析</pre></div><div id="opf-rx-items"></div><div class="opf-sec"><div class="opf-sec-label">自检</div><pre id="opf-rx-issues" class="opf-box opf-char-report">尚未自检</pre></div></div>';
 
 function rxInit() {
   ST.rx = ST.rx || { core: '', coreName: '', parsed: null, items: [], _inited: false };
@@ -3655,6 +3655,17 @@ function bindRxPage() {
   getEl('opf-rx-copyall').addEventListener('click', function(){ rxCopy(true); });
   getEl('opf-rx-new').addEventListener('click', function(){ rxClear(); });
   getEl('opf-rx-ping').addEventListener('click', function(){ rxPing(); });
+  getEl('opf-rx-last').addEventListener('click', function(){
+    var box = getEl('opf-rx-lastraw'); if (!box) return;
+    var t = ST.rx.lastRaw;
+    if (!t) { toast('还没有调用过模型', 'warning'); return; }
+    if (box.style.display === 'none') {
+      box.style.display = '';
+      box.textContent = '【模型原始返回 · ' + t.length + ' 字符】\n\n' + (t.length > 20000 ? t.slice(0, 20000) + '\n\n…（已截断显示，完整 ' + t.length + ' 字符）' : t);
+    } else {
+      box.style.display = 'none';
+    }
+  });
   getEl('opf-rx-models').addEventListener('click', function(){ rxDoFetchModels(this); });
   getEl('opf-rx-pulltavern').addEventListener('click', function(){
     if (rxPullFromTavern()) rxDoFetchModels(getEl('opf-rx-models'));
@@ -3825,7 +3836,8 @@ function rxRenderItems() {
     // 替换体
     body.appendChild(rxLabel('替换体（模型产出，可手改）'));
     var ta = document.createElement('textarea'); ta.className = 'opf-char-input'; ta.style.minHeight = '80px'; ta.value = item.replaceHtml;
-    ta.addEventListener('input', function () { item.replaceHtml = this.value; rxPreviewInto(item); rxCacheSave(); });
+    // 手改即视为「以文本框为准」：清掉可能过期的 css 缓存，之后 rxItemCss 会从 HTML 里现取
+    ta.addEventListener('input', function () { item.replaceHtml = this.value; item.css = ''; rxPreviewInto(item); rxCacheSave(); });
     body.appendChild(ta);
     // 生成后修改：提要求 → AI 只改被要求的部分（可只改样式，或连带匹配式）
     body.appendChild(rxLabel('修改（对这条生成结果提要求，AI 只改你点到的部分；其它条目不受影响）'));
@@ -3856,6 +3868,16 @@ function rxRenderItems() {
       toast(logs.length ? ('本条目已修：' + logs.join('；') + (left.length ? '（还剩 ' + left.length + ' 项需 AI）' : '')) : (left.length ? ('本地修不了，' + left.length + ' 项需 AI（点「🔧 自动修复」）') : '本条目自检通过'), logs.length ? 'success' : 'warning');
     });
     fixRow.appendChild(fl); fixRow.appendChild(fb);
+    if (item._undo) {
+      var ub = document.createElement('button'); ub.type = 'button'; ub.className = 'opf-step-act'; ub.textContent = '↩ 撤销上次 AI 改动';
+      ub.title = '退回这次 AI 改写之前的匹配式/替换体（' + new Date(item._undo.at).toLocaleTimeString() + '）';
+      ub.addEventListener('click', function () {
+        if (!rxUndo(item)) { toast('没有可撤销的改动', 'warning'); return; }
+        rxRenderItems(); rxCacheSave(); rxDoCheck(false);
+        toast('已退回 AI 改动前的内容', 'success');
+      });
+      fixRow.appendChild(ub);
+    }
     body.appendChild(fixRow);
     // 测试文本 + 预览
     body.appendChild(rxLabel('测试文本（默认取核心自带范例）'));
@@ -3873,7 +3895,7 @@ function rxRenderItems() {
 }
 function rxLabel(t) { var d = document.createElement('div'); d.className = 'opf-dim'; d.textContent = t; return d; }
 function rxSetButtons() {
-  ['opf-rx-parse', 'opf-rx-parse2', 'opf-rx-check', 'opf-rx-fix', 'opf-rx-pull', 'opf-rx-copy1', 'opf-rx-copyall', 'opf-rx-new', 'opf-rx-ping', 'opf-rx-models'].forEach(function (id) {
+  ['opf-rx-parse', 'opf-rx-parse2', 'opf-rx-check', 'opf-rx-fix', 'opf-rx-pull', 'opf-rx-copy1', 'opf-rx-copyall', 'opf-rx-new', 'opf-rx-ping', 'opf-rx-models', 'opf-rx-last'].forEach(function (id) {
     var b = getEl(id); if (b) b.disabled = !!ST.running;
   });
   var ps = getEl('opf-rx-parse');
@@ -3928,12 +3950,16 @@ function rxSetItemCss(item, css) {
 }
 // ---------- 自动修复：先本地（纯字符串、立即），剩下交给 AI ----------
 var RX_AI_FIXABLE = ['ref', 'moodbranch', 'external', 'fixedwidth', 'nomatch', 'toosmall', 'toobig', 'exmatch', 'empty'];
-// 条目是否「由插件生成」（骨架+CSS 分离）→ 才能只换 CSS；手写替换体一律整段改
+// 条目是否「就是插件生成的骨架 + CSS」——只有这种才能安全地只换 CSS 层。
+// 判据是逐字重建比对：把现有 CSS 塞回骨架，能与条文一字不差，才认定结构没被动过；
+// 用户手改过（哪怕只改了标签）就一律走「整段替换」模式，绝不拿骨架覆盖他的手写内容。
 function rxIsSkeletonItem(item) {
   var rep = String((item && item.replaceHtml) || '');
-  if (rep.indexOf('<style') < 0) return false;
-  var pre = String((item && item.prefix) || '').replace(/-box$/, '');
-  return !pre || rep.indexOf('class="' + pre + '-box"') >= 0;
+  if (rep.indexOf('<style') < 0 || rep.indexOf(RX_STYLE_SLOT) >= 0) return false;
+  try {
+    var f = rxItemFormat(item);
+    return rxAssemble(item, f, rxItemCss(item)) === rep;
+  } catch (e) { return false; }
 }
 function rxAutoFixLocal(item) {
   var done = [];
@@ -3967,26 +3993,100 @@ function rxApplyAiResult(item, j, rawText, scope) {
   item.issues = rxLint(item, ST.rx.parsed);
   return changed;
 }
+// ---------- 撤销快照：任何 AI 改写前先存一份，改坏了能一键退回 ----------
+function rxSnapshot(item) {
+  item._undo = { css: (typeof item.css === 'string' ? item.css : ''), replaceHtml: String(item.replaceHtml || ''), findSource: String(item.findSource || ''), at: Date.now() };
+}
+function rxUndo(item) {
+  var u = item._undo; if (!u) return false;
+  item.css = u.css; item.replaceHtml = u.replaceHtml; item.findSource = u.findSource; item._undo = null;
+  item.issues = rxLint(item, ST.rx.parsed);
+  return true;
+}
+// 用户是不是明确要求「变短/删东西」——是的话缩水保护放宽
+function rxWantsShort(dir) {
+  return /精简|简化|缩短|短一点|更短|压缩|删|去掉|去除|移除|减少|减掉|瘦身|太长|简略/.test(String(dir || ''));
+}
+function rxShrinkThreshold(dir) { return rxWantsShort(dir) ? 0.45 : 0.75; }
+// 结果明显偏短 = 疑似只回传了改动片段（600 字符以下的小样式不做判定，免得误伤）
+function rxIsShrinkSuspect(beforeLen, afterLen, dir) {
+  var b = Number(beforeLen) || 0;
+  return b >= 600 && (Number(afterLen) || 0) < b * rxShrinkThreshold(dir);
+}
+// 从模型回复里取正文本体：优先 css（骨架条目）/ replaceString（手写条目），再兜底整段 CSS
+function rxAiPayload(j, rawText, mode) {
+  if (j && typeof j.css === 'string' && j.css.trim() && mode === 'css') return { kind: 'css', text: j.css };
+  if (j && typeof j.replaceString === 'string' && j.replaceString.trim()) return { kind: 'replaceString', text: j.replaceString };
+  if (mode === 'css') { var c = rxExtractCss(rawText); if (c) return { kind: 'css', text: c, loose: true }; }
+  return null;
+}
+function rxAiPromptOf(item, f, issues, dir, scope, mode) { return rxRepairPrompt(item, f, issues, dir, scope, mode)[0]; }
+async function rxCallRepair(prompt, phase) {
+  var resp = await rxStreamCall([{ role: 'system', content: rxSlimSystemContent(ST.rx.parsed && ST.rx.parsed.section || '', 6000) }, { role: 'user', content: prompt }], null, { phase: phase, idleMs: 20000, maxMs: 220000, maxTokens: 16000 });
+  ST.rx.lastRaw = String(resp.text || '');
+  ST.rx.lastStalled = !!resp.stalled;
+  return resp.text || '';
+}
+// AI 改写唯一入口：改写 → 缩水保护（自动重试一次）→ 落地。
+// 返回 { changed:[], mode, before, after, blocked:bool }
+async function rxAiRewrite(item, f, issues, dir, scope, phase) {
+  var mode = rxIsSkeletonItem(item) ? 'css' : 'full';
+  var beforeText = mode === 'css' ? rxItemCss(item) : String(item.replaceHtml || '');
+  var out = { changed: [], mode: mode, before: beforeText.length, after: beforeText.length, blocked: false, note: '' };
+  var prompt = rxAiPromptOf(item, f, issues, dir, scope, mode);
+  var raw = await rxCallRepair(prompt, phase);
+  var j = rxExtractJson(raw);
+  var payload = rxAiPayload(j, raw, mode);
+  var tooShort = function (len) { return rxIsShrinkSuspect(beforeText.length, len, dir); };
+  if (payload && tooShort(payload.text.length)) {
+    // 模型多半只回了「改动片段」。明确要求它把未改动的部分逐字补全，再给一次机会。
+    var p2 = prompt
+      + '\n\n[上一次的输出不合格：疑似省略了未改动部分]\n上一次只给了 ' + payload.text.length + ' 字符，而原内容有 ' + beforeText.length + ' 字符。请重新输出**完整**的' + (mode === 'css' ? 'CSS' : '替换体') + '：未被要求改动的规则必须逐字保留，禁止 "/* 其余不变 */"「以下省略」这类占位，也不要用中文说明代替代码。\n\n[上一次的输出]\n' + String(payload.text).slice(0, 4000);
+    var raw2 = await rxCallRepair(p2, phase + '（补全重试）');
+    var j2 = rxExtractJson(raw2);
+    var p2r = rxAiPayload(j2, raw2, mode);
+    if (p2r && p2r.text.length > payload.text.length) { payload = p2r; j = j2; }
+  }
+  if (!payload) { out.note = '模型没有返回可用的' + (mode === 'css' ? 'CSS' : '替换体') + (ST.rx.lastStalled ? '（传输中途停顿，疑似被截断，可直接重试）' : '') + '（工具栏「📄 上次返回」可看原文）'; return out; }
+  out.after = payload.text.length;
+  if (tooShort(payload.text.length)) {
+    // 连重试都还是明显偏短：不静默落地，交用户裁决（默认保留原样）
+    out.blocked = true;
+    out.note = '改后只有 ' + payload.text.length + ' 字符，原为 ' + beforeText.length + ' 字符（-' + Math.round((1 - payload.text.length / Math.max(1, beforeText.length)) * 100) + '%），疑似只回传了改动片段（已自动重试一次仍未补全）' + (ST.rx.lastStalled ? '；传输中途停顿过，也可能被截断' : '');
+    var ask = (typeof window !== 'undefined' && window.confirm) ? window.confirm : function () { return false; };
+    if (!ask(out.note + '。\n\n要用这个偏短的结果替换吗？\n（点「取消」= 保留原样，点「确定」= 替换，之后还能用「↩ 撤销」退回）')) return out;
+    out.blocked = false;
+    out.note += '（你选择保留这个偏短结果）';
+  }
+  rxSnapshot(item);
+  var jj = {};
+  if (j && typeof j.findRegex === 'string') jj.findRegex = j.findRegex;
+  if (payload.kind === 'css') jj.css = payload.text; else jj.replaceString = payload.text;
+  out.changed = rxApplyAiResult(item, jj, payload.loose ? raw : '', scope);
+  return out;
+}
 function rxRepairPrompt(item, f, issues, dir, scope, mode) {
   var L = [];
+  var cur = mode === 'css' ? rxItemCss(item) : String(item.replaceHtml || '');
   L.push('[任务] ' + (dir ? '按用户要求修改' : '修复') + '一条「对话美化正则」：它把命定系统输出的对话标签渲染成美化框。' + (dir ? '' : '只改与问题清单有关的地方。'));
   if (dir) L.push('[用户要求]\n' + String(dir));
   if (issues && issues.length) L.push('[自检发现的问题（逐条修掉）]\n' + issues.map(function (x, i) { return (i + 1) + '. [' + (x.side === 'core' ? '核心侧' : '正则侧') + '] ' + x.msg; }).join('\n'));
   L.push('[当前匹配式' + (scope === 'find' ? '（本次允许修改：改完必须仍能匹配核心自带的范例）' : '（本次不要改动）') + ']\n' + item.findSource);
-  L.push(mode === 'css' ? ('[当前 CSS]\n' + (rxItemCss(item) || '（空，需要你写）')) : ('[当前替换体全文]\n' + String(item.replaceHtml || '（空，需要你写）')));
+  L.push(mode === 'css' ? ('[当前 CSS（共 ' + cur.length + ' 字符）]\n' + (cur || '（空，需要你写）')) : ('[当前替换体全文（共 ' + cur.length + ' 字符）]\n' + (cur || '（空，需要你写）')));
   L.push(mode === 'css'
     ? ('[骨架（HTML 结构由插件生成并锁定，绝不能改动）]\n' + rxSkeleton(item, f))
     : ('[本条在核心里的典型形态（仅供你对齐 $n 引用布局，结构可自行组织）]\n' + rxSkeleton(item, f)));
   if (f.params && f.params.length) f.params.forEach(function (p) { if (p.values && p.values.length) L.push('[参数 ' + p.name + ' 的枚举值] ' + p.values.join('、')); });
   L.push(mode === 'css' ? RX_REFINE_RULES : RX_REFINE_RULES_FULL);
-  L.push('[输出] 只输出一个 ' + fence() + 'json 代码块：' + (mode === 'css' ? '{"css":"修改后的完整 CSS"}' : '{"replaceString":"修改后的完整替换体"}') + (scope === 'find' ? '；若确需改匹配式，再加 "findRegex":"/…/g"' : '') + '；不要输出任何其它文字。');
+  L.push('[完整性要求] 你必须输出**完整**的结果，不是改动片段：未被要求改动的规则原样逐字保留（包括注释、选择器、变量定义、@keyframes、data-mood 分支），禁止 "/* 其余不变 */"「以下省略」这类占位。原始内容有 ' + cur.length + ' 字符，除非用户明确要求精简，你的输出不应明显短于这个长度。');
+  L.push('[输出] 只输出一个 ' + fence() + 'json 代码块：' + (mode === 'css' ? '{"css":"修改后的完整 CSS"}' : '{"replaceString":"修改后的完整替换体"}') + (scope === 'find' ? '；若确需改匹配式，再加 "findRegex":"/…/g"' : '') + '。字符串内部如需换行请写成 \\n 转义（或直接输出 ' + fence() + 'css 代码块），不要输出任何其它文字。');
   return [macroFill(L.join('\n\n')), mode];
 }
 async function rxAutoFixAi(item, issues) {
   var f = rxItemFormat(item);
-  var built = rxRepairPrompt(item, f, issues, '', 'find', rxIsSkeletonItem(item) ? 'css' : 'full');
-  var resp = await rxStreamCall([{ role: 'system', content: rxSlimSystemContent(ST.rx.parsed && ST.rx.parsed.section || '', 6000) }, { role: 'user', content: built[0] }], null, { phase: '自动修复', idleMs: 20000, maxMs: 180000, maxTokens: 9000 });
-  return rxApplyAiResult(item, rxExtractJson(resp.text), resp.text, 'find');
+  var r = await rxAiRewrite(item, f, issues, '', 'find', '自动修复');
+  if (r.blocked) return [];
+  return r.changed;
 }
 async function rxAutoFixAll() {
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
@@ -4039,12 +4139,20 @@ async function rxRefineItem(item, dir, scope) {
   var st = getEl('opf-rx-statusline');
   if (st) st.textContent = '按你的要求修改中…';
   try {
-    var built = rxRepairPrompt(item, f, null, text, scope, rxIsSkeletonItem(item) ? 'css' : 'full');
-    var resp = await rxStreamCall([{ role: 'system', content: rxSlimSystemContent(ST.rx.parsed && ST.rx.parsed.section || '', 6000) }, { role: 'user', content: built[0] }], null, { phase: '修改', idleMs: 20000, maxMs: 200000, maxTokens: 9000 });
-    var changed = rxApplyAiResult(item, rxExtractJson(resp.text), resp.text, scope);
+    var r = await rxAiRewrite(item, f, null, text, scope, '修改');
     rxRenderItems(); rxCacheSave();
-    if (st) st.textContent = changed.length ? ('已修改：' + changed.join('、')) : '模型没有返回可用的修改结果';
-    toast(changed.length ? ('已修改（' + changed.join('、') + '）') : '模型没有返回可用的修改结果，可换个说法再试', changed.length ? 'success' : 'warning');
+    if (r.changed.length) {
+      var msg = r.changed.join('、') + '：' + r.before + ' → ' + r.after + ' 字符';
+      if (st) st.textContent = '已修改（' + msg + '）' + (r.note ? ' ｜ ' + r.note : '');
+      toast('已修改（' + msg + '）' + (r.blocked ? '（结果偏短，是你确认保留的）' : ''), r.blocked ? 'warning' : 'success');
+    } else if (r.blocked) {
+      if (st) st.textContent = '已中止：' + r.note;
+      toast('已保留原样（' + r.note + '）', 'warning');
+    } else {
+      var n = r.note || '模型没有返回可用的修改结果';
+      if (st) st.textContent = n + '（工具栏「📄 上次返回」可看原文）';
+      toast(n + '，可换个说法再试', 'warning');
+    }
   } catch (e) {
     toast('修改出错：' + rxDiagError(e), 'error');
     if (st) st.textContent = '修改出错：' + rxDiagError(e).slice(0, 120);
@@ -4866,6 +4974,28 @@ function rxParseSystemContent() {
   lines.push('[输出 schema]\n' + RX_PARSE_SCHEMA);
   return macroFill(lines.join('\n\n'));
 }
+// 长 CSS 塞进 JSON 字符串时模型常写裸换行/裸制表符（非法 JSON），
+// 这里把字符串内部的裸控制字符转义回来；字符串没闭合 = 被截断，直接判死（绝不能当片段用）
+function rxRepairJson(txt) {
+  var s = String(txt || '');
+  var out = '', inStr = false, esc = false;
+  for (var i = 0; i < s.length; i++) {
+    var ch = s.charAt(i);
+    if (inStr) {
+      if (esc) { esc = false; out += ch; continue; }
+      if (ch === '\\') { esc = true; out += ch; continue; }
+      if (ch === '"') { inStr = false; out += ch; continue; }
+      if (ch === '\n') { out += '\\n'; continue; }
+      if (ch === '\r') { out += '\\r'; continue; }
+      if (ch === '\t') { out += '\\t'; continue; }
+      out += ch; continue;
+    }
+    if (ch === '"') { inStr = true; out += ch; continue; }
+    out += ch;
+  }
+  if (inStr) return null;
+  return out.replace(/,\s*([}\]])/g, '$1');
+}
 function rxExtractJson(text) {
   var t = String(text || '');
   var F = fence();
@@ -4876,7 +5006,11 @@ function rxExtractJson(text) {
   }
   var a = t.indexOf('{'), b = t.lastIndexOf('}');
   if (a < 0 || b <= a) return null;
-  try { return JSON.parse(t.slice(a, b + 1)); } catch (err) { return null; }
+  var body = t.slice(a, b + 1);
+  try { return JSON.parse(body); } catch (err) {}
+  var rp = rxRepairJson(body);
+  if (rp) { try { return JSON.parse(rp); } catch (err2) {} }
+  return null;
 }
 function rxNormText(s) {
   return String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
