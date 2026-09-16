@@ -3891,6 +3891,7 @@ function rxCfg() {
 }
 function rxHeaders() { var h = { 'Content-Type': 'application/json' }; var k = String(rxCfg().proxyPassword || '').trim(); if (k) h['Authorization'] = 'Bearer ' + k; return h; }
 // 通用 SSE 读取：同时兼容 OpenAI 形状与 Google 原生形状
+// opts: { idleMs: 无新字节多久判定停顿, maxMs: 绝对上限, maxChars: 收满即停（硬顶防跑飞）}
 function rxSseText(obj) {
   if (!obj) return '';
   var ch = obj.choices && obj.choices[0];
@@ -3905,33 +3906,56 @@ function rxSseText(obj) {
   }
   return '';
 }
-async function rxReadSse(resp, onDelta) {
+async function rxReadSse(resp, onDelta, opts) {
+  var o = opts || {};
+  var idleMs = Number(o.idleMs) || 20000;      // 20 秒没有新字节 → 判定停顿
+  var maxMs = Number(o.maxMs) || 240000;       // 4 分钟绝对上限
+  var maxChars = Number(o.maxChars) || 0;
   if (!resp.body || !resp.body.getReader) throw new Error('当前环境不支持流式读取（ReadableStream 不可用）');
   var reader = resp.body.getReader(), dec = new TextDecoder(), buf = '', full = '';
-  while (true) {
-    var chunk = await reader.read();
-    if (chunk.done) break;
-    buf += dec.decode(chunk.value, { stream: true });
-    var lines = buf.split('\n');
-    buf = lines.pop();
-    for (var i = 0; i < lines.length; i++) {
-      var line = lines[i].trim();
-      if (!line) continue;
-      if (line.indexOf('data:') !== 0) continue;
-      var payload = line.slice(5).trim();
-      if (!payload || payload === '[DONE]') continue;
-      try {
-        var t = rxSseText(JSON.parse(payload));
-        if (t) { full += t; if (onDelta) onDelta(t, full.length); }
-      } catch (e) { /* 心跳或非 JSON 行 */ }
+  var lastByte = Date.now(), stalled = false;
+  var kill = function () { stalled = true; try { reader.cancel().catch(function () {}); } catch (e) {} };
+  var tIdle = setTimeout(function () { if (Date.now() - lastByte >= idleMs) kill(); }, idleMs + 300);
+  var tMax = setTimeout(kill, maxMs);
+  try {
+    while (true) {
+      var chunk;
+      try { chunk = await reader.read(); }
+      catch (e) { stalled = true; break; }
+      if (chunk.done) break;
+      lastByte = Date.now();
+      buf += dec.decode(chunk.value, { stream: true });
+      var lines = buf.split('\n');
+      buf = lines.pop();
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i].trim();
+        if (!line || line.indexOf('data:') !== 0) continue;
+        var payload = line.slice(5).trim();
+        if (!payload || payload === '[DONE]') continue;
+        try {
+          var t = rxSseText(JSON.parse(payload));
+          if (t) { full += t; if (onDelta) onDelta(t, full.length); }
+        } catch (e) { /* 心跳或非 JSON 行 */ }
+      }
+      if (maxChars && full.length >= maxChars) { kill(); break; }   // 收够就停，防模型跑飞
+    }
+  } finally {
+    clearTimeout(tIdle); clearTimeout(tMax);
+  }
+  // 尾缓冲（没有换行结尾的最后一段）也要处理
+  if (buf.trim()) {
+    var last = buf.trim();
+    if (last.indexOf('data:') === 0 && last.slice(5).trim() !== '[DONE]') {
+      try { var t2 = rxSseText(JSON.parse(last.slice(5).trim())); if (t2) { full += t2; if (onDelta) onDelta(t2, full.length); } } catch (e) {}
     }
   }
-  return full;
+  return { text: full, stalled: stalled };
 }
 // ① 经酒馆服务端转发（推荐：兼容类反向代理、无 CORS 问题、Google 协议由 ST 转换）
-async function rxServerStream(messages, onDelta) {
+async function rxServerStream(messages, onDelta, opts) {
+  var o = opts || {};
   var cfg = rxCfg();
-  if (!cfg.model) throw new Error('未填写模型名（如 gemini-2.5-pro）');
+  if (!cfg.model) throw new Error('未填写模型名（可点「🔌 获取模型列表」自动拉取）');
   if (!cfg.reverseProxy) throw new Error('未填写中转/反代地址');
   var origin = (typeof window !== 'undefined' && window.location) ? window.location.origin : '';
   var h = { 'Content-Type': 'application/json' };
@@ -3947,7 +3971,7 @@ async function rxServerStream(messages, onDelta) {
     messages: messages.map(function (m) { return { role: m.role, content: m.content }; }),
     use_sysprompt: true,
     stream: true,
-    max_tokens: 8192,
+    max_tokens: Number(o.maxTokens) || 8192,   // 按每段预算换算，硬顶防跑飞
     temperature: 0.85
   };
   var r = await fetch(origin + '/api/backends/chat-completions/generate', { method: 'POST', headers: h, body: JSON.stringify(body) });
@@ -3956,7 +3980,7 @@ async function rxServerStream(messages, onDelta) {
     try { txt = (await r.text()).slice(0, 300); } catch (e) {}
     throw new Error('酒馆服务端转发失败 HTTP ' + r.status + ' ' + txt);
   }
-  return rxReadSse(r, onDelta);
+  return rxReadSse(r, onDelta, { idleMs: o.idleMs, maxMs: o.maxMs, maxChars: o.maxChars });
 }
 // ② 浏览器直连（OpenAI 兼容 / Google 原生）
 function rxGeminiBody(messages) {
@@ -3968,7 +3992,8 @@ function rxGeminiBody(messages) {
   if (sys) body.systemInstruction = { parts: [{ text: sys }] };
   return body;
 }
-async function rxDirectStream(messages, onDelta) {
+async function rxDirectStream(messages, onDelta, opts) {
+  var o = opts || {};
   var cfg = rxCfg();
   var base = String(cfg.baseUrl || '').trim().replace(/\/+$/, '');
   if (!base) throw new Error('未填写直连地址');
@@ -3979,22 +4004,40 @@ async function rxDirectStream(messages, onDelta) {
   if (cfg.directProtocol === 'gemini') {
     url = base + '/v1beta/models/' + encodeURIComponent(model) + ':streamGenerateContent?alt=sse' + (key ? '&key=' + encodeURIComponent(key) : '');
     body = rxGeminiBody(messages);
+    if (o.maxTokens) body.generationConfig = body.generationConfig || {}; body.generationConfig.maxOutputTokens = Number(o.maxTokens);
     if (key) headers['x-goog-api-key'] = key;
   } else {
     url = base + '/chat/completions';
     body = { model: model, messages: messages, stream: true, temperature: 0.85 };
+    if (o.maxTokens) body.max_tokens = Number(o.maxTokens);
     if (key) headers['Authorization'] = 'Bearer ' + key;
   }
   var r = await fetch(url, { method: 'POST', headers: headers, body: JSON.stringify(body) });
   if (!r.ok) { var t = ''; try { t = (await r.text()).slice(0, 300); } catch (e) {} throw new Error('HTTP ' + r.status + ' ' + t); }
-  return rxReadSse(r, onDelta);
+  return rxReadSse(r, onDelta, { idleMs: o.idleMs, maxMs: o.maxMs, maxChars: o.maxChars });
 }
-function rxStreamCall(messages, onNote) {
+function rxStreamCall(messages, onNote, opts) {
   var cfg = rxCfg();
-  if (cfg.transport === 'st') return callModel(messages);
+  if (cfg.transport === 'st') {
+    return callModel(messages).then(function (t) { return { text: String(t), stalled: false }; });
+  }
+  var o = opts || {};
   var t0 = Date.now();
-  var onDelta = function (t, len) { if (onNote && len % 900 < t.length) onNote('流式接收中… ' + len + ' 字符（' + Math.round((Date.now() - t0) / 1000) + 's）'); };
-  return cfg.transport === 'server' ? rxServerStream(messages, onDelta) : rxDirectStream(messages, onDelta);
+  var lastShown = 0;
+  var onDelta = function (t, len) {
+    var now = Date.now();
+    if (onNote && (len - lastShown >= 700 || now - t0 - 5000 * (Math.floor((now - t0) / 5000)) >= 0 && len !== lastShown)) {
+      // 每 700 字符或每 5 秒刷一次（含"持续生成中"），避免长时间看起来像卡死
+      lastShown = len;
+      onNote('流式接收中… ' + len + ' 字符（' + Math.round((now - t0) / 1000) + 's' + (o.phase ? '｜' + o.phase : '') + '）');
+    }
+  };
+  // 定时兜底刷新：即使没有新字节也每 5 秒报一次时间
+  var timer = setInterval(function () {
+    if (onNote) onNote('流式接收中… ' + lastShown + ' 字符（' + Math.round((Date.now() - t0) / 1000) + 's' + (o.phase ? '｜' + o.phase : '') + '，仍在等待…）');
+  }, 5000);
+  var p = (cfg.transport === 'server' ? rxServerStream(messages, onDelta, o) : rxDirectStream(messages, onDelta, o));
+  return p.then(function (res) { clearInterval(timer); return res; }, function (e) { clearInterval(timer); throw e; });
 }
 // 模型列表：服务端转发档走 ST 的 /status（同一反代通道，无 CORS）；直连档直接打 /models
 async function rxFetchModels() {
@@ -4078,12 +4121,51 @@ async function rxPing() {
   try {
     var out = await rxStreamCall([{ role: 'user', content: '回复两个字：正常' }], function (s) { say('自检收流中… ' + s); });
     var ms = Date.now() - t0;
-    say('连通正常：' + ms + 'ms｜' + label + '｜返回「' + String(out).trim().slice(0, 20) + '」');
-    toast('连通性自检通过（' + ms + 'ms）', 'success');
+    var extra = out.stalled ? '（流中途停顿，可能是中转限流或网络抖动）' : '';
+    say('连通正常：' + ms + 'ms｜' + label + '｜返回「' + String(out.text).trim().slice(0, 20) + '」' + extra);
+    toast('连通性自检通过（' + ms + 'ms）' + extra, out.stalled ? 'warning' : 'success');
   } catch (e) {
     say('自检失败：' + rxDiagError(e));
     toast('自检失败：' + rxDiagError(e), 'error');
   }
+}
+// ---------- 并发工具与实时预览（流式传输下大幅缩短总时长）----------
+var RX_PARALLEL = 3;   // 并发段数上限（中转限流时自动少发）
+async function rxMapLimit(items, limit, fn) {
+  var results = new Array(items.length);
+  var cursor = 0;
+  async function worker() {
+    while (cursor < items.length) {
+      var idx = cursor++;
+      try { results[idx] = await fn(items[idx], idx); }
+      catch (e) { results[idx] = { css: '', partial: true, err: rxDiagError(e) }; }
+    }
+  }
+  var ws = [];
+  for (var w = 0; w < Math.max(1, Math.min(limit, items.length)); w++) ws.push(worker());
+  await Promise.all(ws);
+  return results;
+}
+var rxLiveTick = { last: 0 };
+function rxLivePreview(it, cssMap, order) {
+  var now = Date.now();
+  if (now - rxLiveTick.last < 500) return;
+  rxLiveTick.last = now;
+  var css = '';
+  (order || []).forEach(function (id) { if (cssMap[id]) css += (css ? '\n' : '') + cssMap[id]; });
+  if (!css) return;
+  var f = (ST.rx.parsed && ST.rx.parsed.formats || []).filter(function (x) { return x.key === it.formatKey; })[0] || { family: 'quote', params: [] };
+  it.replaceHtml = rxAssemble(it, f, css);
+  try { rxPreviewInto(it); } catch (e) {}
+  var st = getEl('opf-rx-statusline');
+  if (st && !st.dataset.prog) st.textContent = '实时预览已更新（' + css.length + ' 字符 CSS）';
+}
+// 设计基调：一组 CSS 变量 + 风格基调注释，供并发块引用，保证配色一致
+function rxBriefPart() {
+  return {
+    id: 'brief', label: '设计基调', budget: 900,
+    hint: '只输出一组 CSS 自定义属性（--rx-bg / --rx-accent / --rx-text / --rx-font / --rx-line 等，至少 4 个）与 2~4 条 CSS 注释风格基调（配色气质、字体取向、边框风格）；不要写具体选择器的完整规则，后续每个块都会引用这些变量。'
+  };
 }
 // ---------- 替换体：结构由代码生成，模型只写 CSS（防 524 超时与截断）----------
 // 捕获组布局必须与 rxGenFindRegex 完全一致，否则 $n 会指错
@@ -4139,7 +4221,7 @@ function rxCssParts(f, tierTarget) {
   var per = target > 0 ? Math.max(1200, Math.round(target / parts.length * 0.85)) : 3500;
   return parts.map(function (p) { return { id: p.id, label: p.label, hint: p.hint, budget: per }; });
 }
-function rxCssPartPrompt(item, f, part, prevText) {
+function rxCssPartPrompt(item, f, part, prevText, brief) {
   var refs = rxRefs(f);
   var L = [];
   L.push('[任务] 只为已经定好的 HTML 骨架写 CSS 规则。骨架结构由插件生成，你不得改动、也不得输出 HTML 标签。');
@@ -4151,26 +4233,44 @@ function rxCssPartPrompt(item, f, part, prevText) {
       if (p.values && p.values.length) L.push('[参数 ' + p.name + ' 的枚举] ' + p.values.join('、'));
     });
   }
+  if (brief) L.push('[设计基调（必须引用其中的 CSS 变量，不要另起炉灶）]\n' + brief.slice(-1500));
   L.push('[本段只写] ' + part.label + ' —— ' + part.hint);
   if (part.budget) L.push('[本段字数] 控制在 ' + part.budget + ' 字符左右（宁少勿断，写不完就少写几条规则）');
   if (prevText) L.push('[已经写好的部分（不要重复、不要冲突）]\n' + prevText.slice(-1200));
   L.push('[输出要求] 只输出 CSS 规则本身：不要 <style> 标签、不要 HTML、不要注释以外的解释文字、不要代码块围栏。');
   return L.join('\n\n');
 }
-// 单项 CSS 片段生成：真流式（可选）+ 截断续写 + 超时重试；失败不丢已生成内容
-async function rxGenCssPart(item, f, part, prevCss, onNote) {
+// 单项 CSS 片段生成：真流式 + 停顿检测 + 截断续写；失败不丢已生成内容
+async function rxGenCssPart(item, f, part, prevCss, onNote, brief) {
   var css = '';
   var attempt = 0;
   var lastErr = '';
+  var budget = Number(part.budget) || 2500;
+  var opts = {
+    phase: part.label,
+    idleMs: 20000,                       // 20 秒无新字节 → 判定停顿并止损
+    maxMs: 240000,                       // 4 分钟绝对上限
+    maxChars: budget * 2,                // 单次调用硬顶，防跑飞
+    maxTokens: Math.max(1024, Math.round(budget * 4))   // 按字数换算 token 硬顶
+  };
   while (attempt < 3) {
     attempt++;
-    var ask = rxCssPartPrompt(item, f, part, prevCss + css);
+    var ask = rxCssPartPrompt(item, f, part, prevCss + css, brief);
     if (css) ask += '\n\n[续写要求] 你上一次输出在中途被截断了，已保留的部分结尾是：\n' + css.slice(-500) + '\n只输出**剩余**部分，不要重复已写过的内容，不要重新开头。';
     var msgs = [{ role: 'system', content: rxSlimSystemContent(part.colorRef, part.budget) }, { role: 'user', content: macroFill(ask) }];
     var t0 = Date.now();
     try {
-      var resp = await rxStreamCall(msgs, onNote);
-      var chunk = rxExtractCss(resp);
+      var resp = await rxStreamCall(msgs, onNote, opts);
+      var chunk = rxExtractCss(resp.text);
+      if (resp.stalled) {
+        // 流停顿：不再重试同一段（重试只会再停一次），把已收到的内容交回去
+        if (!chunk) return { css: css, partial: true, err: '流停顿且未收到内容（' + Math.round((Date.now() - t0) / 1000) + 's）' };
+        css += (css && !/\n$/.test(css) ? '\n' : '') + chunk;
+        var bal0 = rxBraceDelta(css);
+        return bal0 <= 0
+          ? { css: css, partial: false, err: '流停顿（' + Math.round((Date.now() - t0) / 1000) + 's），但内容已完整' }
+          : { css: css, partial: true, err: '流停顿（' + Math.round((Date.now() - t0) / 1000) + 's），内容未写完整（已保留 ' + css.length + ' 字符）' };
+      }
       if (!chunk) { if (onNote) onNote('第 ' + attempt + ' 次返回为空'); if (attempt < 3) { await waitTick(); continue; } break; }
       css += (css && !/\n$/.test(css) ? '\n' : '') + chunk;
       if (onNote) onNote(part.label + ' 第 ' + attempt + ' 次：+' + chunk.length + ' 字符（' + Math.round((Date.now() - t0) / 1000) + 's）');
@@ -4224,42 +4324,70 @@ async function rxGenerate() {
   if (!ST.rx.parsed || !ST.rx.items.length) { toast('请先「🔍 解析语言格式（AI）」', 'warning'); return; }
   var todo = ST.rx.items.filter(function (it) { return !it.replaceHtml; });
   if (!todo.length) todo = ST.rx.items.slice();
+  var streaming = rxCfg().transport !== 'st';   // 流式传输才有资本并发生成
   ST.running = true; renderRunButtons();
-  var status = getEl('opf-shx-status');
+  rxLiveTick.last = 0;
   var log = [];
-  var shrink = 1;                                     // 撞到 524 就折半，让后面的段更小
+  var shrink = 1;
+  var t0 = Date.now();
+  var note = function (it, s) {
+    log.push('[' + it.label + '] ' + s);
+    var stl = getEl('opf-rx-statusline');
+    if (stl) stl.textContent = it.label + ' · ' + s;
+    opfLog('[regex-forge] ' + it.label + ' ' + s);
+  };
   try {
     for (var i = 0; i < todo.length; i++) {
       if (isStop()) break;
       var it = todo[i];
       var f = (ST.rx.parsed.formats || []).filter(function (x) { return x.key === it.formatKey; })[0] || { family: 'quote', params: [] };
       var tier = rxTier(it.tier);
-      var baseParts = rxCssParts(f, tier.target);
-      var parts = baseParts.map(function (p) {
-        return { id: p.id, label: p.label, hint: p.hint, budget: Math.max(800, Math.round(p.budget * shrink)), colorRef: (ST.rx.parsed.section || '') };
-      });
-      var css = '';
       it.partial = false;
-      for (var p2 = 0; p2 < parts.length; p2++) {
-        if (isStop()) break;
-        var note = function (s) {
-          log.push('[' + it.label + '] ' + s);
-          var stl = getEl('opf-rx-statusline');
-          if (stl) stl.textContent = it.label + ' · ' + s;
-          opfLog('[regex-forge] ' + it.label + ' ' + s);
-        };
-        note('开始生成 ' + parts[p2].label + '（' + (p2 + 1) + '/' + parts.length + '，预算 ' + parts[p2].budget + ' 字符' + (shrink < 1 ? '·已自动缩段' : '') + '）');
-        var r = await rxGenCssPart(it, f, parts[p2], css, note);
-        css += (css ? '\n' : '') + r.css;
-        if (r.partial) {
-          it.partial = true;
-          it.lastErr = r.err;
-          if (/524|超时/.test(r.err)) { shrink = Math.max(0.35, shrink * 0.5); note('遇到 524/超时：后续段预算自动折半为 ≈' + Math.max(800, Math.round(parts[p2].budget * 0.5)) + ' 字符'); }
-          note('本段未完成：' + String(r.err).slice(0, 120) + '（已保留 ' + r.css.length + ' 字符，可稍后再点一次续做）');
+      if (streaming) {
+        // ===== 流式路径：基调先行 + 并发分段 =====
+        var blocks = rxCssParts(f, tier.target).map(function (p) {
+          return { id: p.id, label: p.label, hint: p.hint, budget: Math.max(1200, Math.round(p.budget)), colorRef: (ST.rx.parsed.section || '') };
+        });
+        var cssMap = {};
+        var order = ['brief'].concat(blocks.map(function (b) { return b.id; }));
+        var brief = await rxGenCssPart(it, f, rxBriefPart(), '', function (s) { note(it, s); rxLivePreview(it, cssMap, order); });
+        cssMap.brief = brief.css;
+        if (brief.partial) note(it, '设计基调未完成：' + String(brief.err).slice(0, 100));
+        note(it, '基调完成（' + brief.css.length + ' 字符），并发生成 ' + blocks.length + ' 个样式块（并发上限 ' + RX_PARALLEL + '）…');
+        var results = await rxMapLimit(blocks, RX_PARALLEL, async function (block, bi) {
+          var r = await rxGenCssPart(it, f, block, brief.css, function (s) {
+            note(it, '[' + block.label + ' ' + (bi + 1) + '/' + blocks.length + '] ' + s);
+            rxLivePreview(it, cssMap, order);
+          }, brief.css);
+          cssMap[block.id] = r.css;
+          return r;
+        });
+        var partials = results.filter(function (r) { return r && r.partial; });
+        it.partial = partials.length > 0;
+        it.lastErr = partials.map(function (r) { return r.err; }).filter(Boolean).join('；');
+        it.replaceHtml = rxAssemble(it, f, order.map(function (id) { return cssMap[id] || ''; }).join('\n'));
+        if (it.partial) note(it, '有 ' + partials.length + ' 个块未完成（已保留其余内容，可再点一次续做）');
+      } else {
+        // ===== 非流式路径：顺序小段 + 自适应缩段（防 524）=====
+        var baseParts = rxCssParts(f, tier.target);
+        var parts = baseParts.map(function (p) {
+          return { id: p.id, label: p.label, hint: p.hint, budget: Math.max(800, Math.round(p.budget * shrink)), colorRef: (ST.rx.parsed.section || '') };
+        });
+        var css = '';
+        for (var p2 = 0; p2 < parts.length; p2++) {
+          if (isStop()) break;
+          note(it, '开始生成 ' + parts[p2].label + '（' + (p2 + 1) + '/' + parts.length + '，预算 ' + parts[p2].budget + ' 字符' + (shrink < 1 ? '·已自动缩段' : '') + '）');
+          var r = await rxGenCssPart(it, f, parts[p2], css, function (s) { note(it, s); });
+          css += (css ? '\n' : '') + r.css;
+          if (r.partial) {
+            it.partial = true;
+            it.lastErr = r.err;
+            if (/524|超时/.test(String(r.err))) { shrink = Math.max(0.35, shrink * 0.5); note(it, '遇到 524/超时：后续段预算自动折半为 ≈' + Math.max(800, Math.round(parts[p2].budget * 0.5)) + ' 字符'); }
+            note(it, '本段未完成：' + String(r.err).slice(0, 120) + '（已保留 ' + r.css.length + ' 字符，可稍后再点一次续做）');
+          }
         }
+        it.replaceHtml = rxAssemble(it, f, css);
       }
-      it.skeleton = rxSkeleton(it, f);
-      it.replaceHtml = rxAssemble(it, f, css);
       it.issues = rxLint(it, ST.rx.parsed);
       rxRenderItems();
       rxCacheSave();
@@ -4267,10 +4395,11 @@ async function rxGenerate() {
     }
     var st2 = getEl('opf-rx-statusline');
     var anyPartial = ST.rx.items.filter(function (x) { return x.partial; }).length;
-    if (st2) st2.textContent = '完成：' + log.slice(-2).join(' ｜ ') + (anyPartial ? '（' + anyPartial + ' 项未完成，可再点一次续做）' : '');
+    var secs = Math.round((Date.now() - t0) / 1000);
+    if (st2) st2.textContent = '完成（总耗时 ' + secs + 's）：' + log.slice(-2).join(' ｜ ') + (anyPartial ? '（' + anyPartial + ' 项未完成，可再点一次续做）' : '');
     if (isStop()) toast('已停止（已生成的部分已保留）');
-    else if (anyPartial) toast('部分完成：' + anyPartial + ' 项因 524/超时未写完，已保留内容，可再点一次续做；或改用「直连 + 真流式」', 'warning');
-    else toast('替换体生成完成：结构由代码保证、样式分段产出', 'success');
+    else if (anyPartial) toast('部分完成：' + anyPartial + ' 项未写完（已保留内容，可再点一次续做）', 'warning');
+    else toast('替换体生成完成（耗时 ' + secs + 's' + (streaming ? '，流式并发模式' : '') + '）', 'success');
   } catch (e) {
     toast('生成替换体出错：' + rxDiagError(e) + '（已生成的部分保留，可再点一次续做）', 'error');
     var st3 = getEl('opf-rx-statusline'); if (st3) st3.textContent = '出错：' + rxDiagError(e).slice(0, 160);
