@@ -3615,7 +3615,7 @@ function rxExtractHtml(text) {
   return (end > start ? t.slice(start + 1, end) : t.slice(start + 1)).replace(/^\n+/, '').replace(/\s+$/, '');
 }
 // ---------- 页面 ----------
-var RX_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">✦ 正则工坊 · 命定系统对话美化</div><div class="opf-dim">流程：粘贴核心全文（或从 ④ 页带入）→ 解析语言格式 → 勾选要美化的格式 → 选用途与预算档位 → 匹配式由插件确定生成、替换体由模型产出 → 实时预览 → 自检 → 导出 JSON。字段名与你现有 4 条正则一致，可直接粘进预设的 regex_scripts。</div><textarea id="opf-rx-core" class="opf-char-input" placeholder="把命定系统核心条目全文粘在这里（必须含「语言格式」节）"></textarea><div class="opf-char-tools"><button type="button" class="opf-btn ghost" id="opf-rx-pull">⬅ 从 ④ 页带入</button><button type="button" class="opf-btn primary" id="opf-rx-parse">🔍 解析语言格式（AI）</button><button type="button" class="opf-btn ghost" id="opf-rx-parse2">⚙ 脚本解析（离线）</button><button type="button" class="opf-btn ghost" id="opf-rx-gen">🎨 生成替换体</button><button type="button" class="opf-btn ghost" id="opf-rx-check">🔎 自检</button><button type="button" class="opf-btn ghost" id="opf-rx-copy1">⧉ 复制单条 JSON</button><button type="button" class="opf-btn ghost" id="opf-rx-copyall">⧉ 复制 JSON 数组</button><button type="button" class="opf-btn ghost" id="opf-rx-new">🗑 清空</button></div><div class="opf-dim" id="opf-rx-statusline">就绪</div><div class="opf-sec"><div class="opf-sec-label">语言格式解析结果（只读核对）</div><pre id="opf-rx-parsed" class="opf-box opf-char-report">尚未解析</pre></div><div id="opf-rx-items"></div><div class="opf-sec"><div class="opf-sec-label">自检</div><pre id="opf-rx-issues" class="opf-box opf-char-report">尚未自检</pre></div></div>';
+var RX_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">✦ 正则工坊 · 命定系统对话美化</div><div class="opf-dim">流程：粘贴核心全文（或从 ④ 页带入）→ 解析语言格式 → 勾选要美化的格式 → 选用途与预算档位 → 匹配式由插件确定生成、替换体由模型产出 → 实时预览 → 自检 → 导出 JSON。字段名与你现有 4 条正则一致，可直接粘进预设的 regex_scripts。</div><textarea id="opf-rx-core" class="opf-char-input" placeholder="把命定系统核心条目全文粘在这里（必须含「语言格式」节）"></textarea><div class="opf-char-tools"><button type="button" class="opf-btn ghost" id="opf-rx-pull">⬅ 从 ④ 页带入</button><button type="button" class="opf-btn primary" id="opf-rx-parse">🔍 解析语言格式（AI）</button><button type="button" class="opf-btn ghost" id="opf-rx-parse2">⚙ 脚本解析（离线）</button><button type="button" class="opf-btn ghost" id="opf-rx-gen">🎨 生成替换体</button><button type="button" class="opf-btn ghost" id="opf-rx-check">🔎 自检</button><button type="button" class="opf-btn ghost" id="opf-rx-copy1">⧉ 复制单条 JSON</button><button type="button" class="opf-btn ghost" id="opf-rx-copyall">⧉ 复制 JSON 数组</button><button type="button" class="opf-btn ghost" id="opf-rx-new">🗑 清空</button><button type="button" class="opf-btn ghost" id="opf-rx-ping">🩺 连通性自检</button></div><div class="opf-shx-cfg"><label id="opf-rx-directwrap"><input type="checkbox" id="opf-rx-direct"> 🚀 直连 + 真流式生成（绕开 generateRaw 的非流式限制，需自备接口）</label><label class="opf-opt">直连地址<input id="opf-rx-base" class="opf-ref-input" placeholder="https://api.example.com/v1"></label><label class="opf-opt">密钥<input id="opf-rx-key" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">聊天模型<input id="opf-rx-chatmodel" class="opf-ref-input" placeholder="如 gemini-2.5-pro / gpt-4o-mini"></label></div><div class="opf-dim" id="opf-rx-statusline">就绪</div><div class="opf-sec"><div class="opf-sec-label">语言格式解析结果（只读核对）</div><pre id="opf-rx-parsed" class="opf-box opf-char-report">尚未解析</pre></div><div id="opf-rx-items"></div><div class="opf-sec"><div class="opf-sec-label">自检</div><pre id="opf-rx-issues" class="opf-box opf-char-report">尚未自检</pre></div></div>';
 
 function rxInit() {
   ST.rx = ST.rx || { core: '', coreName: '', parsed: null, items: [], _inited: false };
@@ -3632,6 +3632,21 @@ function bindRxPage() {
   getEl('opf-rx-copy1').addEventListener('click', function(){ rxCopy(false); });
   getEl('opf-rx-copyall').addEventListener('click', function(){ rxCopy(true); });
   getEl('opf-rx-new').addEventListener('click', function(){ rxClear(); });
+  getEl('opf-rx-ping').addEventListener('click', function(){ rxPing(); });
+  getEl('opf-rx-direct').addEventListener('change', function(){ rxCfg().direct = this.checked; rxCacheSave(); toast(this.checked ? '已切换为直连 + 真流式生成' : '已切回酒馆主 API（generateRaw，非流式）'); });
+  ['opf-rx-base', 'opf-rx-key', 'opf-rx-chatmodel'].forEach(function (id) {
+    var el = getEl(id); if (!el) return;
+    el.addEventListener('change', function () {
+      var cfg = rxCfg();
+      cfg.baseUrl = getEl('opf-rx-base').value; cfg.apiKey = getEl('opf-rx-key').value; cfg.chatModel = getEl('opf-rx-chatmodel').value;
+      rxCacheSave();
+    });
+  });
+  var c = rxCfg();
+  if (getEl('opf-rx-direct')) getEl('opf-rx-direct').checked = !!c.direct;
+  if (getEl('opf-rx-base')) getEl('opf-rx-base').value = c.baseUrl || '';
+  if (getEl('opf-rx-key')) getEl('opf-rx-key').value = c.apiKey || '';
+  if (getEl('opf-rx-chatmodel')) getEl('opf-rx-chatmodel').value = c.chatModel || '';
   getEl('opf-rx-core').addEventListener('input', function(){ ST.rx.core = this.value; rxCacheSave(); });
   rxRenderItems();
 }
@@ -3786,7 +3801,7 @@ function rxRenderItems() {
 }
 function rxLabel(t) { var d = document.createElement('div'); d.className = 'opf-dim'; d.textContent = t; return d; }
 function rxSetButtons() {
-  ['opf-rx-parse', 'opf-rx-parse2', 'opf-rx-check', 'opf-rx-pull', 'opf-rx-copy1', 'opf-rx-copyall', 'opf-rx-new'].forEach(function (id) {
+  ['opf-rx-parse', 'opf-rx-parse2', 'opf-rx-check', 'opf-rx-pull', 'opf-rx-copy1', 'opf-rx-copyall', 'opf-rx-new', 'opf-rx-ping'].forEach(function (id) {
     var b = getEl(id); if (b) b.disabled = !!ST.running;
   });
   var ps = getEl('opf-rx-parse');
@@ -3825,6 +3840,95 @@ function rxPreviewInto(item) {
     pv.textContent = out;
   }
   st.textContent = '匹配 ' + hits + ' 处' + (item.replaceHtml ? ' ｜ 替换体 ' + item.replaceHtml.length + ' 字符（' + rxTier(item.tier).label + '档）' : ' ｜ 尚未生成替换体');
+}
+// ---------- 524 / 超时诊断：把 Cloudflare 的 8KB HTML 变成一句人话 ----------
+function rxDiagError(err) {
+  var m = (err && err.message) ? err.message : String(err || '');
+  if (/524/.test(m) && /cloudflare|timeout occurred|cf-error|A timeout occurred/i.test(m)) {
+    return '中转站超时（Cloudflare 524：源站在 100 秒内没有回任何字节）。注意这不是插件的问题：'
+      + '酒馆的 generateRaw 永远是非流式的（源码 script.js L4018 用 sendOpenAIRequest(\'quiet\',…) 调用，'
+      + '而流式分支 L5326 明确排除 quiet），所以中转站必须等整段生成完才回包，输出越长越容易撞墙。'
+      + '对策：① 打开本页的「直连 + 真流式」② 降低档位让每段更小 ③ 换时段或换中转。';
+  }
+  var code = m.match(/\b(50[234])\b/);
+  if (code) return '中转站返回 ' + code[1] + '（网关错误），属可重试类，稍后重试或降低单段字数。';
+  if (/No message generated/i.test(m)) return '模型返回空（可能被中转站截断或安全策略拦截），可重试或降低单段字数。';
+  if (/aborted|Cancelled|停止/i.test(m)) return '已中止。';
+  return m.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+}
+// ---------- 直连 + 真流式（绕开 generateRaw 的非流式限制）----------
+function rxCfg() {
+  rxInit();
+  ST.rx.cfg = ST.rx.cfg || { direct: false, chatModel: '', baseUrl: '', apiKey: '' };
+  if (!ST.rx.cfg.baseUrl) { try { var c = shxCfg(); ST.rx.cfg.baseUrl = c.baseUrl || ''; ST.rx.cfg.apiKey = c.apiKey || ''; } catch (e) {} }
+  return ST.rx.cfg;
+}
+async function rxDirectStream(messages, onDelta, signal) {
+  var cfg = rxCfg();
+  var base = String(cfg.baseUrl || '').trim().replace(/\/+$/, '');
+  if (!base) throw new Error('未填写直连接口地址');
+  if (!cfg.chatModel) throw new Error('未填写直连聊天模型');
+  var h = { 'Content-Type': 'application/json' };
+  if (String(cfg.apiKey || '').trim()) h['Authorization'] = 'Bearer ' + String(cfg.apiKey).trim();
+  var r = await fetch(base + '/chat/completions', {
+    method: 'POST', headers: h, signal: signal,
+    body: JSON.stringify({ model: cfg.chatModel, stream: true, messages: messages, temperature: 0.8 })
+  });
+  if (!r.ok) {
+    var body = '';
+    try { body = (await r.text()).slice(0, 300); } catch (e) {}
+    throw new Error('HTTP ' + r.status + ' ' + body);
+  }
+  if (!r.body || !r.body.getReader) throw new Error('当前环境不支持流式读取（ReadableStream 不可用）');
+  var reader = r.body.getReader(), dec = new TextDecoder(), buf = '', full = '';
+  while (true) {
+    var chunk = await reader.read();
+    if (chunk.done) break;
+    buf += dec.decode(chunk.value, { stream: true });
+    var lines = buf.split('\n');
+    buf = lines.pop();
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].trim();
+      if (line.indexOf('data:') !== 0) continue;
+      var payload = line.slice(5).trim();
+      if (!payload || payload === '[DONE]') continue;
+      try {
+        var j = JSON.parse(payload);
+        var ch0 = j.choices && j.choices[0];
+        var d = ch0 && (ch0.delta || ch0.message);
+        var t = d && d.content;
+        if (t) { full += t; if (onDelta) onDelta(t, full.length); }
+      } catch (e) { /* 忽略心跳与非 JSON 行 */ }
+    }
+  }
+  return full;
+}
+function rxStreamCall(messages, onNote) {
+  var cfg = rxCfg();
+  if (!cfg.direct) return callModel(messages);
+  var t0 = Date.now();
+  return rxDirectStream(messages, function (t, len) {
+    if (onNote && (len % 800 < t.length)) onNote('流式接收中… ' + len + ' 字符（' + Math.round((Date.now() - t0) / 1000) + 's）');
+  });
+}
+// 连通性自检：一次极小请求，用于区分「中转站挂了」与「任务太重」
+async function rxPing() {
+  var el = getEl('opf-rx-statusline');
+  var say = function (s) { if (el) el.textContent = s; };
+  var cfg = rxCfg();
+  say('自检中…');
+  var t0 = Date.now();
+  try {
+    var out;
+    if (cfg.direct) out = await rxDirectStream([{ role: 'user', content: '回复两个字：正常' }], null, null);
+    else out = await callModel([{ role: 'user', content: '回复两个字：正常' }]);
+    var ms = Date.now() - t0;
+    say('连通正常：' + ms + 'ms，返回「' + String(out).trim().slice(0, 20) + '」（' + (cfg.direct ? '直连流式' : '酒馆主 API / generateRaw 非流式') + '）');
+    toast('连通性自检通过（' + ms + 'ms）', 'success');
+  } catch (e) {
+    say('自检失败：' + rxDiagError(e));
+    toast('自检失败：' + rxDiagError(e), 'error');
+  }
 }
 // ---------- 替换体：结构由代码生成，模型只写 CSS（防 524 超时与截断）----------
 // 捕获组布局必须与 rxGenFindRegex 完全一致，否则 $n 会指错
@@ -3898,36 +4002,35 @@ function rxCssPartPrompt(item, f, part, prevText) {
   L.push('[输出要求] 只输出 CSS 规则本身：不要 <style> 标签、不要 HTML、不要注释以外的解释文字、不要代码块围栏。');
   return L.join('\n\n');
 }
-// 单项 CSS 片段生成：带截断续写与超时重试
+// 单项 CSS 片段生成：真流式（可选）+ 截断续写 + 超时重试；失败不丢已生成内容
 async function rxGenCssPart(item, f, part, prevCss, onNote) {
   var css = '';
   var attempt = 0;
-  var colorRef = (part.colorRef !== undefined) ? part.colorRef : '';
+  var lastErr = '';
   while (attempt < 3) {
     attempt++;
     var ask = rxCssPartPrompt(item, f, part, prevCss + css);
     if (css) ask += '\n\n[续写要求] 你上一次输出在中途被截断了，已保留的部分结尾是：\n' + css.slice(-500) + '\n只输出**剩余**部分，不要重复已写过的内容，不要重新开头。';
-    var msgs = [{ role: 'system', content: rxSlimSystemContent(colorRef, part.budget) }, { role: 'user', content: macroFill(ask) }];
+    var msgs = [{ role: 'system', content: rxSlimSystemContent(part.colorRef, part.budget) }, { role: 'user', content: macroFill(ask) }];
     var t0 = Date.now();
     try {
-      var resp = await callModel(msgs);
+      var resp = await rxStreamCall(msgs, onNote);
       var chunk = rxExtractCss(resp);
       if (!chunk) { if (onNote) onNote('第 ' + attempt + ' 次返回为空'); if (attempt < 3) { await waitTick(); continue; } break; }
       css += (css && !/\n$/.test(css) ? '\n' : '') + chunk;
       if (onNote) onNote(part.label + ' 第 ' + attempt + ' 次：+' + chunk.length + ' 字符（' + Math.round((Date.now() - t0) / 1000) + 's）');
       var bal = rxBraceDelta(css);
-      if (bal <= 0) return css;                       // 括号配平（或多余）视为写完
+      if (bal <= 0) return { css: css, partial: false, err: '' };
       if (onNote) onNote(part.label + ' 花括号还差 ' + bal + ' 个，继续续写…');
     } catch (e) {
-      var msg = (e && e.message) ? e.message : String(e);
-      var transient = /524|502|503|504|timeout|timed out|超时|empty|为空|network|fetch/i.test(msg);
-      if (onNote) onNote(part.label + ' 第 ' + attempt + ' 次失败：' + msg.slice(0, 80) + (transient ? '（判定为可重试）' : ''));
-      if (!transient) throw e;
-      if (attempt >= 3) throw new Error(msg + '（已重试 ' + attempt + ' 次，建议降到更低档位或先停止）');
-      await new Promise(function (r) { setTimeout(r, 1200 * attempt); });
+      lastErr = rxDiagError(e);
+      var transient = /524|502|503|504|timeout|timed out|超时|empty|为空|network|fetch|No message/i.test((e && e.message) ? e.message : String(e));
+      if (onNote) onNote(part.label + ' 第 ' + attempt + ' 次失败：' + lastErr.slice(0, 90));
+      if (!transient) break;
+      if (attempt < 3) await new Promise(function (r) { setTimeout(r, 1200 * attempt); });
     }
   }
-  return css;
+  return { css: css, partial: true, err: lastErr };   // 失败也把已生成的部分交回去
 }
 // CSS 花括号净差（跳过字符串与注释）
 function rxBraceDelta(css) {
@@ -3969,24 +4072,36 @@ async function rxGenerate() {
   ST.running = true; renderRunButtons();
   var status = getEl('opf-shx-status');
   var log = [];
+  var shrink = 1;                                     // 撞到 524 就折半，让后面的段更小
   try {
     for (var i = 0; i < todo.length; i++) {
       if (isStop()) break;
       var it = todo[i];
       var f = (ST.rx.parsed.formats || []).filter(function (x) { return x.key === it.formatKey; })[0] || { family: 'quote', params: [] };
       var tier = rxTier(it.tier);
-      var parts = rxCssParts(f, tier.target).map(function (p) { return { id: p.id, label: p.label, hint: p.hint, budget: p.budget, colorRef: (ST.rx.parsed.section || '') }; });
+      var baseParts = rxCssParts(f, tier.target);
+      var parts = baseParts.map(function (p) {
+        return { id: p.id, label: p.label, hint: p.hint, budget: Math.max(800, Math.round(p.budget * shrink)), colorRef: (ST.rx.parsed.section || '') };
+      });
       var css = '';
-      for (var p = 0; p < parts.length; p++) {
+      it.partial = false;
+      for (var p2 = 0; p2 < parts.length; p2++) {
         if (isStop()) break;
         var note = function (s) {
           log.push('[' + it.label + '] ' + s);
-          var st = getEl('opf-rx-statusline');
-          if (st) st.textContent = it.label + ' · ' + s;
+          var stl = getEl('opf-rx-statusline');
+          if (stl) stl.textContent = it.label + ' · ' + s;
           opfLog('[regex-forge] ' + it.label + ' ' + s);
         };
-        note('开始生成 ' + parts[p].label + '（' + (p + 1) + '/' + parts.length + '）');
-        css += (css ? '\n' : '') + await rxGenCssPart(it, f, parts[p], css, note);
+        note('开始生成 ' + parts[p2].label + '（' + (p2 + 1) + '/' + parts.length + '，预算 ' + parts[p2].budget + ' 字符' + (shrink < 1 ? '·已自动缩段' : '') + '）');
+        var r = await rxGenCssPart(it, f, parts[p2], css, note);
+        css += (css ? '\n' : '') + r.css;
+        if (r.partial) {
+          it.partial = true;
+          it.lastErr = r.err;
+          if (/524|超时/.test(r.err)) { shrink = Math.max(0.35, shrink * 0.5); note('遇到 524/超时：后续段预算自动折半为 ≈' + Math.max(800, Math.round(parts[p2].budget * 0.5)) + ' 字符'); }
+          note('本段未完成：' + String(r.err).slice(0, 120) + '（已保留 ' + r.css.length + ' 字符，可稍后再点一次续做）');
+        }
       }
       it.skeleton = rxSkeleton(it, f);
       it.replaceHtml = rxAssemble(it, f, css);
@@ -3996,12 +4111,14 @@ async function rxGenerate() {
       await waitTick();
     }
     var st2 = getEl('opf-rx-statusline');
-    if (st2) st2.textContent = '完成：' + log.slice(-2).join(' ｜ ');
+    var anyPartial = ST.rx.items.filter(function (x) { return x.partial; }).length;
+    if (st2) st2.textContent = '完成：' + log.slice(-2).join(' ｜ ') + (anyPartial ? '（' + anyPartial + ' 项未完成，可再点一次续做）' : '');
     if (isStop()) toast('已停止（已生成的部分已保留）');
+    else if (anyPartial) toast('部分完成：' + anyPartial + ' 项因 524/超时未写完，已保留内容，可再点一次续做；或改用「直连 + 真流式」', 'warning');
     else toast('替换体生成完成：结构由代码保证、样式分段产出', 'success');
   } catch (e) {
-    toast('生成替换体出错：' + (e && e.message ? e.message : e) + '（已生成的部分保留，可再点一次续做）', 'error');
-    var st3 = getEl('opf-rx-statusline'); if (st3) st3.textContent = '出错：' + (e && e.message ? e.message : e).slice(0, 120);
+    toast('生成替换体出错：' + rxDiagError(e) + '（已生成的部分保留，可再点一次续做）', 'error');
+    var st3 = getEl('opf-rx-statusline'); if (st3) st3.textContent = '出错：' + rxDiagError(e).slice(0, 160);
   } finally {
     ST.running = false; renderRunButtons();
     rxRenderItems(); rxCacheSave();
