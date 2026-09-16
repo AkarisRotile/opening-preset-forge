@@ -2617,10 +2617,10 @@ var DEST_KNOWN_CORES = ['梅林核心', '唐吉坷德核心', '奶龙核心', '�
 var DEST_KNOWN_SYSNAMES = ['命定之诗', '铁王冠', '白祷', '银钥之门', '飞鸟之诗', '他者之眼', '命运的舞台监导', '奶人之契', '命定之书', '九十九夜梦', 'user_system'];
 var DEST_KNOWN_TAGS = ['nailong', 'giraffe', 'Foreigner', 'Foreigner_alter', 'lilith', 'xianzu', 'dalian'];
 var DEST_SLOT_ORDER = ['系统名', '系统核心名', '系统核心', 'fp定义', '爆料风格', '登神长阶系统优势', '生命层级成长系统优势', '技能获取系统优势', '经验值获取系统优势', '复活机制'];
-var DEST_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">✦ 命定系统工坊 · 分段式生成（产出世界书「命定系统」核心条目）</div><div class="opf-dim">流程：① 分段初稿（7 段串行：骨架与命名→契约与核心机制→命运点数→命定之灵→语言格式→十个变量槽→可选扩展）→ ② 交火梳理（先出报告，再逐段应用联动修订，防截断）→ ③ 逐段定点修改（只改你指定的段，其它段冻结）→ ④ 最终封装：输出世界书条目正文 + 条目元数据提示，并自动跑内置 lint。与「开局预设」「二创角色」完全隔离。</div><label id="opf-dest-ejswrap"><input type="checkbox" id="opf-dest-ejs"> 🧬 进阶（可选）：EJS 重型核心 —— 追加 3 段 EJS 流水线（守卫与数据层 / 派生与渲染层 / 引擎与兜底）+ EJS 规范注入 + EJS 专用 lint</label><textarea id="opf-dest-demand" class="opf-char-input" placeholder="写谁的核心？例：以《Fate/Grand Order》的梅林为原型做一版二创核心；或：围绕“赌徒的骰子”做一个原创命定系统，赌注越大 FP 越多……"></textarea><textarea id="opf-dest-ref" class="opf-char-input" placeholder="（可选）参考文本：原型描述 / 已有核心片段（可作为骨架改造对象）/ 世界书片段，将作为参考注入"></textarea><input id="opf-dest-author" class="opf-char-input" placeholder="署名（写进条目注释名，例如：北游 / H一串 / 你的ID；留空则写“未署名”）"><div class="opf-char-tools"><button type="button" class="opf-btn primary" id="opf-dest-run">▶ 分段初稿</button><button type="button" class="opf-btn ghost" id="opf-dest-link">⚔ 交火梳理</button><button type="button" class="opf-btn ghost" id="opf-dest-final">🎁 最终封装</button><button type="button" class="opf-btn ghost" id="opf-dest-lint">🔎 重新自检</button><button type="button" class="opf-btn ghost" id="opf-dest-clean">🧹 去装饰</button><button type="button" class="opf-btn ghost" id="opf-dest-std">📐 标准速查</button><button type="button" class="opf-btn ghost" id="opf-dest-ejsstd">🧬 EJS 速查</button><button type="button" class="opf-btn ghost" id="opf-dest-new">🗑 新核心</button></div><pre id="opf-dest-standard" class="opf-box opf-char-report" style="display:none">尚未展开</pre><pre id="opf-dest-ejsstandard" class="opf-box opf-char-report" style="display:none">尚未展开</pre><div id="opf-dest-steps"></div><div class="opf-sec"><div class="opf-sec-label">交火梳理报告</div><pre id="opf-dest-report" class="opf-box opf-char-report">尚未梳理</pre></div><div class="opf-out"><div class="opf-sec-label">最终稿件（YAML 框架 + 条目正文）</div><div class="opf-dim" id="opf-dest-outnote"></div><pre id="opf-dest-out" class="opf-box">尚未封装</pre><div class="opf-char-copyrow"><button type="button" class="opf-btn ghost" id="opf-dest-copy">⧉ 复制条目正文</button><button type="button" class="opf-btn ghost" id="opf-dest-metacopy">⧉ 复制完整 YAML</button></div></div></div>';
+var DEST_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">✦ 命定系统工坊 · 分段式生成（产出世界书「命定系统」核心条目）</div><div class="opf-dim">流程：① 分段初稿（7 段串行：骨架与命名→契约与核心机制→命运点数→命定之灵→语言格式→十个变量槽→可选扩展）→ ② 交火梳理（先出报告，再逐段应用联动修订，防截断）→ ③ 逐段定点修改（只改你指定的段，其它段冻结）→ ④ 最终封装：输出世界书条目正文 + 条目元数据提示，并自动跑内置 lint。与「开局预设」「二创角色」完全隔离。</div><label id="opf-dest-ejswrap"><input type="checkbox" id="opf-dest-ejs"> 🧬 进阶（可选）：EJS 重型核心 —— 追加 3 段 EJS 流水线（守卫与数据层 / 派生与渲染层 / 引擎与兜底）+ EJS 规范注入 + EJS 专用 lint</label><textarea id="opf-dest-demand" class="opf-char-input" placeholder="写谁的核心？例：以《Fate/Grand Order》的梅林为原型做一版二创核心；或：围绕“赌徒的骰子”做一个原创命定系统，赌注越大 FP 越多……"></textarea><textarea id="opf-dest-ref" class="opf-char-input" placeholder="（可选）参考文本：原型描述 / 已有核心片段（可作为骨架改造对象）/ 世界书片段，将作为参考注入"></textarea><input id="opf-dest-author" class="opf-char-input" placeholder="署名（写进条目注释名，例如：北游 / H一串 / 你的ID；留空则写“未署名”）"><div class="opf-char-tools"><button type="button" class="opf-btn primary" id="opf-dest-run">▶ 分段初稿</button><button type="button" class="opf-btn ghost" id="opf-dest-link">⚔ 交火梳理</button><button type="button" class="opf-btn primary" id="opf-dest-final">🎁 脚本封装</button><button type="button" class="opf-btn ghost" id="opf-dest-reviewbtn">🔎 AI 检查</button><button type="button" class="opf-btn ghost" id="opf-dest-finalai">🧠 AI 整合（备用）</button><button type="button" class="opf-btn ghost" id="opf-dest-lint">🔎 重新自检</button><button type="button" class="opf-btn ghost" id="opf-dest-clean">🧹 去装饰</button><button type="button" class="opf-btn ghost" id="opf-dest-std">📐 标准速查</button><button type="button" class="opf-btn ghost" id="opf-dest-ejsstd">🧬 EJS 速查</button><button type="button" class="opf-btn ghost" id="opf-dest-new">🗑 新核心</button></div><pre id="opf-dest-standard" class="opf-box opf-char-report" style="display:none">尚未展开</pre><pre id="opf-dest-ejsstandard" class="opf-box opf-char-report" style="display:none">尚未展开</pre><div id="opf-dest-steps"></div><div class="opf-sec"><div class="opf-sec-label">AI 检查报告（只审校不改写：修改一律回到分段，再由脚本重新拼装）</div><pre id="opf-dest-reviewbox" class="opf-box opf-char-report">尚未检查</pre><div id="opf-dest-review"></div></div><div class="opf-sec"><div class="opf-sec-label">交火梳理报告</div><pre id="opf-dest-report" class="opf-box opf-char-report">尚未梳理</pre></div><div class="opf-out"><div class="opf-sec-label">最终稿件（YAML 框架 + 条目正文）</div><div class="opf-dim" id="opf-dest-outnote"></div><pre id="opf-dest-out" class="opf-box">尚未封装</pre><div class="opf-char-copyrow"><button type="button" class="opf-btn ghost" id="opf-dest-copy">⧉ 复制条目正文</button><button type="button" class="opf-btn ghost" id="opf-dest-metacopy">⧉ 复制完整 YAML</button></div><div class="opf-sec"><div class="opf-sec-label">附：可选扩展（命运抽卡等——属于独立条目，不并入正文）</div><pre id="opf-dest-extras" class="opf-box opf-char-report" style="display:none">（空）</pre><div class="opf-char-copyrow"><button type="button" class="opf-btn ghost" id="opf-dest-extracopy">⧉ 复制可选扩展</button></div></div></div></div>';
 
 function destInit(){
-  ST.dest = ST.dest || { demand: '', ref: '', author: '', segs: {}, status: {}, report: '', out: '', body: '', meta: '', outNote: [], ejs: false, _inited: false };
+  ST.dest = ST.dest || { demand: '', ref: '', author: '', segs: {}, status: {}, report: '', out: '', body: '', meta: '', outNote: [], ejs: false, _inited: false, asmInfo: null, review: '', reviewIssues: [] };
   ST.dest.outNote = ST.dest.outNote || [];
   ST.destEls = ST.destEls || {};
 }
@@ -2629,7 +2629,10 @@ function bindDestinyPage(){
   var run = getEl('opf-dest-run'); if (!run || run._b) return; run._b = true;
   run.addEventListener('click', function(){ if (ST.running) { ST.stopReq = true; toast('正在停止…'); return; } runDestDraft(); });
   getEl('opf-dest-link').addEventListener('click', function(){ runDestLinkage(); });
-  getEl('opf-dest-final').addEventListener('click', function(){ finalizeDest(); });
+  getEl('opf-dest-final').addEventListener('click', function(){ destFinalizeScript(false); });
+  getEl('opf-dest-reviewbtn').addEventListener('click', function(){ destAiReview(); });
+  getEl('opf-dest-finalai').addEventListener('click', function(){ finalizeDest(); });
+  getEl('opf-dest-extracopy').addEventListener('click', function(){ destCopyText((ST.dest.asmInfo && ST.dest.asmInfo.hooks) || '', '「可选扩展」段为空'); });
   getEl('opf-dest-lint').addEventListener('click', function(){ reLintDest(); });
   getEl('opf-dest-clean').addEventListener('click', function(){ cleanDestOut(); });
   getEl('opf-dest-std').addEventListener('click', function(){ toggleDestStandard(); });
@@ -2747,12 +2750,15 @@ function renderDestinyPage(){
   var note = getEl('opf-dest-outnote');
   if (note) note.textContent = destNoteText();
   var rep = getEl('opf-dest-report'); if (rep && rep.textContent !== '交火梳理中…') rep.textContent = ST.dest.report || '尚未梳理';
+  try { destRenderReview(); } catch (e) {}
+  var ex2 = getEl('opf-dest-extras');
+  if (ex2) { var hk = ST.dest.asmInfo && ST.dest.asmInfo.hooks; ex2.textContent = hk || '（本次「可选扩展」段为空或写了「无」）'; ex2.style.display = hk ? 'block' : 'none'; }
   destSegs().forEach(function (s) { renderDestSegOut(s.id); destSetSegUi(s.id, ST.dest.status[s.id] || 'wait'); });
 }
 function destNoteText(){
   if (!ST.dest || !ST.dest.out) return '';
   var parts = [];
-  if (ST.dest.body) parts.push('正文 ' + ST.dest.body.length + ' 字符｜YAML 框架由插件生成（注释名/开关/位置/order 已填好）');
+  if (ST.dest.body) parts.push('正文 ' + ST.dest.body.length + ' 字符｜' + (destAssembleNote() || 'YAML 框架由插件生成（注释名/开关/位置/order 已填好）'));
   if (ST.dest.outNote && ST.dest.outNote.length) parts.push('⚠ ' + ST.dest.outNote.join('；'));
   else parts.push('✓ 结构与命名自检通过');
   return parts.join('　｜　');
@@ -2848,7 +2854,8 @@ async function refineDestSeg(pid, dir){
     var resp = await callModel(msgs);
     ST.dest.segs[pid] = resp;
     destSetSeg(pid, 'ok'); renderDestSegOut(pid);
-    toast('已修改【' + seg.title + '】（其余分段未动）');
+    if (ST.dest.body) destFinalizeScript(true);          // 分段一变，成品由脚本重新拼装（不再让模型重抄）
+    toast('已修改【' + seg.title + '】（其余分段未动）' + (ST.dest.body ? '，成品已重新拼装' : ''));
   } catch (e) { destSetSeg(pid, 'err'); toast('定点修改出错：' + (e && e.message ? e.message : e), 'error'); }
   finally { ST.running = false; renderRunButtons(); destDraftCacheSave(); }
 }
@@ -2916,8 +2923,9 @@ async function runDestLinkage(){
       await waitTick();
     }
     if (report) report.textContent = ST.dest.report + (isStop() ? '\n\n（已停止：修订应用中断）' : '\n\n（修订应用完成，改动 ' + changed + ' 段）');
+    if (ST.dest.body && changed) destFinalizeScript(true);      // 分段被联动改过 → 成品重新拼装
     if (isStop()) toast('已停止');
-    else toast('交火梳理完成：报告已生成，联动修订应用到 ' + changed + ' 段', 'success');
+    else toast('交火梳理完成：报告已生成，联动修订应用到 ' + changed + ' 段' + (ST.dest.body ? '，成品已重新拼装' : ''), 'success');
   } catch (e) { toast('交火梳理出错：' + (e && e.message ? e.message : e), 'error'); if (report) report.textContent = '梳理失败：' + (e && e.message ? e.message : e); }
   finally { ST.running = false; renderRunButtons(); destDraftCacheSave(); }
 }
@@ -2926,6 +2934,104 @@ function destCoreNameGuess(){
   var m = f.match(/系统核心[：:]\s*(.+)/) || f.match(/核心名[：:]\s*(.+)/);
   if (m) return String(m[1]).trim().split(/[，,。\s(（]/)[0].slice(0, 30);
   return '未命名核心';
+}
+// ---------- AI 检查（只报告，不改写；修改一律回到分段，再由脚本重新拼装）----------
+var DEST_REVIEW_SEG_BY_NAME = [
+  { id: 'pact', re: /契约|核心机制|定义|隐蔽|缔结/ },
+  { id: 'fp', re: /命运点数|FP|消耗|获取|档位|情感修正/ },
+  { id: 'spirit', re: /命定之灵|人设|开场白|功能|规则|灵/ },
+  { id: 'voice', re: /语言格式|标签|参数|范例|口吻/ },
+  { id: 'slots', re: /setvar|变量槽|槽位|复活机制|系统名|系统核心/ },
+  { id: 'frame', re: /命名|骨架|系统名|核心名|撞名|重名/ },
+  { id: 'hooks', re: /抽卡|扩展|钩子/ }
+];
+function destReviewSegId(s){
+  var t = String(s || '');
+  for (var i = 0; i < DEST_REVIEW_SEG_BY_NAME.length; i++) { if (DEST_REVIEW_SEG_BY_NAME[i].re.test(t)) return DEST_REVIEW_SEG_BY_NAME[i].id; }
+  return 'pact';
+}
+async function destAiReview(){
+  if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
+  if (!ST.dest || !ST.dest.body) { toast('请先点「🎁 脚本封装」（拼出正文后再检查）', 'warning'); return; }
+  ST.running = true; renderRunButtons();
+  var box = getEl('opf-dest-review'), rb = getEl('opf-dest-reviewbox');
+  if (box) box.textContent = '';
+  if (rb) rb.textContent = '检查中…（只审校、不改写）';
+  try {
+    var L = [];
+    L.push('[任务] 审校一份已经拼装好的「命定系统」核心条目正文。你只做审校与报告，**禁止改写正文**（修正由插件回到对应分段去做）。');
+    L.push('[标准]\n' + DEST_STANDARD);
+    L.push('[联动链条]\n' + DEST_LINK_CHAIN);
+    L.push('[各分段标题（用于定位"改哪一段"）]\n' + destSegs().map(function (s) { return s.id + ' = ' + s.title; }).join('\n'));
+    L.push('[正在审校的成品正文（脚本拼装）]\n' + String(ST.dest.body || '').slice(0, 24000));
+    L.push('[输出] 只输出一个 ' + fence() + 'json 代码块，结构如下，不要任何其它文字：\n{"总评":"一两句","问题":[{"级别":"高|中|低","段":"pact","位置":"问题出现在正文的哪一句/哪个字段","问题":"具体是什么问题","建议":"怎么改"}]}\n最多 12 条，按严重程度排序；没有问题时 "问题":[]。');
+    var resp = await callModel([{ role: 'system', content: destSystemContent() }, { role: 'user', content: macroFill(L.join('\n\n')) }]);
+    var j = rxExtractJson(resp);
+    var issues = (j && Array.isArray(j['问题'])) ? j['问题'] : null;
+    if (!issues) {
+      if (rb) rb.textContent = '模型没有返回可解析的 JSON（原文见下）\n\n' + String(resp || '').slice(0, 4000);
+      ST.dest.reviewRaw = String(resp || '');
+      toast('AI 检查没返回可解析的结果，可重试（原文已显示在检查区）', 'warning');
+      return;
+    }
+    ST.dest.review = String((j && j['总评']) || '');
+    ST.dest.reviewIssues = issues.map(function (x, i) {
+      return {
+        i: i, level: String(x['级别'] || '中'), segId: destReviewSegId(x['段'] + ' ' + x['位置'] + ' ' + x['问题']),
+        where: String(x['位置'] || ''), issue: String(x['问题'] || ''), fix: String(x['建议'] || ''),
+        done: false
+      };
+    });
+    destRenderReview();
+    toast(issues.length ? ('AI 检查完成：' + issues.length + ' 条问题（每条都能一键回到对应分段修，改完自动重新拼装）') : 'AI 检查完成：没有发现问题', issues.length ? 'warning' : 'success');
+  } catch (e) { toast('AI 检查出错：' + (e && e.message ? e.message : e), 'error'); }
+  finally { ST.running = false; renderRunButtons(); destDraftCacheSave(); }
+}
+function destRenderReview(){
+  var box = getEl('opf-dest-review'), rb = getEl('opf-dest-reviewbox');
+  if (!box) return;
+  box.textContent = '';
+  var list = ST.dest.reviewIssues || [];
+  if (rb) rb.textContent = ST.dest.review ? ('总评：' + ST.dest.review) : (list.length ? '' : '尚未检查');
+  if (!list.length) return;
+  var doneN = list.filter(function (x) { return x.done; }).length;
+  var head = document.createElement('div'); head.className = 'opf-step-ref-row';
+  var info = document.createElement('span'); info.className = 'opf-dim';
+  info.textContent = '共 ' + list.length + ' 条（已处理 ' + doneN + '）｜点「✨ 修这一段」只改对应分段，改完插件自动重新拼装并复检';
+  head.appendChild(info);
+  box.appendChild(head);
+  list.forEach(function (x) {
+    var row = document.createElement('div'); row.className = 'opf-step-ref-row';
+    var tag = document.createElement('span'); tag.className = 'opf-ref-tag' + (x.level === '高' ? ' dirty' : '');
+    tag.textContent = x.level + '｜' + destSegOf(x.segId).title;
+    var msg = document.createElement('span'); msg.className = 'opf-dim';
+    msg.textContent = (x.where ? '[' + x.where + '] ' : '') + x.issue + (x.fix ? ' → ' + x.fix : '');
+    if (x.done) msg.style.textDecoration = 'line-through';
+    row.appendChild(tag); row.appendChild(msg);
+    var b1 = document.createElement('button'); b1.type = 'button'; b1.className = 'opf-step-act'; b1.textContent = '✨ 修这一段';
+    b1.addEventListener('click', async function () {
+      if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
+      await refineDestSeg(x.segId, '按审校意见修正本段（只改本段，不新增设定、不改动其它段的内容）：\n问题：' + x.issue + (x.fix ? '\n建议改法：' + x.fix : '') + (x.where ? '\n出现位置：' + x.where : ''));
+      if (ST.dest.segs[x.segId]) {
+        destFinalizeScript(true);
+        x.done = true;
+        destRenderReview();
+        toast('已修「' + destSegOf(x.segId).title + '」并重新拼装（正文 ' + String(ST.dest.body || '').length + ' 字符）', 'success');
+      }
+    });
+    row.appendChild(b1);
+    var b2 = document.createElement('button'); b2.type = 'button'; b2.className = 'opf-step-act'; b2.textContent = '我自己看';
+    b2.title = '展开并滚动到该分段';
+    b2.addEventListener('click', function () {
+      var ph = getEl('opf-dph-' + x.segId);
+      if (ph) { ph.classList.add('open'); ph.scrollIntoView({ block: 'center' }); }
+    });
+    row.appendChild(b2);
+    var b3 = document.createElement('button'); b3.type = 'button'; b3.className = 'opf-step-act'; b3.textContent = '忽略';
+    b3.addEventListener('click', function () { x.done = true; destRenderReview(); destDraftCacheSave(); });
+    row.appendChild(b3);
+    box.appendChild(row);
+  });
 }
 async function finalizeDest(){
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
@@ -3034,16 +3140,20 @@ function destBuildFrame(body){
   return L.join('\n');
 }
 // 去装饰：清掉 markdown 标记，但跳过 {{setvar::…}} 槽位（其中 `# 体系名的加护` 是既有惯例）
+// 以及 EJS/JS 代码区（<% … %> 内外的反引号、# 、--- 都是代码，动了就把核心改坏）
 function destCleanMarkdown(body){
-  var stats = { bold: 0, head: 0, star: 0, rule: 0, tick: 0 };
+  var stats = { bold: 0, head: 0, star: 0, rule: 0, tick: 0, ejs: 0 };
   var t = String(body || '');
   var spans = [], re = /\{\{setvar::[\s\S]*?\}\}/g, m;
   while ((m = re.exec(t)) !== null) spans.push([m.index, m.index + m[0].length]);
   var inSlot = function (a, b) { return spans.some(function (s) { return a < s[1] && b > s[0]; }); };
-  var pos = 0, res = [];
+  var pos = 0, res = [], ejsDepth = 0;
   t.split('\n').forEach(function (line) {
     var lineStart = pos; pos += line.length + 1;
     if (inSlot(lineStart, lineStart + line.length)) { res.push(line); return; }
+    var opens = (line.match(/<%/g) || []).length, closes = (line.match(/%>/g) || []).length;
+    var inEjs = ejsDepth > 0 || opens > 0;
+    if (inEjs) { res.push(line); stats.ejs++; ejsDepth += opens - closes; if (ejsDepth < 0) ejsDepth = 0; return; }
     var l = line;
     if (/^\s*#{1,6}\s+/.test(l)) { l = l.replace(/^(\s*)#{1,6}\s+/, '$1'); stats.head++; }
     if (/^\s*([-*_])\1{2,}\s*$/.test(l)) { if (res.join('').trim() !== '') { stats.rule++; return; } }
@@ -3054,8 +3164,270 @@ function destCleanMarkdown(body){
   });
   return { text: res.join('\n'), stats: stats };
 }
-function destTierPrices(t){
-  // 兼容两种写法：「一层级200 | 二500 | 三2500 …」与「第一层级: 500 FP」
+// ============================================================================
+// 脚本封装（v1.11.3）：正文结构一律由代码拼装，模型不生产成品
+// 版式依据世界书 22 个命定系统条目的真实结构：<系统名> 包裹 + 与标签同名的一级键
+// + 2 空格缩进的一级节（定义/核心机制/隐蔽原则/命运点数(FP)/{灵名}/{灵名}语言格式）
+// + 闭合标签之后逐条十槽。模型只写分段，拼装、缩进、槽位排序、包裹标签全由代码完成，
+// 从根上消掉「漏槽/错序/标签不闭合/段落丢失/夹 markdown」这一整类 bug。
+// ============================================================================
+var DEST_ASSEMBLE_MAP = [
+  { seg: 'pact',   header: null,               indent: 2, aliases: ['契约与核心机制', '定义与核心机制', '核心机制与契约', '核心机制', '契约', '定义'] },
+  { seg: 'fp',     header: '命运点数(FP)',     indent: 4, aliases: ['命运点数(FP)', '命运点数（FP）', '命运点数规则', '命运点数', 'FP'] },
+  { seg: 'spirit', header: '{核心名}',         indent: 4, aliases: ['命定之灵', '灵', '灵格'] },
+  { seg: 'voice',  header: '{核心名}语言格式', indent: 4, aliases: ['语言格式', '命定之灵语言格式', '{核心名}语言格式'] }
+];
+function destSegOf(id) {
+  var hit = null;
+  try { destSegs().forEach(function (s) { if (s.id === id) hit = s; }); } catch (e) {}
+  return hit || { id: id, title: id, short: '' };
+}
+function destAsmRule(id) { return DEST_ASSEMBLE_MAP.filter(function (x) { return x.seg === id; })[0] || { seg: id, header: null, indent: 2, aliases: [] }; }
+function destNormLabel(s) { return String(s || '').replace(/^\s*(?:[-*•]|\d+[.、)])\s*/, '').replace(/^#+\s*/, '').replace(/\*\*/g, '').replace(/^【|】$/g, '').replace(/[:：]\s*$/, '').replace(/\s+/g, '').trim(); }
+// 去掉模型抄回来的分段名标签与整段代码块包裹；markdown 装饰另由 destCleanMarkdown 处理
+function destSegCleanup(text, seg) {
+  var t = String(text || '');
+  var F = fence();
+  var fenced = t.match(new RegExp('^\\s*' + F + '[a-zA-Z]*\\s*\\n([\\s\\S]*?)\\n?' + F + '\\s*$'));
+  if (fenced) t = fenced[1];
+  var rule = destAsmRule(seg.id);
+  var aliases = [seg.title, String(seg.title || '').replace(/\(.*?\)/g, ''), seg.short].concat(rule.aliases)
+    .filter(Boolean).map(destNormLabel);
+  var lines = t.split(/\r?\n/);
+  for (var pass = 0; pass < 3; pass++) {
+    var i0 = -1;
+    for (var i = 0; i < lines.length && i < 6; i++) { if (lines[i].trim()) { i0 = i; break; } }
+    if (i0 < 0) break;
+    if (aliases.indexOf(destNormLabel(lines[i0])) < 0) break;
+    lines.splice(i0, 1);
+  }
+  return lines.join('\n').replace(/^\n+/, '').replace(/[ \t]+$/, '').replace(/\s+$/, '');
+}
+// 把一段内容整体平移缩进：先去掉公共最小缩进，再统一加上 base 个空格（相对结构不变，块标量安全）
+function destShiftIndent(text, base) {
+  var lines = String(text || '').split(/\r?\n/);
+  var min = -1;
+  lines.forEach(function (l) { if (!l.trim()) return; var n = (l.match(/^ */) || [''])[0].length; if (min < 0 || n < min) min = n; });
+  if (min < 0) return '';
+  var pad = new Array(Math.max(0, base) + 1).join(' ');
+  var res = lines.map(function (l) { return l.trim() ? pad + l.slice(min).replace(/[ \t]+$/, '') : ''; }).join('\n');
+  return res.replace(/^\n+/, '').replace(/\n+$/, '');
+}
+// 按花括号配对抽出 {{setvar::名::值}} 整块（值里可能还有 {{…}} 与换行）
+function destExtractSlots(text) {
+  var s = String(text || ''), map = {}, order = [], idx = 0;
+  for (;;) {
+    var start = s.indexOf('{{setvar::', idx);
+    if (start < 0) break;
+    var depth = 0, i = start, end = -1;
+    while (i < s.length) {
+      if (s.slice(i, i + 2) === '{{') { depth++; i += 2; continue; }
+      if (s.slice(i, i + 2) === '}}') { depth--; i += 2; if (depth === 0) { end = i; break; } continue; }
+      i++;
+    }
+    if (end < 0) break;
+    var block = s.slice(start, end);
+    var nm = (block.match(/^\{\{setvar::([^:]+)::/) || [])[1];
+    if (nm) { nm = nm.trim(); if (!map[nm]) { map[nm] = block; order.push(nm); } }
+    idx = end;
+  }
+  return { map: map, order: order };
+}
+// 槽位区扫描：按出现顺序返回 slot / raw 两类条目。
+// raw = 夹在十槽之间的 {{…}} 标记行（如 {{//自定义配置}}）——必须原样保留，不能因为
+// "只认 {{setvar::}}" 就把它吃掉（这正是"内容静默丢失"的一类）。
+function destScanSlotRegion(text) {
+  var s = String(text || ''), items = [], idx = 0, guard = 0;
+  for (;;) {
+    if (guard++ > 500) break;
+    var start = s.indexOf('{{setvar::', idx);
+    var pre = start < 0 ? s.slice(idx) : s.slice(idx, start);
+    pre.split(/\r?\n/).forEach(function (l) {
+      var t = l.trim();
+      if (/^\{\{[\s\S]*\}\}$/.test(t) && !/^\{\{setvar::/.test(t)) items.push({ kind: 'raw', text: t });
+    });
+    if (start < 0) break;
+    var depth = 0, i = start, end = -1;
+    while (i < s.length) {
+      if (s.slice(i, i + 2) === '{{') { depth++; i += 2; continue; }
+      if (s.slice(i, i + 2) === '}}') { depth--; i += 2; if (depth === 0) { end = i; break; } continue; }
+      i++;
+    }
+    if (end < 0) break;
+    var block = s.slice(start, end);
+    var nm = (block.match(/^\{\{setvar::([^:]+)::/) || [])[1];
+    if (nm) items.push({ kind: 'slot', name: nm.trim(), block: block });
+    idx = end;
+  }
+  return items;
+}
+// 十槽允许写在任何分段里（模型有时把它们塞进 slots 段之外），全分段收集
+function destHarvestSlots() {
+  var map = {}, from = {}, pre = {}, order = [], extras = [], tail = [];
+  destSegs().forEach(function (s) {
+    var t = (ST.dest && ST.dest.segs) ? ST.dest.segs[s.id] : null;
+    if (!t) return;
+    var pending = [];
+    destScanSlotRegion(t).forEach(function (it) {
+      if (it.kind === 'raw') { pending.push(it.text); return; }
+      if (DEST_SLOT_ORDER.indexOf(it.name) < 0) {
+        if (!extras.some(function (x) { return x.name === it.name; })) extras.push({ name: it.name, block: it.block, pre: pending.slice() });
+        pending = [];
+        return;
+      }
+      if (map[it.name]) { pending = []; return; }
+      map[it.name] = it.block; from[it.name] = s.title; pre[it.name] = pending.slice();
+      order.push(it.name);
+      pending = [];
+    });
+    tail = tail.concat(pending);
+  });
+  return { map: map, from: from, pre: pre, order: order, extras: extras, tail: tail };
+}
+function destSlotInner(block) {
+  var m = String(block || '').match(/^\{\{setvar::[^:]+::([\s\S]*)\}\}$/);
+  return m ? m[1].trim() : '';
+}
+// 从「骨架与命名」段的列表/键值里取值
+function destFrameValue(t, names) {
+  var lines = String(t || '').split(/\r?\n/);
+  for (var i = 0; i < lines.length; i++) {
+    var l = lines[i].replace(/^\s*(?:[-*•]|\d+[.、)])\s*/, '').replace(/\*\*/g, '').replace(/^#+\s*/, '').trim();
+    for (var k = 0; k < names.length; k++) {
+      var m = l.match(new RegExp('^' + names[k] + '\\s*[:：]\\s*(.+)$'));
+      if (m) {
+        var v = m[1].trim().replace(/^["'「『]/, '').replace(/["'」』]$/, '').trim();
+        if (v && !/^(?:待定|未知|无|none)$/i.test(v)) return v;
+      }
+    }
+  }
+  return '';
+}
+// 兜底：从任何分段里找第一个像包裹标签的 <中文/英文名>（排除 <user> 与 HTML 标签）
+function destGuessSystemName() {
+  var skip = ['user', 'br', 'p', 'div', 'span', 'style', 'state_bar', '复活机制', '物品', '名称', '品质', '类型', '物品简介', '吐槽', '对白'];
+  var hit = '';
+  ['frame', 'pact', 'voice'].forEach(function (id) {
+    if (hit) return;
+    var t = (ST.dest.segs && ST.dest.segs[id]) || '';
+    var re = /<([A-Za-z\u4e00-\u9fa5_]{2,12})>/g, m;
+    while ((m = re.exec(t)) !== null) {
+      var n = m[1];
+      if (skip.indexOf(n) >= 0 || skip.indexOf(n.toLowerCase()) >= 0) continue;
+      hit = n; break;
+    }
+  });
+  return hit;
+}
+function destAssemble() {
+  var notes = [], info = { sections: [], slots: [], missing: [], wrapper: '', chars: 0, hooks: '', ejs: 0 };
+  var segs = {};
+  destSegs().forEach(function (s) { if (ST.dest && ST.dest.segs && ST.dest.segs[s.id]) segs[s.id] = ST.dest.segs[s.id]; });
+  if (!segs.pact && !segs.fp && !segs.spirit && !segs.voice) return { body: '', notes: ['还没有任何正文分段内容，请先「▶ 分段初稿」'], info: info };
+  var slots = destHarvestSlots();
+  var sysFromMeta = destFrameValue(segs.frame, ['系统名', '系统名称', '包裹标签名', '标签名'])
+    || (slots.map['系统名'] ? destSlotInner(slots.map['系统名']) : '');
+  var sysName = sysFromMeta || destGuessSystemName() || '';
+  var coreName = destFrameValue(segs.frame, ['系统核心名', '核心名', '灵名', '系统灵名'])
+    || (slots.map['系统核心名'] ? destSlotInner(slots.map['系统核心名']) : '') || '';
+  var coreId = destFrameValue(segs.frame, ['系统核心'])
+    || (slots.map['系统核心'] ? destSlotInner(slots.map['系统核心']) : '') || '';
+  if (!sysName) { sysName = '未命名系统'; notes.push('没能从「骨架与命名」段读出「系统名」，包裹标签暂用「未命名系统」——请在分段里补上系统名后重新拼装'); }
+  else if (!sysFromMeta) notes.push('「系统名」是由脚本从分段正文里猜出的（' + sysName + '），请核对');
+  if (!coreName) { coreName = '命定之灵'; notes.push('没能读出「系统核心名」，一级节暂用通用名「命定之灵」'); }
+  info.wrapper = sysName;
+  var clean = function (id) {
+    var t = destSegCleanup(segs[id], destSegOf(id));
+    // 分段里模型可能把包裹标签/一级键也抄了回来 → 一律剥掉（包裹结构由拼装负责）
+    var keep = [];
+    t.split(/\r?\n/).forEach(function (l) {
+      var s2 = l.trim();
+      if (s2 === '<' + sysName + '>' || s2 === '</' + sysName + '>' || s2 === sysName + ':') return;
+      keep.push(l);
+    });
+    t = keep.join('\n');
+    var c = destCleanMarkdown(t);
+    if (c.stats.bold + c.stats.head + c.stats.star + c.stats.rule + c.stats.tick > 0) {
+      notes.push('「' + destSegOf(id).title + '」里清掉了 ' + (c.stats.bold + c.stats.head + c.stats.star + c.stats.rule + c.stats.tick) + ' 处 markdown 装饰（硬约束禁止）');
+    }
+    return c.text;
+  };
+  var out = ['<' + sysName + '>', sysName + ':'];
+  var pushBlock = function (text, indent) { var t = destShiftIndent(text, indent); if (t.trim()) out.push(t); };
+  var pushHead = function (h, indent) { if (h) out.push(new Array(indent + 1).join(' ') + h + ':'); };
+  if (segs.pact) { pushBlock(clean('pact'), 2); info.sections.push('契约与核心机制'); }
+  if (segs.fp) { out.push(''); pushHead('命运点数(FP)', 2); pushBlock(clean('fp'), 4); info.sections.push('命运点数(FP)'); }
+  if (segs.spirit) { out.push(''); pushHead(coreName, 2); pushBlock(clean('spirit'), 4); info.sections.push(coreName); }
+  if (segs.voice) { out.push(''); pushHead(coreName + '语言格式', 2); pushBlock(clean('voice'), 4); info.sections.push(coreName + '语言格式'); }
+  out.push('</' + sysName + '>');
+  var slotLines = [], carry = [];
+  var emitRaw = function (arr) { (arr || []).forEach(function (m) { if (m) slotLines.push(String(m).trim()); }); };
+  var normBlock = function (b) { return String(b).split(/\r?\n/).map(function (l) { return l.replace(/[ \t]+$/, ''); }).join('\n').trim(); };
+  DEST_SLOT_ORDER.forEach(function (n) {
+    var b = slots.map[n];
+    if (!b) {
+      if (n === '系统名') b = '{{setvar::系统名::' + sysName + '}}';
+      else if (n === '系统核心名') b = '{{setvar::系统核心名::' + coreName + '}}';
+      else if (n === '系统核心' && coreId) b = '{{setvar::系统核心::' + coreId + '}}';
+      else { info.missing.push(n); carry = carry.concat(slots.pre[n] || []); return; }
+      notes.push('槽位「' + n + '」在原分段里缺失，已由脚本按命名段补上（值请核对）');
+    }
+    emitRaw(carry); carry = [];
+    emitRaw(slots.pre[n]);
+    slotLines.push(normBlock(b));
+    info.slots.push(n);
+  });
+  emitRaw(carry); emitRaw(slots.tail);
+  (slots.extras || []).forEach(function (x) {
+    emitRaw(x.pre);
+    slotLines.push(normBlock(x.block));
+    info.extraSlots = (info.extraSlots || []).concat([x.name]);
+  });
+  if (info.extraSlots && info.extraSlots.length) notes.push('检测到 ' + info.extraSlots.length + ' 个非标准槽位（' + info.extraSlots.join('、') + '），已原样附在十槽之后（额外变量钩子属于这种）');
+  if (info.missing.length) notes.push('十槽缺 ' + info.missing.length + ' 条：' + info.missing.join('、') + '——可点「🔎 AI 检查」定位，或回到「十个变量槽」段重跑');
+  var body = out.filter(function (l, i) { return !(l === '' && out[i - 1] === ''); }).join('\n');
+  if (slotLines.length) body += '\n' + slotLines.join('\n');
+  if (segs.hooks && !/^\s*无[。．.]?\s*$/.test(segs.hooks)) {
+    info.hooks = destSegCleanup(segs.hooks, destSegOf('hooks'));
+    notes.push('「可选扩展」段未并入正文（命运抽卡等属于独立条目，order 1103）——内容单独放在下方「附：可选扩展」里');
+  }
+  var ejsIds = ['ejs1', 'ejs2', 'ejs3'].filter(function (id) { return segs[id]; });
+  if (ejsIds.length) {
+    info.ejs = ejsIds.length;
+    ejsIds.forEach(function (id) { body += '\n\n' + String(segs[id]).trim(); });
+    notes.push('EJS 重型核心：' + ejsIds.length + ' 段 EJS 已按顺序附在正文末尾。EJS 块的实际插入位置需要人工确认（或改用「🧠 AI 整合」）');
+  }
+  info.chars = body.length;
+  return { body: body, notes: notes, info: info };
+}
+function destAssembleNote(){
+  var i = ST.dest && ST.dest.asmInfo;
+  if (!i) return '';
+  return '脚本拼装：包裹标签 <' + i.wrapper + '>｜一级节 ' + i.sections.length + ' 个（' + i.sections.join(' / ') + '）｜十槽 ' + i.slots.length + '/10'
+    + (i.ejs ? '｜EJS ' + i.ejs + ' 段' : '');
+}
+function destFinalizeScript(silent){
+  var asm = destAssemble();
+  if (!asm.body) { if (!silent) toast(asm.notes[0] || '还没有可拼装的分段内容', 'warning'); return false; }
+  ST.dest.body = asm.body;
+  ST.dest.out = destBuildFrame(asm.body);
+  ST.dest.outNote = destLint(asm.body).concat(destEjsLint(asm.body)).concat(asm.notes);
+  ST.dest.asmInfo = asm.info;
+  var outEl = getEl('opf-dest-out'); if (outEl) outEl.textContent = ST.dest.out;
+  var noteEl = getEl('opf-dest-outnote'); if (noteEl) noteEl.textContent = destNoteText();
+  var exEl = getEl('opf-dest-extras');
+  if (exEl) {
+    exEl.textContent = asm.info.hooks ? asm.info.hooks : '（本次「可选扩展」段为空或写了「无」）';
+    exEl.style.display = asm.info.hooks ? 'block' : 'none';
+  }
+  destDraftCacheSave();
+  if (!silent) {
+    var bad = ST.dest.outNote.filter(function (x) { return !/未并入正文|markdown 装饰/.test(x); });
+    toast('脚本封装完成（零 AI）：' + destAssembleNote() + (bad.length ? '｜' + bad.length + ' 条自检提示见输出区上方' : '｜自检通过'), bad.length ? 'warning' : 'success');
+  }
+  return true;
+}
+function destTierPrices(t){  // 兼容两种写法：「一层级200 | 二500 | 三2500 …」与「第一层级: 500 FP」
   var s = String(t).replace(/([一二三四五六])(\d{2,7})/g, '$1层级$2');
   var map = {};
   s.split(/\r?\n/).forEach(function (ln) {
@@ -3224,7 +3596,7 @@ function destDraftCacheSave(){
   if (destDraftCacheSave._t) clearTimeout(destDraftCacheSave._t);
   destDraftCacheSave._t = setTimeout(function () {
     if (!ST.dest) return;
-    lsSet(LS_DEST_KEY, { demand: ST.dest.demand, ref: ST.dest.ref, author: ST.dest.author, segs: ST.dest.segs, status: ST.dest.status, report: ST.dest.report, out: ST.dest.out, body: ST.dest.body, meta: ST.dest.meta, outNote: ST.dest.outNote, ejs: !!ST.dest.ejs });
+    lsSet(LS_DEST_KEY, { demand: ST.dest.demand, ref: ST.dest.ref, author: ST.dest.author, segs: ST.dest.segs, status: ST.dest.status, report: ST.dest.report, out: ST.dest.out, body: ST.dest.body, meta: ST.dest.meta, outNote: ST.dest.outNote, ejs: !!ST.dest.ejs, asmInfo: ST.dest.asmInfo, review: ST.dest.review, reviewIssues: ST.dest.reviewIssues });
   }, 500);
 }
 function destDraftRestore(){
@@ -3235,6 +3607,9 @@ function destDraftRestore(){
   ST.dest.report = c.report || ''; ST.dest.out = c.out || ''; ST.dest.body = c.body || ''; ST.dest.meta = c.meta || ''; ST.dest.outNote = c.outNote || [];
   ST.dest.author = c.author || '';
   ST.dest.ejs = !!c.ejs;
+  ST.dest.asmInfo = c.asmInfo || null; ST.dest.review = c.review || ''; ST.dest.reviewIssues = c.reviewIssues || [];
+  // 旧缓存里的成品是「AI 重抄」时代的，重启后与分段可能不一致 → 用脚本重拼一次（零成本、无 AI）
+  try { if (ST.dest.segs && Object.keys(ST.dest.segs).length) { var changed = destFinalizeScript(true); if (changed) ST.dest.outNote = (ST.dest.outNote || []).concat(['已用「脚本拼装」按当前分段重建成品（v1.11.3 起成品由代码拼装）']); } } catch (e) { opfErr('destDraftRestore reassemble', e); }
   try { renderDestSteps(); renderDestinyPage(); } catch (e) { opfErr('destDraftRestore render', e); }
 }
 
