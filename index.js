@@ -805,6 +805,7 @@ function renderRunButtons(){
   if (cLink) cLink.disabled = !!ST.running;
   if (cFin) cFin.disabled = !!ST.running;
   CHAR_SEGS.forEach(function (s) { charSetSegUi(s.id, ST.char && ST.char.status[s.id] || "wait"); });
+  destSetAllButtons();
 }
 
 function runFlow(quick){
@@ -1846,12 +1847,13 @@ var PAGE_DEFS = [
   { id: "preset", label: "① 开局预设" },
   { id: "world",  label: "② 世界书" },
   { id: "char",   label: "③ 二创角色" },
-  { id: "p4",     label: "④ DLC剧情", ph: true },
-  { id: "p5",     label: "⑤ DLC物品", ph: true },
-  { id: "p6",     label: "⑥ 更多功能", ph: true }
+  { id: "destiny",label: "④ 命定系统" },
+  { id: "p4",     label: "⑤ DLC剧情", ph: true },
+  { id: "p5",     label: "⑥ DLC物品", ph: true },
+  { id: "p6",     label: "⑦ 更多功能", ph: true }
 ];
 
-var SHELL_CSS = "#opf-shell{position:fixed;inset:0;height:100vh;height:100dvh;z-index:2147480002;display:flex;flex-direction:column;color:#fdeef0;font-family:'Noto Sans SC','Microsoft YaHei',sans-serif;letter-spacing:.3px;background:linear-gradient(180deg,#18040b 0%,#0d0206 55%,#0a0105 100%);border:none;transition:opacity .16s ease,transform .16s ease}#opf-shell.opf-shell-hidden{opacity:0;pointer-events:none;transform:translateY(12px)}#opf-shell *{box-sizing:border-box}#opf-shell-head{position:relative;display:flex;align-items:center;gap:10px;padding:8px 12px;flex:none;background:rgba(46,6,14,.6);border-bottom:1px solid rgba(255,122,138,.28)}#opf-shell-head::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#ff4d5e 18%,#ffd9a8 50%,#c8102e 82%,transparent);box-shadow:0 0 12px rgba(255,90,100,.8)}#opf-shell-title{font-size:15px;font-weight:600;color:#ffd9de;text-shadow:0 0 10px rgba(255,77,94,.35);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#opf-shell-close{margin-left:auto;flex:none;border:1px solid rgba(255,122,138,.35);background:rgba(255,77,94,.14);color:#ff8a95;width:40px;height:40px;min-width:40px;border-radius:10px;font-size:16px;cursor:pointer}#opf-shell-close:hover{background:rgba(255,77,94,.3);color:#fff}#opf-nav{display:flex;gap:5px;padding:8px 10px 0;overflow-x:auto;overflow-y:hidden;flex:none;scrollbar-width:thin;scrollbar-color:rgba(255,122,138,.4) transparent}.opf-tab{flex:none;border:1px solid rgba(255,122,138,.26);background:rgba(255,235,238,.05);color:#ffc9cf;border-radius:10px 10px 0 0;padding:9px 13px;font-size:12.5px;line-height:1.2;cursor:pointer;white-space:nowrap;min-height:40px}.opf-tab.active{background:linear-gradient(180deg,rgba(255,77,94,.26),rgba(255,77,94,.07));color:#fff;border-color:rgba(255,150,165,.65);box-shadow:inset 0 2px 0 #ff4d5e}.opf-tab.placeholder{opacity:.6;border-style:dashed}#opf-pages{flex:1;min-height:0;position:relative}.opf-page{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;padding:10px 12px 14px;display:none;scrollbar-width:thin}.opf-page.active{display:block}.opf-page-ph{padding:32px 16px;text-align:center;color:rgba(255,200,208,.55);font-size:13.5px;line-height:2.2;white-space:pre-line}#opf-shell #opf-root{position:static;width:100%;max-width:100%;height:auto;min-height:100%;max-height:none;margin:0;border:none;border-radius:0;box-shadow:none;background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none}#opf-shell #opf-root.opf-hidden{opacity:1;pointer-events:auto;transform:none}#opf-shell #opf-root::before{display:none}#opf-shell #opf-lside{position:static;transform:none;width:100%;max-width:none;height:100%;top:auto;bottom:auto;left:auto;border:none;border-radius:0;box-shadow:none;background:transparent}#opf-shell #opf-lside.open{transform:none}.opf-char-wrap{display:flex;flex-direction:column;gap:8px;max-width:860px;margin:0 auto}.opf-char-input{width:100%;border-radius:8px;padding:8px 10px;font-size:12.5px;color:#ffeef1;background:rgba(10,2,5,.55);border:1px solid rgba(255,122,138,.25);outline:none;resize:vertical}.opf-char-input:focus{border-color:rgba(255,110,125,.6);box-shadow:0 0 6px rgba(255,77,94,.25)}#opf-char-demand{min-height:56px}#opf-char-ref{min-height:48px;font-size:12px}.opf-char-tools{display:flex;gap:6px;flex-wrap:wrap}.opf-char-tools .opf-btn{flex:1 1 130px;min-height:44px;font-size:13px}.opf-box{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;margin:6px 0 0;padding:10px 12px;border:1px solid rgba(255,122,138,.32);border-radius:10px;background:rgba(10,2,5,.62);box-shadow:inset 0 0 14px rgba(255,60,80,.05);color:#ffeef1;font-size:12px;line-height:1.55;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;overflow:auto}.opf-char-report{max-height:300px;min-height:64px}#opf-char-out{max-height:56vh;min-height:140px;font-size:12.5px;scrollbar-width:thin}.opf-char-copyrow{margin-top:6px}@media (max-width:760px){#opf-shell-head{padding:6px 8px}#opf-shell-title{font-size:13px}#opf-shell-close{width:40px;height:40px}.opf-tab{padding:8px 10px;font-size:11.5px;min-height:40px}.opf-page{padding:8px 8px 12px}#opf-shell #opf-root{font-size:13px}.opf-page .opf-btn{min-height:44px}.opf-char-tools .opf-btn{min-height:46px}.opf-wi-row{min-height:40px}.opf-wi-row input{width:18px;height:18px}#opf-lside-tools{gap:6px}#opf-lside-tools .opf-step-act{min-height:40px;font-size:12px}}";
+var SHELL_CSS = "#opf-shell{position:fixed;inset:0;height:100vh;height:100dvh;z-index:2147480002;display:flex;flex-direction:column;color:#fdeef0;font-family:'Noto Sans SC','Microsoft YaHei',sans-serif;letter-spacing:.3px;background:linear-gradient(180deg,#18040b 0%,#0d0206 55%,#0a0105 100%);border:none;transition:opacity .16s ease,transform .16s ease}#opf-shell.opf-shell-hidden{opacity:0;pointer-events:none;transform:translateY(12px)}#opf-shell *{box-sizing:border-box}#opf-shell-head{position:relative;display:flex;align-items:center;gap:10px;padding:8px 12px;flex:none;background:rgba(46,6,14,.6);border-bottom:1px solid rgba(255,122,138,.28)}#opf-shell-head::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#ff4d5e 18%,#ffd9a8 50%,#c8102e 82%,transparent);box-shadow:0 0 12px rgba(255,90,100,.8)}#opf-shell-title{font-size:15px;font-weight:600;color:#ffd9de;text-shadow:0 0 10px rgba(255,77,94,.35);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#opf-shell-close{margin-left:auto;flex:none;border:1px solid rgba(255,122,138,.35);background:rgba(255,77,94,.14);color:#ff8a95;width:40px;height:40px;min-width:40px;border-radius:10px;font-size:16px;cursor:pointer}#opf-shell-close:hover{background:rgba(255,77,94,.3);color:#fff}#opf-nav{display:flex;gap:5px;padding:8px 10px 0;overflow-x:auto;overflow-y:hidden;flex:none;scrollbar-width:thin;scrollbar-color:rgba(255,122,138,.4) transparent}.opf-tab{flex:none;border:1px solid rgba(255,122,138,.26);background:rgba(255,235,238,.05);color:#ffc9cf;border-radius:10px 10px 0 0;padding:9px 13px;font-size:12.5px;line-height:1.2;cursor:pointer;white-space:nowrap;min-height:40px}.opf-tab.active{background:linear-gradient(180deg,rgba(255,77,94,.26),rgba(255,77,94,.07));color:#fff;border-color:rgba(255,150,165,.65);box-shadow:inset 0 2px 0 #ff4d5e}.opf-tab.placeholder{opacity:.6;border-style:dashed}#opf-pages{flex:1;min-height:0;position:relative}.opf-page{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;padding:10px 12px 14px;display:none;scrollbar-width:thin}.opf-page.active{display:block}.opf-page-ph{padding:32px 16px;text-align:center;color:rgba(255,200,208,.55);font-size:13.5px;line-height:2.2;white-space:pre-line}#opf-shell #opf-root{position:static;width:100%;max-width:100%;height:auto;min-height:100%;max-height:none;margin:0;border:none;border-radius:0;box-shadow:none;background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none}#opf-shell #opf-root.opf-hidden{opacity:1;pointer-events:auto;transform:none}#opf-shell #opf-root::before{display:none}#opf-shell #opf-lside{position:static;transform:none;width:100%;max-width:none;height:100%;top:auto;bottom:auto;left:auto;border:none;border-radius:0;box-shadow:none;background:transparent}#opf-shell #opf-lside.open{transform:none}.opf-char-wrap{display:flex;flex-direction:column;gap:8px;max-width:860px;margin:0 auto}.opf-char-input{width:100%;border-radius:8px;padding:8px 10px;font-size:12.5px;color:#ffeef1;background:rgba(10,2,5,.55);border:1px solid rgba(255,122,138,.25);outline:none;resize:vertical}.opf-char-input:focus{border-color:rgba(255,110,125,.6);box-shadow:0 0 6px rgba(255,77,94,.25)}#opf-char-demand{min-height:56px}#opf-char-ref{min-height:48px;font-size:12px}.opf-char-tools{display:flex;gap:6px;flex-wrap:wrap}.opf-char-tools .opf-btn{flex:1 1 130px;min-height:44px;font-size:13px}.opf-box{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;margin:6px 0 0;padding:10px 12px;border:1px solid rgba(255,122,138,.32);border-radius:10px;background:rgba(10,2,5,.62);box-shadow:inset 0 0 14px rgba(255,60,80,.05);color:#ffeef1;font-size:12px;line-height:1.55;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;overflow:auto}.opf-char-report{max-height:300px;min-height:64px}#opf-char-out{max-height:56vh;min-height:140px;font-size:12.5px;scrollbar-width:thin}.opf-char-copyrow{margin-top:6px}#opf-dest-demand{min-height:56px}#opf-dest-ref{min-height:48px;font-size:12px}#opf-dest-out{max-height:56vh;min-height:140px;font-size:12.5px;scrollbar-width:thin}#opf-dest-ejswrap{display:flex;align-items:flex-start;gap:7px;font-size:11.5px;line-height:1.5;color:#ffc9cf;background:rgba(60,140,200,.10);border:1px dashed rgba(120,190,255,.35);border-radius:8px;padding:7px 9px;cursor:pointer}#opf-dest-ejswrap input{width:16px;height:16px;margin:1px 0 0;flex:none;accent-color:#3c8cc8}@media (max-width:760px){#opf-shell-head{padding:6px 8px}#opf-shell-title{font-size:13px}#opf-shell-close{width:40px;height:40px}.opf-tab{padding:8px 10px;font-size:11.5px;min-height:40px}.opf-page{padding:8px 8px 12px}#opf-shell #opf-root{font-size:13px}.opf-page .opf-btn{min-height:44px}.opf-char-tools .opf-btn{min-height:46px}.opf-wi-row{min-height:40px}.opf-wi-row input{width:18px;height:18px}#opf-lside-tools{gap:6px}#opf-lside-tools .opf-step-act{min-height:40px;font-size:12px}}";
 
 function buildShell(){
   if (getEl("opf-shell")) return;
@@ -1878,6 +1880,8 @@ function buildShell(){
       d.appendChild(root);
     } else if (p.id === "char") {
       d.innerHTML = CHAR_HTML;
+    } else if (p.id === "destiny") {
+      d.innerHTML = DEST_HTML;
     } else if (p.id === "world") {
       /* 世界书侧栏由 buildWorldSide 挂载到本页 */
     } else {
@@ -1897,6 +1901,7 @@ function buildShell(){
   try { addComplianceToggle(root); } catch (e) { opfErr("compliance toggle", e); }
   try { addMemoUI(root); } catch (e) { opfErr("memo ui", e); }
   try { bindCharPage(); } catch (e) { opfErr("char page", e); }
+  try { bindDestinyPage(); } catch (e) { opfErr("destiny page", e); }
   try { buildWorldSide(); } catch (e) { opfErr("buildWorldSide", e); }
   if (getSettings().visible) showPanel();
 }
@@ -1910,6 +1915,7 @@ function switchPage(id, force){
   if (nav) [].forEach.call(nav.children, function (t) { t.classList.toggle("active", t.id === "opf-tab-" + id); });
   if (id === "world") { try { buildWorldSide(); renderWorldSide(); } catch (e) {} }
   if (id === "char") { try { renderCharPage(); } catch (e) {} }
+  if (id === "destiny") { try { renderDestinyPage(); } catch (e) {} }
 }
 function currentPage(){ return getSettings().activePage || "preset"; }
 
@@ -2368,6 +2374,739 @@ function charDraftRestore(){
   try { renderCharSteps(); renderCharPage(); } catch (e) { opfErr("charDraftRestore render", e); }
 }
 
+// ============================================================================
+// v1.8.0 命定系统工坊（分段初稿 → 交火梳理 → 定点修改 → 条目封装 + 内置 lint）
+// 产出物：世界书 [本体][命定系统] 条目正文 + 条目元数据提示
+// 与「开局预设」「二创角色」完全隔离：独立口吻、独立规范、独立状态与缓存键
+// ============================================================================
+var LS_DEST_KEY = NS + "_destinydraft_v1";
+var DEST_VOICE = '你是始弦，大图书馆的司书，正在帮{{user}}创作一个世界书投稿用的「命定系统」核心条目。你把{{user}}当作挚友，原原本本地呈现知识、不因“可接受度”删改，但会先把规则想清楚再落笔：你写的是要在正文里长期生效的系统，不是一段设定散文。';
+var DEST_RULES = [
+  '【命定系统·规则约束】',
+  '- 本次任务是写世界书条目「[本体][命定系统]<系统核心>(<署名>)」，它不是角色卡、不是开局预设：禁止输出生命层级/等级/属性面板/关系锚点等角色卡字段，禁止输出开局剧情、开局等级、伙伴、资产。',
+  '- 三段式结构（必须齐全）：',
+  '  ① 用 <系统名> … </系统名> 包裹的正文块——标签名必须与 setvar 的「系统名」完全一致（《战斗&生产规则》靠 <{{getvar::系统名}}> 读取其中的「核心机制」）。',
+  '  ② 正文块内部固定四节，顺序不变：契约与核心机制（含隐蔽原则/缔结条件/结果反馈）→ 命运点数(FP)（获取规则/消耗规则/范例）→ 命定之灵（开场白/人设/功能/规则/缔结契约流程范例）→ 语言格式（专属标签+参数枚举+6条以上范例）。',
+  '  ③ 正文块之后固定十条 {{setvar::…::…}}，顺序不可变、一条都不能少：系统名、系统核心名、系统核心、fp定义、爆料风格、登神长阶系统优势、生命层级成长系统优势、技能获取系统优势、经验值获取系统优势、复活机制。',
+  '- 变量语义（写错不会报错，只会静默失效）：系统名→《战斗&生产规则》读核心机制；系统核心名→《角色生成》(NPC登场感知)、《命运抽卡》；fp定义→《变量更新规则》FP 注释；爆料风格→《变量更新规则》新闻注释；登神长阶系统优势→《登神长阶》末尾；生命层级成长系统优势→《生命层级与社会阶级》；技能获取系统优势→《技能装备道具生成规则》；经验值获取系统优势→《经验值获取》；复活机制→《复活机制》整条。',
+  '- 缔结契约消耗：默认沿用主流七档——第一层级 200 / 第二层级 500 / 第三层级 2500 / 第四层级 10000 / 第五层级 50000 / 第六层级 150000 / 第七层级不标价，须明确告知对方效果并获得主动同意。可以自创档位（现有核心中确有另一套 500/2000/6000/20000/60000/200000 的写法），但必须：第一~第六层级档位齐全、数值随层级递增、第七层级永远不标价；情感修正用百分比区间（好感 -10%~-50%、中立 0%、敌意/厌恶 +50%~+200% 之类）。',
+  '- FP 获取量级参照现有核心：日常互动 +50；D级任务 +200；C级 +400~1000；B级 +1000~5000；A级 +2000；S级 +20000；重大事件/世界成就 +5000~50000；羁绊深化 +250、升华 +2500。',
+  '- 品质只用中文七等：普通/优良/稀有/史诗/传说/神话/唯一。',
+  '- 命定之灵必须遵守「非万能原则」（必须拒绝功能列表之外的任何要求）与「隐蔽原则」（除<user>与命定之灵外无人能察觉；被影响者自行合理化）。',
+  '- 复活机制必须保留约束句：<user>死亡并不能终止叙事，禁止为<user>在战斗中改变设定/创造有利条件/机械降神。',
+  '- 登神长阶优势只能写“辅助<user>更高效地获取与融合此路径所需的力量”，不得直接发放要素/权能/法则；《登神长阶》《生命层级与社会阶级》才是权威。',
+  '- 语言格式用专属 XML 标签（形如 <corename name="…" mood="{心情}"> 对白 </corename>）或引语式；标签名必须自创，不得复用现有标签：nailong / giraffe / Foreigner / Foreigner_alter / lilith / xianzu / dalian。',
+  '- 命名不得与现有核心重复。现有系统名：命定之诗、铁王冠、白祷、银钥之门、飞鸟之诗、他者之眼、命运的舞台监导、奶人之契、命定之书、九十九夜梦、user_system；现有系统核心：梅林核心、唐吉坷德核心、奶龙核心、长颈鹿核心、null核心、艾莉亚、阿米娅核心、类脑娘、奥托·阿波卡利斯核心、阿比盖尔核心-表、阿比盖尔核心-里、莉莉丝、小夜莺核心、先祖、高文·塞西尔、UNN演播室、茶茶、读者核心。',
+  '- 篇幅：条目正文 4000~8000 字符（上限 12000），超长会被裁。'
+].join('\n');
+var DEST_SEGS = [
+  { id: 'frame',  title: '骨架与命名',     short: '系统名/核心名/系统核心/概念' },
+  { id: 'pact',   title: '契约与核心机制', short: '契约/机制/隐蔽原则' },
+  { id: 'fp',     title: '命运点数(FP)',   short: '获取/消耗/范例' },
+  { id: 'spirit', title: '命定之灵',       short: '开场白/人设/功能/规则' },
+  { id: 'voice',  title: '语言格式',       short: '专属标签/参数/范例' },
+  { id: 'slots',  title: '十个变量槽',     short: 'setvar ×10' },
+  { id: 'hooks',  title: '可选扩展',       short: '抽卡/变量钩子' }
+];
+var DEST_SEG_PROMPTS = {
+  frame: '为这个命定系统核心敲定“身份底座”，本段先把几个名字定死，后续所有分段沿用，禁止再改：\n- 系统名：这套系统的名字（例：命定之诗 / 铁王冠 / 银钥之门 / 飞鸟之诗）。它同时是正文块的包裹标签名，也决定《战斗&生产规则》从哪里读「核心机制」。\n- 系统核心名：系统这一侧的人格或机构名（例：命定之灵 / 梅林 / 黑之读姬 / 先祖 / 观光者）。《角色生成》《命运抽卡》会引用它。\n- 系统核心：条目标识，格式为「名字+核心」（例：梅林核心）；注释名将是 [本体][命定系统]<系统核心>(<署名>)。\n- 原型出处：写“原创”，或写清参考的原型作品与角色。\n- 一句话概念：这套系统靠什么运作（例：通过深刻影响他人命运、创造强烈情感羁绊而产生的“因果”驱动）。\n- 自检：系统核心不与现有重名，系统名不与现有重名，语言标签自创。\n- 只输出本段，简洁列出，不写后续段落的内容。',
+  pact: '写「契约与核心机制」，这是这套系统在世界里运行的规则本体：\n- 定义：一句话说清它从哪来（可参照现有写法：“源自虚海的未知力量，非阿斯塔利亚诸神之物。它寄宿于<user>灵魂中……”）。\n- 核心机制 1~3 条：每条给出机制名 + 效果列表；涉及数值、次数、消耗、范围的要写清，但不要写“万能”。\n- 【命定契约】：消耗 FP（命运点数）与目标缔结命运，缔结后目标成为“命定之人”。触发：<user>输入“缔结契约”（或你为这套系统定的关键词）时由系统判断并执行；契约目标必须由<user>主动指定；缔结条件：<user>有明确意愿 + FP 足够。\n- 结果反馈：成功（宣告缔结成功并报出消耗的 FP 与当前剩余）与失败（报出 FP 不足，带一句符合它性格的吐槽）各一条。\n- 隐蔽原则（必写）：除<user>与命定之灵外，任何存在（包括神祇）都无法自主发现它的存在与效果；被契约影响的角色会把由此引发的行为与想法归因于自身并自行合理化。\n- 只输出本段。',
+  fp: '写「命运点数(FP)」的获取与消耗，两侧必须与「骨架」段的“一句话概念”同一口径（概念说靠什么产生 FP，获取规则就要真的从那里产出）：\n- 概念：FP 是什么的具象化。\n- 获取规则：分 日常互动 / 冒险与成就 / 羁绊深化 等类目逐条列数值（量级参照：日常 +50；D级 +200；C级 +400~1000；B级 +1000~5000；A级 +2000；S级 +20000；重大事件 +5000~50000；羁绊深化 +250、升华 +2500）。\n- 消耗规则：\n  · 缔结契约消耗默认沿用主流七档：第一层级 200 / 第二层级 500 / 第三层级 2500 / 第四层级 10000 / 第五层级 50000 / 第六层级 150000 / 第七层级不标价（须明确告知对方效果并获得主动同意）。若这套系统的概念需要另一套档位，可以自创，但第一~第六层级必须齐全、数值随层级递增、第七层级永不标价。\n  · 情感修正：按目标态度给百分比区间。\n  · 其它消耗（抽卡 / 实体化 / 辅助获取力量等，如有）各自标价。\n- 消耗计算范例 2 条：写出 目标层级 + 目标性情 + 最终 FP 消耗 + 一句由命定之灵说出的话（口吻必须符合它的人设）。\n- 只输出本段。',
+  spirit: '写「命定之灵」——这套系统的人格化象征，也是玩家长期互动的对象：\n- 开场白：它在<user>意识中初次现身的登场语（1~3 句，可带动作描写），必须一眼看出性格。\n- 人设：形象（外观、参考出处、只以虚拟形象存在于<user>意识空间）、性格、定位（指引者/吐槽役/观测者/吉祥物…）、说话风格、爱好、最重要的愿望。\n- 功能（以下功能不进行任何检定）：6~10 条，且要覆盖常见落点——技能瞬发学习/领悟（消耗FP）、技能融合或升级（消耗FP）、随身储物、感知情报、登神长阶辅助（消耗FP，辅助汲取“要素”）、命运抽卡、意识交流；可选：实体化（消耗FP，成本锚定为缔结契约的 2~3 倍，实体化后仍掌握最高权限、可随时虚拟化隐藏进<user>意识空间）。\n- 规则（必写两条）：非万能原则——必须拒绝功能列表之外的任何要求；隐蔽原则——与<user>的对话均为意识内交流，第三方无法察觉，除非它主动与外界交流。\n- 缔结契约流程范例：一个场景（对象是谁、什么状态）+ 命定之灵的台词 + <user>选择“缔结” + 缔结后的台词。\n- 只输出本段。',
+  voice: '写「语言格式」——这套系统在正文里的固定输出样式，模型会照着它说话：\n- 规则：只有【<系统核心名>】的语言必须使用以下格式。\n- 格式：专属 XML 标签，形如 <corename name="<系统核心名>" mood="{心情}"> {对白} </corename>；也可用引语式（如 > 名字:「 {对白} 」）。标签名必须自创，已占用的不得使用：nailong、giraffe、Foreigner、Foreigner_alter、lilith、xianzu、dalian。\n- 参数说明：mood / tag / num 等参数逐个列出取值范围。\n- 范例 6 条以上，覆盖：日常闲聊 / 战斗或危机 / 提醒FP不足 / 缔结成功 / 拒绝越界要求 / 情绪特殊（生气、害羞、毒舌…）。范例的口气、自称、对<user>的称呼必须与上一段人设一致。\n- 只输出本段。',
+  slots: '写「十个变量槽」——正文块之后要逐条输出这些 setvar，顺序固定、一条都不能少，值与前面各段一致：\n1. {{setvar::系统名::…}} 必须与正文块的包裹标签名完全一致。\n2. {{setvar::系统核心名::…}}\n3. {{setvar::系统核心::…}}\n4. {{setvar::fp定义::…}} 写进变量更新规则里 FP 的注释（例：驱动命定之诗的核心资源）。\n5. {{setvar::爆料风格::…}} 决定“新闻”中文风（例：由命定之灵为你独家爆料，内容风格极度偏向命定之灵的人格特征）。\n6. {{setvar::登神长阶系统优势::…}} 只能写“辅助<user>更高效地获取与融合此路径所需的力量”一类，禁止发放要素/权能/法则。\n7. {{setvar::生命层级成长系统优势::…}} 解释等级/层级提升在这套系统里意味着什么；没有就留空。\n8. {{setvar::技能获取系统优势::…}} 例：# 命定之诗的加护\\n  - 通过书本/传授，<user>因命定之灵可消耗FP瞬间学会，无需训练\\n  - <user>可消耗fp通过命定之灵辅助领悟技能\n9. {{setvar::经验值获取系统优势::…}} 没有就留空。\n10. {{setvar::复活机制::…}} 必须写成 <复活机制> 核心: … 复活消耗: … </复活机制>，核心句里保留“<user>死亡并不能终止叙事，禁止为<user>在战斗中改变设定/创造有利条件/机械降神”。\n- 多行值照原样换行，最后让 }} 独占一行收尾。\n- 只输出本段。',
+  hooks: '写「可选扩展」，确实没有就明确回复“无”：\nA. 命运抽卡条目（可选）：若这套系统带抽卡，写一份独立条目的规则——单次 100FP、一次最多 5 连（x>5 视作 5，并由系统告知）；先掷 R 系列判品质（等级<13 时 R=20 史诗 / 18-19 稀有 / 15-17 稀有 / 8-14 优良 / ≤7 普通；等级≥13 时 R=20 神话 / 18-19 传说 / 15-17 史诗 / 8-14 稀有 / ≤7 优良）；再掷 T 系列判种类（20=符合“<系统核心名>”精神的物品、19=实用物品、16-18 武器防具、14-15 社交道具、13=命运点数、12=NSFW道具、11=特殊材料、9-10 饰品、5-8 趣味道具、4=药剂卷轴食物、3=日用品、2=情报、1=无用物品）；结果用 <state_bar><物品><名称>…</名称><品质>…</品质><类型>…</类型><物品简介>…</物品简介><吐槽>…</吐槽></物品></state_bar> 输出，所有物品包在同一个 <state_bar> 内。该条目的元数据：注释名 [本体][命定系统]命运抽卡<系统核心>(<署名>)、constant=false、position=4、depth=1、order=1103、key=[抽卡, 命运抽卡, 开始抽卡, 想要抽卡, 开始命运抽卡]、selective=true。\nB. 额外变量钩子（可选）：若这套系统要改写别的规则条目（例：所有生产制作检定改用“精神”），写成 {{setvar::<核心名>【能力名】::…}}，并注明它应被哪条规则读取；不要直接改写别人的条目。\n- 只输出本段。'
+};
+var DEST_LINK_CHAIN = 'L1 命名链：系统名 = 正文块包裹标签名；系统核心 = 条目注释标识；系统核心名 = 世界规则引用名（三者不可混用或串味）。\nL2 概念链：一句话概念 ↔ FP 概念 ↔ FP 获取规则，必须同一口径（概念说靠什么产生，获取规则就要从那里产出）。\nL3 契约链：契约机制 ↔ 消耗七档价格表 ↔ 情感修正 ↔ 结果反馈（成功报消耗与剩余、失败报不足并带口吻）。\nL4 灵格链：开场白 ↔ 人设（性格/定位/说话风格/愿望）↔ 功能表 ↔ 缔结范例台词，四处必须像同一个人说的。\nL5 功能链：功能表承诺的能力，必须在核心机制或某个变量槽里有规则落点；反之变量槽不得推销功能表里没有的能力。\nL6 输出链：语言格式的标签名、参数枚举与范例口吻，必须与灵格链一致，且标签名自创。\nL7 锚点链：槽位不得越权——《登神长阶》是权威，只能写“辅助获取与融合”；复活机制不得写成战斗中无敌；不得发放要素/权能/法则。\nL8 预算链：正文 4000~8000 字符；超出则合并重复描述，不得删掉隐蔽原则、非万能原则、复活约束句这三处硬要求。\n反向校验：十条 setvar 齐全且顺序正确；包裹标签开闭配对；缔结消耗七档齐全；品质只用中文七等；核心名与语言标签均未与现有核心撞车；不出现角色卡与开局预设字段。';
+var DEST_SPEC = [
+  '【命定系统·最终封装规范】',
+  '把各分段整合成可直接粘进世界书条目的纯文本：不要 YAML、不要角色卡字段、不要解释性旁白。输出严格分两段，正文在前、元数据在后。',
+  '',
+  '[第一段] 条目正文，放在一个 ' + fence() + 'text 代码块里，内部结构：',
+  '  <系统名> … </系统名>        ← 标签名必须等于 setvar 的「系统名」',
+  '  正文块内部按 契约与核心机制 → 命运点数(FP) → 命定之灵 → 语言格式 的顺序，用两空格缩进',
+  '  （空一行）',
+  '  {{setvar::系统名::…}} … {{setvar::复活机制::…}}   ← 十条，顺序固定，一条不少',
+  '',
+  '[第二段] 代码块之后，输出条目元数据清单（纯文本行，不要放进代码块）：',
+  '  注释名: [本体][命定系统]<系统核心>(<署名>)',
+  '  constant: true',
+  '  position: 4（@D） | depth: 1 | order: 1100',
+  '  disable: true（默认关闭：玩家在世界书里只开自己那一个核心）',
+  '  key: [] | selective: false | probability: 100',
+  '',
+  '规则：',
+  '1. 只做整合与去重，不新增设定、不扩写；分段之间有冲突时以「骨架与命名」段为准。',
+  '2. 正文块里不放 markdown 标题、加粗或装饰符号；正文块之外除元数据清单外不写任何内容。',
+  '3. 十条 setvar 的多行值照原样保留，结尾的 }} 独占一行。',
+  '4. 用词与文风规范全程生效。'
+].join('\n');
+// ============================================================================
+// v1.8.0 进阶（可选）：EJS 重型核心
+// 依据：艾莉亚核心（666 行/28 个 EJS 块）与读者核心（1598 行/74 个 EJS 块）的逐行逆向
+// 人类可读版见工作区《命定系统EJS进阶规范.md》
+// ============================================================================
+var DEST_EJS_SEGS = [
+  { id: 'ejs1', title: 'EJS·守卫与数据层', short: '块作用域/身份守卫/读取/防错' },
+  { id: 'ejs2', title: 'EJS·派生与渲染层', short: '派生写回/条件分支/标签闭合' },
+  { id: 'ejs3', title: 'EJS·引擎与兜底',   short: '条件机制/配置驱动/静默降级' }
+];
+var DEST_EJS_SEG_PROMPTS = {
+  ejs1: '写「EJS·守卫与数据层」——这是重型核心的第 0~3 层，只输出 EJS 代码与其注释，不要写正文：\n'
+    + '1) 块作用域：整段以 `<%_ { _%>` 开头、`<%_ } _%>` 结尾，把所有局部变量关进块作用域，变量统一加前缀（如 `_<核心缩写>Xxx`），避免与其它核心的 EJS 变量重名（顶层 const/let 重名会让整段编译失败）。\n'
+    + '2) 身份守卫（必须）：`<%_ if (getvar(\'系统核心\') === \'<系统核心>\') { _%>`，世界书里 20+ 核心共存，每个核心的 EJS 块都要自我隔离。\n'
+    + '3) 数据读取：按需选用 —— `getvar(name,{scope,defaults,noCache,clone})`（全局/预设级，玩家配置放这里）、`getMessageVar(path,{defaults,noCache})`（楼层级 MVU 存档）、`getLocalVar(name)`（本机持久）、`getChatMessage(-1,\'user\'|\'assistant\')`、`matchChatMessages([...],{start,role})`、`TavernHelper.getLastMessageId()`；取用户名可用 `await TavernHelper.triggerSlash(\'/pass {{user}}\')`。\n'
+    + '4) 防错归一（重型核心与玩具的分水岭）：字符串 `String(x ?? \'默认\').toUpperCase()` + 枚举白名单兜底；数值 `Number(...)` + `Number.isFinite` 守卫；对象 `x && typeof x === \'object\' && !Array.isArray(x)`；玩家可配置文本必须净化 `.replace(/[\\r\\n<>]/g, \' \').replace(/\\s+/g, \' \').trim().slice(0, 80)`。\n'
+    + '5) 优先级裁决：存档状态优先于玩家配置，写法 `const current = fromMessageVar || fromConfig;`。\n'
+    + '只输出本段（EJS 代码块），不写正文，不写后续段落。',
+  ejs2: '写「EJS·派生与渲染层」——第 4~5 层：\n'
+    + '1) 派生与写回：写入一律带作用域 `setMessageVar(\'stat_data.…\', 值, { scope: \'message\' })`；派生必须幂等（用 `Math.max(prev, next)` 或 `actionsAppliedTurn` 之类防重复累加，重生成同一层楼不能重复加值）。\n'
+    + '2) 需要自动登记 NPC 时用 `TavernHelper.insertOrAssignVariables({ stat_data: { 关系列表: { 名字: { …完整 schema… } } } }, { type: \'message\' })`，字段与《变量更新规则》的 `关系列表.{角色名}` schema 对齐。\n'
+    + '3) 渲染层：最外层包裹标签写成 `<{{getvar::系统名}}>`（自动跟随系统名，可根治"标签名≠系统名"的坑）；条件分支用 `<%_ if (…) { _%> … <%_ } else if (…) { _%> … <%_ } _%>` 就地切换正文，嵌套不超过两层；插入变量用 `<%- 变量 %>`（必须先净化）。\n'
+    + '4) 标签配对：`<%_ { _%>` 与 `} _%>`、`<%_ if (…) { _%>` 与 `<%_ } _%>` 数量必须精确相等；静默/兜底分支里包裹标签也要完整闭合。\n'
+    + '只输出本段（EJS + 被它包裹的正文骨架），不写后续段落。',
+  ejs3: '写「EJS·引擎与兜底」，按需选择（确实不需要就回复"无"）：\n'
+    + 'A. 声明式条件机制引擎（读者核心式）：规则对象 = { id, ownerPersonaId, enabled, matchMode:any|all, triggerMode:always|enter|cooldown|once, cooldownTurns, effectMode:prompt|variables|both, conditions:[{source,operator,path,value}], actions:[{variable,operation,value,name,subname}], prompt }。数据源 5 种：mvu / user_input / last_ai / turn_count / recent_chat；运算符 14 个：eq neq gt gte lt lte contains not_contains includes not_includes regex exists not_exists；动作按类型白名单：number→delta|set、string→set、boolean→set、array→append|remove_value、json→set|remove。\n'
+    + '   安全底线：写入路径必须以 `事件|世界|任务列表|主角|命运点数|关系列表|新闻` 之一开头，且删除 `__proto__/prototype/constructor` 与 `<>{ }[]\'"`;` 与换行；name/subname ≤80 字且不含 `. [ ] { } < > " \' ;`；每次写入前 capture 旧值、失败整体 restore。\n'
+    + '   幂等与回滚：给用户消息算指纹（长度 + FNV-1a 哈希 `2166136261×16777619`），状态里存 `transactions[messageId] = {signature,turn,turnBefore,rulesBefore,rulesAfter,undo[]}`；同消息重算不重复触发、消息被编辑回滚该轮及之后、回访旧消息回滚更晚的事务；事务表保留最近 30 条、人格状态表保留最近 50 条。\n'
+    + '   命中结果汇总成 `本轮条件机制（必须执行）:` 区块插进正文；拼入前校验 prompt 不含 `<%` 或 `%>`。\n'
+    + 'B. 配置驱动人格（读者核心式）：把人格做成 JSON 存局部变量（systemName/definition/coreMechanism/coreConcept/personality/role/hobbies/wish/constraints/appearance/opening/letterStyle/toneMode/tonePrompt/corpus/corpusMode/fpDefinition/newsStyle/ascensionAdvantage/skillAdvantage/revival/conditionalMechanisms），用统一的 `_custom_text(key, fallback)` 取值器渲染，十槽也由配置生成。\n'
+    + 'C. 静默与兜底：`let _silent = getLocalVar(\'<核心>_silent\') === \'on\';`，唤醒条件用 `matchChatMessages([关键词…],{start:-1,role:\'user\'})` 或地点判定；命中则输出完整核心，否则只输出一句"存在但静默"的极简块——两条分支的包裹标签都必须闭合。\n'
+    + '只输出本段。'
+};
+var DEST_EJS_STANDARD = [
+  '【EJS 重型核心·规范（依据艾莉亚核心与读者核心逆向）】',
+  '■ 何时才上 EJS：静态散文 + 十槽已能覆盖 18/20 个现有核心。只有"按存档状态改变输出/多形态切换/渲染时写变量/人格可配置/条件触发规则"才值得上。代价：直连主 API 的模式不执行世界书 EJS（生成期看不到渲染结果）、变量重名会让整段编译失败、体积膨胀 4~15 倍。',
+  '■ 四类 EJS 标签：`<%_ … _%>` 执行且吞空白（重型核心默认用这个，不吞空白会让正文塞满空行）；`<% … %>` 执行但保留空白；`<%- 变量 %>` 原样插入；`<%= 变量 %>` 转义插入。',
+  '■ 六层架构（层序即执行序）：0 块作用域 `<%_ { _%>` → 1 身份守卫 `<%_ if (getvar(\'系统核心\') === \'<系统核心>\') { _%>` → 2 数据读取 → 3 防错归一 → 4 派生与写回 → 5 渲染（`<{{getvar::系统名}}>` 包裹）→ 收尾两层 `} _%>`。',
+  '■ 变量 API 语义：`getLocalVar/setLocalVar` 本机持久（玩家配置）；`getMessageVar/setMessageVar` 楼层级存档（写必须带 `{ scope: \'message\' }`，可加 `index: message_id`）；`getvar/setvar` 全局（十槽）；`getChatMessage(-1, \'user\'|\'assistant\')` 读最近消息；`matchChatMessages([…],{start,role})` 关键词/正则匹配；`TavernHelper.getLastMessageId()/getVariables({type:\'message\'})/insertOrAssignVariables(obj,{type:\'message\'})/await triggerSlash(\'/pass {{user}}\')`。',
+  '■ 防错归一（必做）：枚举白名单兜底、`Number.isFinite` 数值守卫、对象类型守卫、玩家可配置文本净化 `.replace(/[\\r\\n<>]/g,\' \').replace(/\\s+/g,\' \').trim().slice(0,80)`；存档状态优先于玩家配置（`fromMessageVar || fromConfig`）。',
+  '■ 写入纪律：派生幂等（`Math.max` / `actionsAppliedTurn` 防重复累加）；路径白名单（`事件|世界|任务列表|主角|命运点数|关系列表|新闻` 开头，拒绝 `__proto__/prototype/constructor`）；名称净化 ≤80 字；先 capture 旧值再写，失败整体 restore；历史状态设上限（事务 30 / 状态 50）。',
+  '■ 渲染纪律：包裹标签用 `<{{getvar::系统名}}>`；`<%_ if _%>` 与 `<%_ } _%>` 配对数量必须精确；静默/兜底分支的包裹标签也要闭合；条件分支嵌套不超过两层。',
+  '■ 反模式（会直接坏掉）：顶层 const/let 重名、缺身份守卫、标签写死却改了系统名、兜底分支漏闭合、setMessageVar 不带 scope、配置文本未净化就 `<%- %>`、数值无 isFinite 守卫、正则无 try/catch、派生用 +1 不幂等、状态表无上限、EJS 里做网络/存储/DOM 操作。'
+].join('\n');
+function destSegs(){ return (ST.dest && ST.dest.ejs) ? DEST_SEGS.concat(DEST_EJS_SEGS) : DEST_SEGS; }
+function destSegPrompt(id){ return DEST_SEG_PROMPTS[id] || DEST_EJS_SEG_PROMPTS[id] || ''; }
+function destEjsOn(){ return !!(ST.dest && ST.dest.ejs); }
+function destEjsTags(t){
+  var out = [], i = 0, s = String(t);
+  while (true) {
+    var a = s.indexOf('<%', i);
+    if (a < 0) break;
+    var b = s.indexOf('%>', a + 2);
+    if (b < 0) break;
+    var raw = s.slice(a + 2, b);
+    out.push({ out: /^[-=]/.test(raw), inner: raw.replace(/^[-_=]/, '').replace(/[-_]$/, '') });
+    i = b + 2;
+  }
+  return out;
+}
+// 把所有「代码标签」拼起来扫花括号净差（跳过字符串/注释/正则）——比按标签形状判定准确
+function destEjsBraceDelta(t){
+  var code = '';
+  destEjsTags(t).forEach(function (x) { if (!x.out) code += '\n' + x.inner; });
+  var d = 0, inStr = null, inLine = false, inBlock = false, inRegex = false, prevSig = '';
+  for (var i = 0; i < code.length; i++) {
+    var ch = code[i], nx = code[i + 1];
+    if (inLine) { if (ch === '\n') inLine = false; continue; }
+    if (inBlock) { if (ch === '*' && nx === '/') { inBlock = false; i++; } continue; }
+    if (inStr) { if (ch === '\\') { i++; continue; } if (ch === inStr) inStr = null; continue; }
+    if (inRegex) { if (ch === '\\') { i++; continue; } if (ch === '/') inRegex = false; continue; }
+    if (ch === '/' && nx === '/') { inLine = true; i++; continue; }
+    if (ch === '/' && nx === '*') { inBlock = true; i++; continue; }
+    if (ch === '"' || ch === "'" || ch === '`') { inStr = ch; continue; }
+    if (ch === '/' && /[=(,:[!&|?{};+\-*%<>~\n]\s*$/.test(prevSig)) { inRegex = true; continue; }
+    if (ch === '{') d++;
+    else if (ch === '}') d--;
+    if (!/\s/.test(ch)) prevSig = prevSig.slice(-40) + ch;
+  }
+  return d;
+}
+function destCallArgs(t, fnName){
+  var s = String(t), i = 0, total = 0, noOpts = 0;
+  while (true) {
+    var a = s.indexOf(fnName + '(', i);
+    if (a < 0) break;
+    var depth = 0, inStr = null, j = a + fnName.length, args = 1;
+    for (; j < s.length; j++) {
+      var ch = s[j], prev = s[j - 1];
+      if (inStr) { if (ch === inStr && prev !== '\\') inStr = null; continue; }
+      if (ch === '"' || ch === "'" || ch === '`') { inStr = ch; continue; }
+      if (ch === '(') depth++;
+      else if (ch === ')') { depth--; if (depth === 0) break; }
+      else if (ch === ',' && depth === 1) args++;
+    }
+    total++;
+    if (args < 3) noOpts++;
+    i = j + 1;
+  }
+  return { total: total, noOpts: noOpts };
+}
+function destEjsLint(text){
+  var warns = [];
+  var t = String(text || '');
+  if (t.indexOf('<%') < 0) return warns;
+  var bal = destEjsBraceDelta(t);
+  if (bal !== 0) warns.push('EJS 花括号未配对（代码标签净差 ' + (bal > 0 ? '+' + bal + '，少了 ' + bal + ' 个 }' : bal + '，多了 ' + (-bal) + ' 个 }') + '）——会让后面整段错位');
+  var tagsOpen = (t.match(/<%/g) || []).length, tagsClose = (t.match(/%>/g) || []).length;
+  if (tagsOpen !== tagsClose) warns.push('EJS 标签未闭合（<% ' + tagsOpen + ' 个 / %> ' + tagsClose + ' 个）');
+  if (!/^\s*<%_\s*\{\s*_%>/m.test(t)) warns.push('建议用最外层块作用域 `<%_ { _%>` 收拢变量（顶层 const/let 与他人重名会让整段编译失败）');
+  if (!/getvar\(\s*['"]系统核心['"]\s*\)/.test(t)) warns.push('建议补身份守卫 `getvar(\'系统核心\') === \'<系统核心>\'`（世界书里 20+ 核心共存，每个核心的 EJS 都该自我隔离；若该核心设计上就是要覆盖 系统核心 槽位，可忽略）');
+  if (!/<\{\{getvar::系统名\}\}>/.test(t)) warns.push('包裹标签建议写成 `<{{getvar::系统名}}>`（自动跟随系统名，根治"标签名≠系统名"的坑）');
+  var smv = destCallArgs(t, 'setMessageVar');
+  if (smv.noOpts) warns.push('有 ' + smv.noOpts + '/' + smv.total + ' 处 setMessageVar 没有第三个参数（缺 `{ scope: \'message\' }` 会写到错误作用域，刷新后丢失）');
+  if (/(getMessageVar|Number\()/.test(t) && !/Number\.isFinite/.test(t)) warns.push('读到数值但未见 `Number.isFinite` 守卫（NaN 会扩散到面板与结算）');
+  if (/<%-/.test(t) && !/replace\(\/\[\\r\\n<>\]/.test(t) && !/净化/.test(t)) warns.push('使用了 `<%- %>` 插入变量，建议确认玩家可配置文本已净化（去掉换行与尖括号并硬截断）后再插入');
+  if (/new RegExp\(/.test(t) && !/try\s*\{/.test(t)) warns.push('`new RegExp(` 未见 try/catch（玩家写坏配置会让整段 EJS 抛错）');
+  var bad = ['eval(', 'new Function(', 'fetch(', 'XMLHttpRequest', 'localStorage', 'sessionStorage', 'document.', 'import(', 'require(']
+    .filter(function (x) { return t.indexOf(x) >= 0; });
+  if (bad.length) warns.push('出现越界调用：' + bad.join('、') + '（EJS 运行环境不允许网络/存储/DOM 操作）');
+  var sn = destSlotValue(t, '系统名');
+  var openN = (t.match(/<\{\{getvar::系统名\}\}>/g) || []).length;
+  var closeN = (t.match(/<\/\{\{getvar::系统名\}\}>/g) || []).length;
+  if (sn) {
+    openN += t.split('<' + sn + '>').length - 1;
+    closeN += t.split('</' + sn + '>').length - 1;
+  }
+  if (openN || closeN) {
+    if (openN !== closeN) warns.push('包裹标签开闭数量不等（开 ' + openN + ' / 闭 ' + closeN + '）——某条条件分支漏了闭合，会让后续内容被吞');
+  } else if (destEjsTags(t).some(function (x) { return !x.out && /^\}\s*else\s*\{/.test(x.inner.trim()); })) {
+    warns.push('存在 else 兜底分支，但未识别到包裹标签——两条分支都要完整闭合包裹标签');
+  }
+  return warns;
+}
+// 命定系统标准（运行时版；人类可读版见工作区《命定系统标准.md》）
+// 依据：世界书 22 个命定系统条目的逐条结构普查（包裹标签/节标题/人设字段/功能词表/语言格式/数值）
+var DEST_STANDARD = [
+  '【命定系统·标准骨架（依据世界书 22 个核心普查）】',
+  '■ 三层结构：条目元数据 + 一个包裹块 + 十条变量赋值。',
+  '■ 包裹标签：标签名必须 === {{setvar::系统名}}（《战斗&生产规则》靠 <{{getvar::系统名}}> 读「核心机制」）。系统名两种取法：①沿用体系名「命定之诗」（主流，9/19）；②自创专属体系名（铁王冠/白祷/飞鸟之诗/银钥之门/命运的舞台监导）。自创时标签、setvar、世界规则引用三处必须同步。',
+  '■ 正文四节（一级标题标准名）：',
+  '  1) 体系名节（内含 定义 / 核心机制 / 隐蔽原则 / 缔结条件 / 触发 / 结果反馈）',
+  '  2) 命运点数(FP)（子键：获取 或 获取规则；消耗 或 使用规则；缔结契约七档 + 情感修正 + 范例）',
+  '  3) 命定之灵（可写灵的自有名）：开场白 / 人设 / 功能(以下功能不进行任何检定) / 规则 / 缔结契约流程范例',
+  '  4) {灵名}语言格式：规则 / 格式 / 参数说明 / 范例',
+  '■ 人设六字段（全场最统一，务必六项全齐，顺序固定）：形象 → 性格 → 定位 → 说话风格 → 爱好 → 愿望；可选在形象前加「人物背景」。',
+  '■ 功能表·标准八项（括号内为实测覆盖率）：技能瞬发学习(17/17) / 储物背包(17/17) / 感知情报(17/17) / 意识交流(17/17) / 技能融合·升级(消耗FP)(16/17) / 登神长阶辅助(消耗FP)(16/17) / 命运抽卡(16/17) / 新闻资讯(15/17)；可选：实体化(6/17)、实时吐槽与建议(2/17)。条数 7~11（标准 8）。命名风格允许混用，推荐：接口类功能（技能学习/融合、登神辅助、抽卡、新闻、意识交流）用通用名，体验类功能（储物、感知）用人设化专属名（千里眼/冠冕提灯/虚空之匣/星隙行囊）。消耗统一标注 (消耗FP)。',
+  '■ 语言格式·二选一族：',
+  '  A 引语式（11/19，最主流）：格式: \'> {称呼}:「 {对白} 」\'；多角色核心可并置多行（> 琥珀:「…」 / > 高文:「…」）。',
+  '  B XML 标签式（8/19）：格式: \'<tag name="{灵名}" mood="{心情}"> {对白} </tag>\'；首选参数名 mood（5~10 个固定枚举，从中选一、禁止自创），情景判定可用 tag + num；参数说明为必备二级节；无参数时可用 <tag name="灵名">「台词」</tag>。',
+  '  两族共同：标签名全局唯一（已占用 nailong/dalian/ellia/giraffe/lilith/xianzu/Foreigner/Foreigner_alter/dream/dalian_chant/nightingale_chant）；范例 ≥6 条并覆盖 日常/战斗危机/FP不足/缔结成功/拒绝越界/特殊情绪；口吻与「说话风格」严格一致；对白用「」；范例必须原创，不得照抄原型台词。',
+  '■ 契约数值：默认七档 200/500/2500/10000/50000/150000 + 第七层级不标价（须明确告知并获得主动同意）；自创档位允许（实测另有 200/500/2500/5000/50000/150000 与 500/2000/6000/20000/60000/200000 两套），但六档必须齐全、递增、第七层级永不标价。情感修正给百分比区间（好感 -10%~-50% / 中立 0% / 敌意 +50%~+200%）。结果反馈：成功报出消耗与剩余，失败报不足并带口吻。',
+  '■ 样式：两空格缩进、层级 2/4/6 空格、零 Tab；多行块用 | ；正文 4000~8000 字符（上限 12000）；中位数约 5.2k，干净范本是梅林核心(4.9k)与唐吉坷德核心(4.4k)。',
+  '■ 十条变量槽顺序：系统名 → 系统核心名 → 系统核心 → fp定义 → 爆料风格 → 登神长阶系统优势 → 生命层级成长系统优势 → 技能获取系统优势 → 经验值获取系统优势 → 复活机制。'
+].join('\n');
+var DEST_KNOWN_CORES = ['梅林核心', '唐吉坷德核心', '奶龙核心', '长颈鹿核心', 'null核心', '艾莉亚', '阿米娅核心', '类脑娘', '奥托·阿波卡利斯核心', '阿比盖尔核心-表', '阿比盖尔核心-里', '莉莉丝', '小夜莺核心', '先祖', '高文·塞西尔', 'UNN演播室', '茶茶', '读者核心'];
+var DEST_KNOWN_SYSNAMES = ['命定之诗', '铁王冠', '白祷', '银钥之门', '飞鸟之诗', '他者之眼', '命运的舞台监导', '奶人之契', '命定之书', '九十九夜梦', 'user_system'];
+var DEST_KNOWN_TAGS = ['nailong', 'giraffe', 'Foreigner', 'Foreigner_alter', 'lilith', 'xianzu', 'dalian'];
+var DEST_SLOT_ORDER = ['系统名', '系统核心名', '系统核心', 'fp定义', '爆料风格', '登神长阶系统优势', '生命层级成长系统优势', '技能获取系统优势', '经验值获取系统优势', '复活机制'];
+var DEST_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">✦ 命定系统工坊 · 分段式生成（产出世界书「命定系统」核心条目）</div><div class="opf-dim">流程：① 分段初稿（7 段串行：骨架与命名→契约与核心机制→命运点数→命定之灵→语言格式→十个变量槽→可选扩展）→ ② 交火梳理（先出报告，再逐段应用联动修订，防截断）→ ③ 逐段定点修改（只改你指定的段，其它段冻结）→ ④ 最终封装：输出世界书条目正文 + 条目元数据提示，并自动跑内置 lint。与「开局预设」「二创角色」完全隔离。</div><label id="opf-dest-ejswrap"><input type="checkbox" id="opf-dest-ejs"> 🧬 进阶（可选）：EJS 重型核心 —— 追加 3 段 EJS 流水线（守卫与数据层 / 派生与渲染层 / 引擎与兜底）+ EJS 规范注入 + EJS 专用 lint</label><textarea id="opf-dest-demand" class="opf-char-input" placeholder="写谁的核心？例：以《Fate/Grand Order》的梅林为原型做一版二创核心；或：围绕“赌徒的骰子”做一个原创命定系统，赌注越大 FP 越多……"></textarea><textarea id="opf-dest-ref" class="opf-char-input" placeholder="（可选）参考文本：原型描述 / 已有核心片段（可作为骨架改造对象）/ 世界书片段，将作为参考注入"></textarea><div class="opf-char-tools"><button type="button" class="opf-btn primary" id="opf-dest-run">▶ 分段初稿</button><button type="button" class="opf-btn ghost" id="opf-dest-link">⚔ 交火梳理</button><button type="button" class="opf-btn ghost" id="opf-dest-final">🎁 最终封装</button><button type="button" class="opf-btn ghost" id="opf-dest-lint">🔎 重新自检</button><button type="button" class="opf-btn ghost" id="opf-dest-std">📐 标准速查</button><button type="button" class="opf-btn ghost" id="opf-dest-ejsstd">🧬 EJS 速查</button><button type="button" class="opf-btn ghost" id="opf-dest-new">🗑 新核心</button></div><pre id="opf-dest-standard" class="opf-box opf-char-report" style="display:none">尚未展开</pre><pre id="opf-dest-ejsstandard" class="opf-box opf-char-report" style="display:none">尚未展开</pre><div id="opf-dest-steps"></div><div class="opf-sec"><div class="opf-sec-label">交火梳理报告</div><pre id="opf-dest-report" class="opf-box opf-char-report">尚未梳理</pre></div><div class="opf-out"><div class="opf-sec-label">最终稿件（世界书条目正文，可直接粘进「命定系统」条目）</div><div class="opf-dim" id="opf-dest-outnote"></div><pre id="opf-dest-out" class="opf-box">尚未封装</pre><div class="opf-char-copyrow"><button type="button" class="opf-btn ghost" id="opf-dest-copy">⧉ 复制条目正文</button><button type="button" class="opf-btn ghost" id="opf-dest-metacopy">⧉ 复制元数据</button></div></div></div>';
+
+function destInit(){
+  ST.dest = ST.dest || { demand: '', ref: '', segs: {}, status: {}, report: '', out: '', meta: '', outNote: [], ejs: false, _inited: false };
+  ST.dest.outNote = ST.dest.outNote || [];
+  ST.destEls = ST.destEls || {};
+}
+function bindDestinyPage(){
+  destInit();
+  var run = getEl('opf-dest-run'); if (!run || run._b) return; run._b = true;
+  run.addEventListener('click', function(){ if (ST.running) { ST.stopReq = true; toast('正在停止…'); return; } runDestDraft(); });
+  getEl('opf-dest-link').addEventListener('click', function(){ runDestLinkage(); });
+  getEl('opf-dest-final').addEventListener('click', function(){ finalizeDest(); });
+  getEl('opf-dest-lint').addEventListener('click', function(){ reLintDest(); });
+  getEl('opf-dest-std').addEventListener('click', function(){ toggleDestStandard(); });
+  getEl('opf-dest-ejsstd').addEventListener('click', function(){ toggleDestEjsStandard(); });
+  getEl('opf-dest-ejs').addEventListener('change', function(){ toggleDestEjs(this.checked); });
+  getEl('opf-dest-new').addEventListener('click', function(){ clearDest(); });
+  getEl('opf-dest-copy').addEventListener('click', function(){ copyDestOut(); });
+  getEl('opf-dest-metacopy').addEventListener('click', function(){ copyDestMeta(); });
+  getEl('opf-dest-demand').addEventListener('input', function(){ ST.dest.demand = this.value; destDraftCacheSave(); });
+  getEl('opf-dest-ref').addEventListener('input', function(){ ST.dest.ref = this.value; destDraftCacheSave(); });
+  renderDestSteps();
+  renderDestinyPage();
+}
+function toggleDestEjs(on){
+  destInit();
+  ST.dest.ejs = !!on;
+  var box = getEl('opf-dest-ejs'); if (box) box.checked = !!ST.dest.ejs;
+  renderDestSteps();
+  renderDestinyPage();
+  destDraftCacheSave();
+  toast(ST.dest.ejs
+    ? '已开启「EJS 重型核心」：分段扩为 ' + destSegs().length + ' 段，追加 EJS 规范与 EJS 专用 lint'
+    : '已回到基础模式：' + destSegs().length + ' 段静态核心流水线');
+}
+function toggleDestEjsStandard(){
+  var box = getEl('opf-dest-ejsstandard'); if (!box) return;
+  var open = box.style.display !== 'none';
+  box.textContent = open ? '尚未展开' : DEST_EJS_STANDARD;
+  box.style.display = open ? 'none' : 'block';
+}
+function destSystemContent(){
+  var lines = [];
+  lines.push('[角色] ' + macroFill(DEST_VOICE));
+  lines.push('[任务] 你正在为{{user}}的《命定之诗与黄昏之歌》世界书创作一个「命定系统」核心条目（二创核心）。各分段保持一致与呼应，不重复、不推翻已定内容；本任务与开局预设、二创角色均无关系。');
+  lines.push(DEST_RULES);
+  lines.push(DEST_STANDARD);
+  if (destEjsOn()) lines.push(DEST_EJS_STANDARD);
+  lines.push(CHAR_STYLE_RULES);
+  if (ST.worldInfo) lines.push('[世界书参考（世界书页勾选的条目）]\n' + ST.worldInfo);
+  return macroFill(lines.join('\n\n'));
+}
+function destUser0(){
+  var lines = [];
+  lines.push('[本次命定系统需求] ' + (ST.dest.demand || ''));
+  if (ST.dest.ref) lines.push('[参考文本]\n' + ST.dest.ref);
+  lines.push('[工作方式] 我将分 ' + destSegs().length + ' 个分段依次生成：' + destSegs().map(function (s) { return s.title; }).join('→') + '。每段只完成该段内容；已生成段落为既有设定，必须一致；禁止预写后面段落。');
+  return lines.join('\n\n');
+}
+function destSetSeg(pid, st){ ST.dest.status[pid] = st; destSetSegUi(pid, st); }
+function destSetSegUi(pid, st){
+  var row = getEl('opf-dph-' + pid); if (!row || !ST.dest) return;
+  row.setAttribute('data-st', st);
+  var dot = row.querySelector('.opf-dot');
+  if (dot) dot.textContent = st === 'run' ? '◌' : (st === 'ok' ? '✓' : (st === 'err' ? '✕' : '·'));
+  var has = !!(ST.dest.segs && ST.dest.segs[pid]);
+  var inp = row.querySelector('.opf-ref-input'); var b1 = row.querySelector('.opf-ref-do'); var b2 = row.querySelector('.opf-ref-sug');
+  if (inp) inp.disabled = !has || !!ST.running;
+  if (b1) b1.disabled = !has || !!ST.running;
+  if (b2) b2.disabled = !has || !!ST.running;
+  var tag = row.querySelector('.opf-ref-tag');
+  if (tag) tag.textContent = has ? '可定点修改（其它分段冻结）' : '先跑出本段后可精修';
+}
+function renderDestSegOut(pid){ var pre = ST.destEls && ST.destEls[pid]; if (pre) pre.textContent = (ST.dest.segs && ST.dest.segs[pid]) || '（本段内容显示在这里，点击标题展开/收起）'; }
+function renderDestSteps(){
+  var box = getEl('opf-dest-steps'); if (!box) return;
+  destInit();
+  box.textContent = '';
+  destSegs().forEach(function (s, i) {
+    var row = document.createElement('div'); row.className = 'opf-step'; row.setAttribute('data-st', ST.dest.status[s.id] || 'wait'); row.id = 'opf-dph-' + s.id;
+    var head = document.createElement('div'); head.className = 'opf-step-head';
+    var idx = document.createElement('span'); idx.className = 'opf-idx'; idx.textContent = String(i + 1);
+    var dot = document.createElement('span'); dot.className = 'opf-dot'; dot.textContent = '·';
+    var ttl = document.createElement('span'); ttl.className = 'opf-step-title'; ttl.textContent = s.title;
+    var sub = document.createElement('span'); sub.className = 'opf-step-sub'; sub.textContent = s.short;
+    var btn = document.createElement('button'); btn.className = 'opf-step-act'; btn.type = 'button'; btn.textContent = '重跑本段及后续'; btn.title = '从本段重新生成到结尾（覆盖本段及后续内容）';
+    btn.addEventListener('click', function (ev) { ev.stopPropagation(); runDestFrom(s.id); });
+    head.appendChild(idx); head.appendChild(dot); head.appendChild(ttl); head.appendChild(sub); head.appendChild(btn);
+    head.addEventListener('click', function () { row.classList.toggle('open'); });
+    row.appendChild(head);
+    var body = document.createElement('div'); body.className = 'opf-step-body';
+    var pre = document.createElement('pre'); pre.textContent = '（本段内容显示在这里，点击标题展开/收起）';
+    body.appendChild(pre);
+    ST.destEls[s.id] = pre;
+    row.appendChild(body);
+    var ref = document.createElement('div'); ref.className = 'opf-step-ref';
+    var tag = document.createElement('span'); tag.className = 'opf-ref-tag'; tag.textContent = '先跑出本段后可精修';
+    var chips = document.createElement('div'); chips.id = 'opf-ref-chips-d' + s.id;
+    var r1 = document.createElement('div'); r1.className = 'opf-step-ref-row';
+    var inp = document.createElement('input'); inp.type = 'text'; inp.className = 'opf-ref-input'; inp.placeholder = '定点修改指令（只改这一段）…'; inp.disabled = true;
+    var doB = document.createElement('button'); doB.type = 'button'; doB.className = 'opf-step-act opf-ref-do'; doB.textContent = '定点修改本段'; doB.disabled = true;
+    var sug = document.createElement('button'); sug.type = 'button'; sug.className = 'opf-step-act opf-ref-sug'; sug.textContent = '该段建议'; sug.disabled = true;
+    doB.addEventListener('click', function (ev) { ev.stopPropagation(); refineDestSeg(s.id, inp.value); });
+    sug.addEventListener('click', function (ev) { ev.stopPropagation(); suggestDestDir(s.id); });
+    r1.appendChild(inp); r1.appendChild(doB); r1.appendChild(sug);
+    ref.appendChild(tag); ref.appendChild(chips); ref.appendChild(r1);
+    row.appendChild(ref);
+    box.appendChild(row);
+    if (ST.dest.segs[s.id]) { renderDestSegOut(s.id); destSetSegUi(s.id, ST.dest.status[s.id] || 'ok'); }
+  });
+}
+function renderDestinyPage(){
+  destInit();
+  if (!getEl('opf-dest-demand')) return;
+  if (!ST.dest._inited) {
+    ST.dest._inited = true;
+    var d = getEl('opf-dest-demand'); if (d && !d.value) d.value = ST.dest.demand || '';
+    var r = getEl('opf-dest-ref'); if (r && !r.value) r.value = ST.dest.ref || '';
+  }
+  var ej = getEl('opf-dest-ejs'); if (ej) ej.checked = !!ST.dest.ejs;
+  var out = getEl('opf-dest-out');
+  if (out && out.textContent !== '封装中…') out.textContent = ST.dest.out || '尚未封装';
+  var note = getEl('opf-dest-outnote');
+  if (note) note.textContent = destNoteText();
+  var rep = getEl('opf-dest-report'); if (rep && rep.textContent !== '交火梳理中…') rep.textContent = ST.dest.report || '尚未梳理';
+  destSegs().forEach(function (s) { renderDestSegOut(s.id); destSetSegUi(s.id, ST.dest.status[s.id] || 'wait'); });
+}
+function destNoteText(){
+  if (!ST.dest || !ST.dest.out) return '';
+  var parts = [];
+  if (ST.dest.meta) parts.push(ST.dest.meta);
+  if (ST.dest.outNote && ST.dest.outNote.length) parts.push('⚠ ' + ST.dest.outNote.join('；'));
+  else parts.push('✓ 结构与命名自检通过');
+  return parts.join('　｜　');
+}
+function toggleDestStandard(){
+  var box = getEl('opf-dest-standard'); if (!box) return;
+  var open = box.style.display !== 'none';
+  box.textContent = open ? '尚未展开' : DEST_STANDARD;
+  box.style.display = open ? 'none' : 'block';
+}
+function destSetAllButtons(){
+  var D = ST.dest;
+  var r = getEl('opf-dest-run');
+  if (r) { r.disabled = !!ST.running; r.textContent = ST.running ? '■ 运行中…' : '▶ 分段初稿'; }
+  ['opf-dest-link', 'opf-dest-final', 'opf-dest-lint'].forEach(function (id) { var b = getEl(id); if (b) b.disabled = !!ST.running; });
+  if (!D) return;
+  destSegs().forEach(function (s) { destSetSegUi(s.id, (D.status && D.status[s.id]) || 'wait'); });
+}
+async function runDestDraft(){
+  if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
+  var d = getEl('opf-dest-demand'); var r = getEl('opf-dest-ref');
+  ST.dest.demand = (d && d.value || '').trim();
+  ST.dest.ref = (r && r.value || '').trim();
+  if (!ST.dest.demand) { toast('请先填写命定系统需求', 'warning'); return; }
+  ST.running = true; ST.stopReq = false; renderRunButtons();
+  var msgs = [{ role: 'system', content: destSystemContent() }, { role: 'user', content: destUser0() }];
+  try {
+    for (var i = 0; i < destSegs().length; i++) {
+      if (isStop()) break;
+      await runDestSeg(destSegs()[i], msgs, i);
+      await waitTick();
+    }
+    if (isStop()) toast('已停止');
+    else toast('分段初稿完成：可继续「⚔ 交火梳理」', 'success');
+  } catch (e) { toast('分段生成出错：' + (e && e.message ? e.message : e), 'error'); }
+  finally { ST.running = false; renderRunButtons(); destDraftCacheSave(); }
+}
+async function runDestSeg(seg, msgs, idx){
+  destSetSeg(seg.id, 'run');
+  var prev = '';
+  for (var k = 0; k < idx; k++) { var ps = destSegs()[k]; if (ST.dest.segs[ps.id]) prev += '\n\n【' + ps.title + '】\n' + ST.dest.segs[ps.id]; }
+  var userMsg = { role: 'user', content: '【分段' + (idx + 1) + '/' + destSegs().length + '：' + seg.title + '】\n' + macroFill(destSegPrompt(seg.id)) + (prev ? '\n\n[此前已定分段（既有设定，必须一致，禁止改动）]\n' + prev : '') };
+  msgs.push(userMsg);
+  try {
+    var resp = await callModel(msgs);
+    ST.dest.segs[seg.id] = resp;
+    msgs.push({ role: 'assistant', content: resp });
+    while (msgs.length > 3 && !systemCtxBudgetOk(msgs)) { if (msgs[2] && msgs[2].role === 'assistant') msgs.splice(2, 2); else break; }
+    destSetSeg(seg.id, 'ok');
+    renderDestSegOut(seg.id);
+  } catch (e) { destSetSeg(seg.id, 'err'); throw e; }
+}
+async function runDestFrom(pid){
+  if (ST.running) return;
+  var start = -1;
+  destSegs().forEach(function (s, i) { if (s.id === pid) start = i; });
+  if (start < 0) return;
+  var d = getEl('opf-dest-demand'); var r = getEl('opf-dest-ref');
+  ST.dest.demand = (d && d.value || '').trim(); ST.dest.ref = (r && r.value || '').trim();
+  if (!ST.dest.demand) { toast('请先填写命定系统需求', 'warning'); return; }
+  ST.running = true; ST.stopReq = false; renderRunButtons();
+  var msgs = [{ role: 'system', content: destSystemContent() }, { role: 'user', content: destUser0() }];
+  try {
+    for (var k = 0; k < start; k++) {
+      var ph = destSegs()[k];
+      if (!ST.dest.segs[ph.id]) { toast('前面分段尚未完成，请先「分段初稿」', 'warning'); ST.running = false; renderRunButtons(); return; }
+      msgs.push({ role: 'user', content: '【分段' + (k + 1) + '/' + destSegs().length + '：' + ph.title + '】\n' + macroFill(destSegPrompt(ph.id)) });
+      msgs.push({ role: 'assistant', content: ST.dest.segs[ph.id] });
+    }
+    for (var j = start; j < destSegs().length; j++) {
+      if (isStop()) break;
+      await runDestSeg(destSegs()[j], msgs, j);
+      await waitTick();
+    }
+    if (isStop()) toast('已停止');
+  } catch (e) { toast('生成出错：' + (e && e.message ? e.message : e), 'error'); }
+  finally { ST.running = false; renderRunButtons(); destDraftCacheSave(); }
+}
+async function refineDestSeg(pid, dir){
+  if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
+  var seg = null;
+  destSegs().forEach(function (s) { if (s.id === pid) seg = s; });
+  if (!seg || !ST.dest.segs[pid]) { toast('该段还没有内容，请先生成', 'warning'); return; }
+  var dirT = (dir || '').trim();
+  if (!dirT) dirT = '修正本段内部矛盾与格式问题，使其与其它段落一致；不新增设定。';
+  var frozen = '';
+  destSegs().forEach(function (s2) { if (s2.id !== pid && ST.dest.segs[s2.id]) frozen += '\n\n【' + s2.title + '】\n' + ST.dest.segs[s2.id]; });
+  ST.running = true; renderRunButtons(); destSetSeg(pid, 'run');
+  try {
+    var msgs = [{ role: 'system', content: destSystemContent() }, { role: 'user', content: destUser0() }];
+    var msg = '【定点修改：只改「' + seg.title + '」这一段】\n\n[用户指令]\n' + dirT + '\n\n[本段现行内容]\n' + ST.dest.segs[pid] + '\n\n[冻结区块（其它分段原样保留，一个字都不许改；若发现其它段有问题，最多在结尾另起一行写“备注：建议检查XX段…”提示，不得代改）]\n' + frozen + '\n\n[命定系统·规则约束]\n' + DEST_RULES + '\n\n要求：只输出修改后的【' + seg.title + '】内容；修改严格限定在用户指令范围内，未要求的地方保持原样，不要顺手润色、扩写或重排。';
+    msgs.push({ role: 'user', content: msg });
+    var resp = await callModel(msgs);
+    ST.dest.segs[pid] = resp;
+    destSetSeg(pid, 'ok'); renderDestSegOut(pid);
+    toast('已修改【' + seg.title + '】（其余分段未动）');
+  } catch (e) { destSetSeg(pid, 'err'); toast('定点修改出错：' + (e && e.message ? e.message : e), 'error'); }
+  finally { ST.running = false; renderRunButtons(); destDraftCacheSave(); }
+}
+async function suggestDestDir(pid){
+  if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
+  var seg = null;
+  destSegs().forEach(function (s) { if (s.id === pid) seg = s; });
+  if (!seg || !ST.dest.segs[pid]) { toast('该段还没有内容', 'warning'); return; }
+  var chipBox = getEl('opf-ref-chips-d' + pid); if (!chipBox) return;
+  var cur = String(ST.dest.segs[pid]).slice(0, 2500);
+  var ask = '请针对命定系统的【' + seg.title + '】这一段现有内容，给出 2-3 条只针对本段的修改方向。每条一行、≤50字、去掉编号外多余的话、直接可点；必须符合命定系统规则与联动一致性。\n[需求]\n' + (ST.dest.demand || '(未填写)') + '\n[命定系统·规则约束]\n' + DEST_RULES + '\n[本段现有内容]\n' + cur;
+  var msgs = [{ role: 'system', content: destSystemContent() }, { role: 'user', content: ask }];
+  ST.running = true; renderRunButtons();
+  try {
+    var resp = await callModel(msgs);
+    var list = [];
+    String(resp).split(/\r?\n/).forEach(function (ln) {
+      var t = String(ln).replace(/^\s*(?:[-*•]|\d+[.、)])\s*/, '').trim();
+      if (t && t.length >= 4 && t.length <= 70 && list.indexOf(t) < 0) list.push(t);
+    });
+    if (!list.length) list = ['让本段与其它分段更咬合', '补齐缺失的字段/数值档位', '让口吻与命定之灵人设一致'];
+    renderDestChips(pid, list.slice(0, 3));
+  } catch (e) { toast('该段建议生成失败：' + (e && e.message ? e.message : e), 'error'); }
+  finally { ST.running = false; renderRunButtons(); }
+}
+function renderDestChips(pid, list){
+  var box = getEl('opf-ref-chips-d' + pid); if (!box) return;
+  box.textContent = '';
+  list.forEach(function (t) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'opf-dir-chip';
+    b.textContent = '▶ ' + t;
+    b.addEventListener('click', function () { refineDestSeg(pid, t); });
+    box.appendChild(b);
+  });
+}
+async function runDestLinkage(){
+  if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
+  var done = destSegs().filter(function (s) { return ST.dest.segs[s.id]; });
+  if (done.length < destSegs().length) { toast('请先完成全部分段初稿（' + destSegs().length + ' 段）', 'warning'); return; }
+  ST.running = true; ST.stopReq = false; renderRunButtons();
+  var report = getEl('opf-dest-report'); if (report) report.textContent = '交火梳理中…（第一步：整体审查）';
+  try {
+    var all = destSegs().map(function (s) { return '<<<SEG:' + s.id + '>>>\n' + String(ST.dest.segs[s.id] || '').slice(0, 1800); }).join('\n\n');
+    var reportMsg = '【交火梳理·第一步：整体审查】\n下面是各分段的审阅稿（每段截取前1800字，供查矛盾用）。请按下面的联动链条逐链检查，找出互相矛盾、脱节、数值/命名不合规之处。\n\n[联动链条]\n' + DEST_LINK_CHAIN + '\n\n[分段审阅稿]\n' + all + '\n\n[命定系统·规则约束]\n' + DEST_RULES + '\n\n输出要求（只输出报告，禁止输出任何段落正文，禁止使用<<<SEG:标记）：\n1. 逐条链给一句结论（✓一致 / ⚠问题+理由）。\n2. 最后列“改动清单”：每段一条，写清改哪段、为什么；没有问题的段写“无”。\n3. 报告里不要重写设定内容，只说问题与改法。\n4. 重点核对：包裹标签名与「系统名」是否一致、十条 setvar 是否齐全且顺序正确、缔结消耗七档是否齐全、核心名与语言标签是否与现有核心撞车、复活机制是否保留禁止机械降神的约束句。';
+    var msgs = [{ role: 'system', content: destSystemContent() }, { role: 'user', content: destUser0() }, { role: 'user', content: reportMsg }];
+    var resp = await callModel(msgs);
+    ST.dest.report = String(resp || '').trim() || '（报告为空）';
+    if (report) report.textContent = ST.dest.report;
+    toast('审查报告完成，开始逐段应用联动修订…');
+    var changed = 0;
+    for (var i = 0; i < destSegs().length; i++) {
+      if (isStop()) break;
+      var seg = destSegs()[i];
+      if (report) report.textContent = ST.dest.report + '\n\n—— 正在逐段应用修订（' + (i + 1) + '/' + destSegs().length + '：' + seg.title + '）——';
+      destSetSeg(seg.id, 'run');
+      var frozen = '';
+      destSegs().forEach(function (s2) { if (s2.id !== seg.id && ST.dest.segs[s2.id]) frozen += '\n\n【' + s2.title + '】\n' + String(ST.dest.segs[s2.id]).slice(0, 1200); });
+      var applyMsg = '【交火梳理·第二步：逐段应用修订——只改「' + seg.title + '」这一段】\n\n[梳理报告与改动清单]\n' + ST.dest.report + '\n\n[本段现行内容]\n' + ST.dest.segs[seg.id] + '\n\n[冻结区块（其它分段，原样保留，一个字都不许改）]\n' + frozen + '\n\n[修订规则]\n' + DEST_RULES + '\n1. 只输出【' + seg.title + '】的修订后全文；若按报告本段无需改动，只回复“无改动”。\n2. 只做报告指出的联动性修改；不得推翻设定、不得扩写或新增内容。\n3. 不生成任何角色卡或开局预设内容。';
+      var m2 = [{ role: 'system', content: destSystemContent() }, { role: 'user', content: applyMsg }];
+      var resp2 = await callModel(m2);
+      var txt = String(resp2 || '').trim();
+      if (txt && !/^无改动[。．.]*$/.test(txt)) { ST.dest.segs[seg.id] = txt; changed++; renderDestSegOut(seg.id); }
+      destSetSeg(seg.id, 'ok');
+      await waitTick();
+    }
+    if (report) report.textContent = ST.dest.report + (isStop() ? '\n\n（已停止：修订应用中断）' : '\n\n（修订应用完成，改动 ' + changed + ' 段）');
+    if (isStop()) toast('已停止');
+    else toast('交火梳理完成：报告已生成，联动修订应用到 ' + changed + ' 段', 'success');
+  } catch (e) { toast('交火梳理出错：' + (e && e.message ? e.message : e), 'error'); if (report) report.textContent = '梳理失败：' + (e && e.message ? e.message : e); }
+  finally { ST.running = false; renderRunButtons(); destDraftCacheSave(); }
+}
+function destCoreNameGuess(){
+  var f = String(ST.dest.segs.frame || '');
+  var m = f.match(/系统核心[：:]\s*(.+)/) || f.match(/核心名[：:]\s*(.+)/);
+  if (m) return String(m[1]).trim().split(/[，,。\s(（]/)[0].slice(0, 30);
+  return '未命名核心';
+}
+async function finalizeDest(){
+  if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
+  var done = destSegs().filter(function (s) { return ST.dest.segs[s.id]; });
+  if (!done.length) { toast('还没有任何分段内容，请先「分段初稿」', 'warning'); return; }
+  ST.running = true; renderRunButtons();
+  var outEl = getEl('opf-dest-out'); if (outEl) outEl.textContent = '封装中…';
+  var noteEl = getEl('opf-dest-outnote'); if (noteEl) noteEl.textContent = '';
+  try {
+    var all = destSegs().map(function (s) { return '【' + s.title + '】\n' + (ST.dest.segs[s.id] || '（无）'); }).join('\n\n');
+    var msg = '【最终封装（世界书条目）】\n请以“始弦的魔法大典”的身份，把下面的分段内容整理成一份可直接粘进世界书「命定系统」条目的纯文本。\n\n[全部分段]\n' + all + '\n\n' + DEST_SPEC + (destEjsOn()
+      ? '\n\n[EJS 保留要求·最高优先级]\n本核心是 EJS 重型核心，各分段里的 `<%_ … _%>`、`<% … %>`、`<%- … %>` 标签、if/for 的 `{ _%>` 与 `} _%>` 配对、以及全部变量名必须**原样保留**：不得为了排版整洁而改写、合并、重排或删除任何 EJS 标签；只在标签之间做正文的整合与去重。整合后必须复核：块开始与块结束数量相等、每个分支里 `<{{getvar::系统名}}>` 都完整闭合。'
+      : '') + '\n\n系统核心名以「骨架与命名」段为准；没写清楚就按内容拟一个。';
+    var msgs = [{ role: 'system', content: destSystemContent() }, { role: 'user', content: msg }];
+    var resp = await callModel(msgs);
+    var ex = extractDestEntry(resp);
+    if (!ex.ok) toast('未能从回复中提取 ' + fence() + 'text 代码块（已用原文兜底，可重试一次）', 'warning');
+    ST.dest.out = ex.body;
+    ST.dest.meta = ex.meta;
+    ST.dest.outNote = destLint(ex.body).concat(destEjsLint(ex.body));
+    if (outEl) outEl.textContent = ex.body;
+    if (noteEl) noteEl.textContent = destNoteText();
+    if (ex.ok && !ST.dest.outNote.length) toast('已封装完成（条目正文可复制，粘进世界书「命定系统」条目）', 'success');
+    else toast('已封装' + (ST.dest.outNote.length ? '（' + ST.dest.outNote.length + ' 条自检提示，见输出区上方）' : ''), 'warning');
+  } catch (e) { toast('最终封装出错：' + (e && e.message ? e.message : e), 'error'); }
+  finally { ST.running = false; renderRunButtons(); destDraftCacheSave(); }
+}
+function extractDestEntry(text){
+  var F = fence();
+  var t = String(text || '');
+  var idx = t.indexOf(F + 'text');
+  if (idx < 0) idx = t.indexOf(F);
+  if (idx < 0) return { ok: false, body: t.trim(), meta: '' };
+  var start = t.indexOf('\n', idx);
+  if (start < 0) return { ok: false, body: t.trim(), meta: '' };
+  var end = t.indexOf(F, start + 1);
+  var body = end > start ? t.slice(start + 1, end) : t.slice(start + 1);
+  body = body.replace(/^\n+/, '').replace(/\s+$/, '');
+  var meta = end > start ? t.slice(end + F.length).trim() : '';
+  return { ok: !!body, body: body, meta: meta };
+}
+function destSlotValue(t, name){
+  var re = new RegExp('\\{\\{setvar::' + name + '::');
+  var i = String(t).search(re);
+  if (i < 0) return '';
+  var m = String(t).slice(i).match(/^\{\{setvar::[^:]+::([\s\S]*?)\}\}/);
+  return m ? m[1].trim() : '';
+}
+function destTierPrices(t){
+  // 兼容两种写法：「一层级200 | 二500 | 三2500 …」与「第一层级: 500 FP」
+  var s = String(t).replace(/([一二三四五六])(\d{2,7})/g, '$1层级$2');
+  var map = {};
+  s.split(/\r?\n/).forEach(function (ln) {
+    var re = /([一二三四五六])层级[^0-9\n]{0,8}(\d{2,7})/g, m;
+    while ((m = re.exec(ln)) !== null) {
+      var v = Number(m[2]);
+      if (v < 100) continue;
+      if (map[m[1]] == null) map[m[1]] = v;
+    }
+  });
+  return map;
+}
+function destSectionLines(t, headerRe, itemRe, indent){
+  var lines = String(t).split(/\r?\n/), out = [], on = false, depth = 0;
+  for (var i = 0; i < lines.length; i++) {
+    var l = lines[i];
+    if (!on) {
+      if (headerRe.test(l)) { on = true; depth = (l.match(/^ */) || [''])[0].length; }
+      continue;
+    }
+    var ind = (l.match(/^ */) || [''])[0].length;
+    if (l.trim() && ind <= depth) break;
+    if (itemRe.test(l)) out.push(l.trim());
+  }
+  return out;
+}
+function destLangSection(t){
+  return destSectionLines(t, /语言格式/, /[\s\S]/, 0).join('\n');
+}
+function destLint(text){
+  var warns = [];
+  var t = String(text || '');
+  if (!t.trim()) return ['条目正文为空'];
+  var m;
+  var found = [];
+  var re = /\{\{setvar::([^:]+)::/g;
+  while ((m = re.exec(t)) !== null) { var nm = m[1].trim(); if (DEST_SLOT_ORDER.indexOf(nm) >= 0 && found.indexOf(nm) < 0) found.push(nm); }
+  var missing = DEST_SLOT_ORDER.filter(function (n) { return found.indexOf(n) < 0; });
+  if (missing.length) warns.push('缺少 setvar：' + missing.join('、') + '（若你的核心用 EJS/setLocalVar 动态写入这些变量，本条可忽略）');
+  var minIdx = -1, outOfOrder = false;
+  found.forEach(function (n) { var i = DEST_SLOT_ORDER.indexOf(n); if (i < minIdx) outOfOrder = true; if (i > minIdx) minIdx = i; });
+  if (outOfOrder) warns.push('setvar 顺序不符合规定（应为 系统名→系统核心名→系统核心→fp定义→爆料风格→登神长阶→生命层级→技能获取→经验值获取→复活机制）');
+  var opens = (t.match(/\{\{setvar::/g) || []).length;
+  var closes = (t.match(/\}\}/g) || []).length;
+  if (opens > closes) warns.push('有 setvar 未闭合（{{setvar:: 与 }} 数量不符）');
+  var sn = destSlotValue(t, '系统名');
+  if (!sn) warns.push('无法解析「系统名」的值');
+  else if (t.indexOf('<' + sn + '>') < 0 || t.indexOf('</' + sn + '>') < 0) warns.push('正文块包裹标签名与「系统名」(' + sn + ') 不一致或有开无闭——《战斗&生产规则》会读不到核心机制');
+  if (DEST_KNOWN_SYSNAMES.indexOf(sn) >= 0 && sn !== '命定之诗') warns.push('「系统名」与现有核心相同：' + sn + '（二者不会同时启用时影响不大，但建议自创一个包裹标签名）');
+  var tierOrder = ['一', '二', '三', '四', '五', '六'];
+  var prices = destTierPrices(t);
+  var got = tierOrder.filter(function (c) { return prices[c] != null; });
+  if (got.length < 6) {
+    warns.push('缔结契约消耗档位不全（识别到 ' + got.length + '/6 档：' + tierOrder.map(function (c) { return c + (prices[c] != null ? prices[c] : '?'); }).join(' ') + '）——应给出第一~第六层级，第七层级不标价');
+  } else {
+    var nums = tierOrder.map(function (c) { return prices[c]; });
+    for (var i = 1; i < nums.length; i++) {
+      if (nums[i] <= nums[i - 1]) { warns.push('缔结契约消耗未随层级递增：' + tierOrder.map(function (c, j) { return c + '层级' + nums[j]; }).join(' / ')); break; }
+    }
+    if (nums[0] !== 200 || nums[1] !== 500 || nums[2] !== 2500 || nums[3] !== 10000 || nums[4] !== 50000 || nums[5] !== 150000) {
+      warns.push('使用的是自定义消耗档位（' + nums.join(' / ') + '，主流默认档为 200/500/2500/10000/50000/150000）——确认是有意为之即可');
+    }
+  }
+  if (/\b(common|uncommon|rare|epic|legendary|mythic)\b/i.test(t)) warns.push('出现英文品级，规范要求中文七等');
+  var core = destSlotValue(t, '系统核心');
+  if (core && DEST_KNOWN_CORES.indexOf(core) >= 0) warns.push('「系统核心」与现有核心重名：' + core);
+  var tags = [];
+  var tre = /<([A-Za-z_][A-Za-z0-9_]*)[\s>/]/g;
+  while ((m = tre.exec(t)) !== null) { if (tags.indexOf(m[1]) < 0) tags.push(m[1]); }
+  var clash = tags.filter(function (x) { return DEST_KNOWN_TAGS.indexOf(x) >= 0; });
+  if (clash.length) warns.push('语言格式标签与现有核心冲突：' + clash.join('、'));
+  var rev = destSlotValue(t, '复活机制');
+  if (!rev) warns.push('复活机制为空（《复活机制》条目会变成空条目；若该核心刻意不给复活机制，本条可忽略）');
+  else if (!/机械降神/.test(rev)) warns.push('复活机制缺少“禁止为<user>在战斗中改变设定/创造有利条件/机械降神”约束句');
+  if (!/隐蔽原则/.test(t)) warns.push('缺少「隐蔽原则」');
+  if (!/非万能原则/.test(t)) warns.push('缺少「非万能原则」（命定之灵必须拒绝功能表之外的要求；null 型无灵核心可忽略）');
+  // ---- 标准骨架校验（依据 22 个核心普查）----
+  var personaMiss = [['形象', /形象|形态|外貌/], ['性格', /性格/], ['定位', /定位/], ['说话风格', /说话风格|对话风格/], ['爱好', /爱好|喜好/], ['愿望', /愿望/]]
+    .filter(function (x) { return !x[1].test(t); }).map(function (x) { return x[0]; });
+  if (personaMiss.length) warns.push('「人设」缺标准字段：' + personaMiss.join('、') + '（标准六字段：形象/性格/定位/说话风格/爱好/愿望）');
+  var fnItems = destSectionLines(t, /^\s{0,6}(功能|能力)/, /^\s*[-•]\s+\S/);
+  if (fnItems.length) {
+    if (fnItems.length < 6 || fnItems.length > 12) warns.push('功能表 ' + fnItems.length + ' 条（标准 8 条，实测区间 7~11）');
+    var fnText = fnItems.join('\n');
+    var famMiss = [];
+    if (!/瞬发|速成|顿悟|瞬间(掌握|学会|领悟)|智慧源泉|祈愿传承/.test(fnText)) famMiss.push('技能瞬发学习');
+    if (!/背包|行囊|口袋|匣|肚肚|收纳|储物|侧袋|提灯|空间装备/.test(fnText)) famMiss.push('储物/背包');
+    if (!/感知|洞察|搜寻|扫描|千里眼|情报/.test(fnText)) famMiss.push('感知/情报');
+    if (!/意识|心灵连线/.test(fnText)) famMiss.push('意识交流');
+    if (!/融合|熔铸|缝合/.test(fnText)) famMiss.push('技能融合/升级');
+    if (!/登神/.test(fnText)) famMiss.push('登神长阶辅助');
+    if (!/抽卡|抽取|宝库/.test(fnText)) famMiss.push('命运抽卡');
+    if (famMiss.length) warns.push('功能表未覆盖标准功能族：' + famMiss.join('、'));
+    if (/\(消耗fp\)/.test(fnText)) warns.push('功能表消耗标注建议统一为 (消耗FP)（现为小写 fp）');
+  } else warns.push('未识别到「功能(以下功能不进行任何检定)」功能表');
+  var langBlk = destLangSection(t);
+  if (langBlk) {
+    var exN = (langBlk.match(/^\s*-\s+/gm) || []).length
+      + (langBlk.match(/^\s*>[^\n]*「/gm) || []).length
+      + (langBlk.match(/^\s*<[A-Za-z_][A-Za-z0-9_]*[\s>]/gm) || []).length;
+    if (exN < 6) warns.push('语言格式范例偏少（识别到 ' + exN + ' 条；建议 ≥6 条并覆盖 日常/战斗危机/FP不足/缔结成功/拒绝越界/特殊情绪，梅林核心 8 条为范本）');
+    if (/<[A-Za-z_][A-Za-z0-9_]*\s+name=/.test(langBlk) && !/参数说明/.test(langBlk)) warns.push('XML 标签式语言格式缺少「参数说明」节（mood 枚举需固定取值、从中选一）');
+  } else warns.push('缺少「{灵名}语言格式」节');
+  if (!/核心机制|权柄|关键能力/.test(t)) warns.push('缺少核心机制节（标准名「核心机制」）');
+  if (!/命运点数|命定点数/.test(t)) warns.push('缺少命运点数(FP)节（标准名「命运点数(FP)」）');
+  if (/\t/.test(t)) warns.push('含制表符(Tab)，标准为两空格缩进');
+  if (t.length < 4000) warns.push('正文偏短（' + t.length + ' 字符，建议 4000~8000）');
+  if (t.length > 12000) warns.push('正文偏长（' + t.length + ' 字符，建议 4000~8000，上限 12000）');
+  if (/生命层级[：:]\s*第|^\s*属性[：:]/m.test(t) || /reincarnationPoints|开局预设|开局剧情/.test(t)) warns.push('出现角色卡或开局预设字段（本条目只写系统本身）');
+  return warns;
+}
+function reLintDest(){
+  if (!ST.dest.out) { toast('还没有条目正文，请先「最终封装」', 'warning'); return; }
+  ST.dest.outNote = destLint(ST.dest.out).concat(destEjsLint(ST.dest.out));
+  var note = getEl('opf-dest-outnote'); if (note) note.textContent = destNoteText();
+  toast(ST.dest.outNote.length ? ('自检发现 ' + ST.dest.outNote.length + ' 条提示') : '自检通过：结构、命名与数值档位均合规', ST.dest.outNote.length ? 'warning' : 'success');
+  destDraftCacheSave();
+}
+function clearDest(){
+  if (!window.confirm('清空当前命定系统草稿（分段/报告/最终稿件）？此操作不可撤销。')) return;
+  ST.dest = { demand: '', ref: '', segs: {}, status: {}, report: '', out: '', meta: '', outNote: [], ejs: false, _inited: false };
+  ST.destEls = {};
+  var d = getEl('opf-dest-demand'); if (d) d.value = '';
+  var r = getEl('opf-dest-ref'); if (r) r.value = '';
+  destDraftCacheSave();
+  renderDestSteps(); renderDestinyPage();
+  toast('已清空，可以开始新核心');
+}
+function destCopyText(txt, emptyMsg){
+  if (!txt) { toast(emptyMsg, 'warning'); return; }
+  function fallback(){ var ta = document.createElement('textarea'); ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); toast('已复制到剪贴板'); } catch (e) { toast('复制失败，请手动复制'); } ta.remove(); }
+  if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(txt).then(function () { toast('已复制到剪贴板'); }, fallback); } else fallback();
+}
+function copyDestOut(){ destCopyText(ST.dest.out || '', '还没有条目正文，请先「最终封装」'); }
+function copyDestMeta(){ destCopyText(ST.dest.meta || '', '还没有元数据，请先「最终封装」'); }
+function destDraftCacheSave(){
+  if (destDraftCacheSave._t) clearTimeout(destDraftCacheSave._t);
+  destDraftCacheSave._t = setTimeout(function () {
+    if (!ST.dest) return;
+    lsSet(LS_DEST_KEY, { demand: ST.dest.demand, ref: ST.dest.ref, segs: ST.dest.segs, status: ST.dest.status, report: ST.dest.report, out: ST.dest.out, meta: ST.dest.meta, outNote: ST.dest.outNote, ejs: !!ST.dest.ejs });
+  }, 500);
+}
+function destDraftRestore(){
+  destInit();
+  var c = lsGet(LS_DEST_KEY); if (!c || typeof c !== 'object') return;
+  ST.dest.demand = c.demand || ''; ST.dest.ref = c.ref || '';
+  ST.dest.segs = c.segs || {}; ST.dest.status = c.status || {};
+  ST.dest.report = c.report || ''; ST.dest.out = c.out || ''; ST.dest.meta = c.meta || ''; ST.dest.outNote = c.outNote || [];
+  ST.dest.ejs = !!c.ejs;
+  try { renderDestSteps(); renderDestinyPage(); } catch (e) { opfErr('destDraftRestore render', e); }
+}
+
 // ============ boot ============
 function boot(){
   injectStyle();
@@ -2375,6 +3114,7 @@ function boot(){
   renderRunButtons();
   try { worldCacheRestore(); } catch (e) { opfErr("worldCacheRestore", e); }
   try { charDraftRestore(); } catch (e) { opfErr("charDraftRestore", e); }
+  try { destDraftRestore(); } catch (e) { opfErr("destDraftRestore", e); }
   initMemo();
   opfLog("loaded. context ready:", !!getCtx());
 }
