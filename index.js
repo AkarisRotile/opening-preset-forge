@@ -3615,7 +3615,7 @@ function rxExtractHtml(text) {
   return (end > start ? t.slice(start + 1, end) : t.slice(start + 1)).replace(/^\n+/, '').replace(/\s+$/, '');
 }
 // ---------- 页面 ----------
-var RX_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">✦ 正则工坊 · 命定系统对话美化</div><div class="opf-dim">流程：粘贴核心全文（或从 ④ 页带入）→ 解析语言格式 → 勾选要美化的格式 → 选用途与预算档位 → 匹配式由插件确定生成、替换体由模型产出 → 实时预览 → 自检 → 导出 JSON。字段名与你现有 4 条正则一致，可直接粘进预设的 regex_scripts。</div><textarea id="opf-rx-core" class="opf-char-input" placeholder="把命定系统核心条目全文粘在这里（必须含「语言格式」节）"></textarea><div class="opf-char-tools"><button type="button" class="opf-btn ghost" id="opf-rx-pull">⬅ 从 ④ 页带入</button><button type="button" class="opf-btn primary" id="opf-rx-parse">🔍 解析语言格式（AI）</button><button type="button" class="opf-btn ghost" id="opf-rx-parse2">⚙ 脚本解析（离线）</button><button type="button" class="opf-btn ghost" id="opf-rx-gen">🎨 生成替换体</button><button type="button" class="opf-btn ghost" id="opf-rx-check">🔎 自检</button><button type="button" class="opf-btn ghost" id="opf-rx-copy1">⧉ 复制单条 JSON</button><button type="button" class="opf-btn ghost" id="opf-rx-copyall">⧉ 复制 JSON 数组</button><button type="button" class="opf-btn ghost" id="opf-rx-new">🗑 清空</button><button type="button" class="opf-btn ghost" id="opf-rx-ping">🩺 连通性自检</button></div><div class="opf-shx-cfg"><label class="opf-opt">生成传输<select id="opf-rx-transport" class="opf-ref-input"><option value="st">酒馆主 API（generateRaw，非流式）</option><option value="server">经酒馆服务端转发 + 流式（反代推荐）</option><option value="direct">浏览器直连 + 流式</option></select></label><label class="opf-opt">协议源<select id="opf-rx-source" class="opf-ref-input"><option value="makersuite">Google AI Studio (makersuite)</option><option value="vertexai">Vertex AI (vertexai)</option></select></label><label class="opf-opt">中转/反代地址<input id="opf-rx-reverse" class="opf-ref-input" placeholder="https://gcli.ggchan.dev"></label><label class="opf-opt">代理密码/密钥<input id="opf-rx-proxypass" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">模型名<input id="opf-rx-model" class="opf-ref-input" placeholder="gemini-2.5-pro"></label></div><div class="opf-shx-cfg"><label class="opf-opt">直连协议<select id="opf-rx-proto" class="opf-ref-input"><option value="openai">OpenAI 兼容 (/chat/completions)</option><option value="gemini">Google 原生 (:streamGenerateContent)</option></select></label><label class="opf-opt">直连地址<input id="opf-rx-base" class="opf-ref-input" placeholder="https://api.example.com/v1"></label><label class="opf-opt">直连密钥<input id="opf-rx-key" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">直连模型<input id="opf-rx-chatmodel" class="opf-ref-input" placeholder="直连时用；留空则用上面的模型名"></label></div><div class="opf-dim" id="opf-rx-statusline">就绪</div><div class="opf-sec"><div class="opf-sec-label">语言格式解析结果（只读核对）</div><pre id="opf-rx-parsed" class="opf-box opf-char-report">尚未解析</pre></div><div id="opf-rx-items"></div><div class="opf-sec"><div class="opf-sec-label">自检</div><pre id="opf-rx-issues" class="opf-box opf-char-report">尚未自检</pre></div></div>';
+var RX_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">✦ 正则工坊 · 命定系统对话美化</div><div class="opf-dim">流程：粘贴核心全文（或从 ④ 页带入）→ 解析语言格式 → 勾选要美化的格式 → 选用途与预算档位 → 匹配式由插件确定生成、替换体由模型产出 → 实时预览 → 自检 → 导出 JSON。字段名与你现有 4 条正则一致，可直接粘进预设的 regex_scripts。</div><textarea id="opf-rx-core" class="opf-char-input" placeholder="把命定系统核心条目全文粘在这里（必须含「语言格式」节）"></textarea><div class="opf-char-tools"><button type="button" class="opf-btn ghost" id="opf-rx-pull">⬅ 从 ④ 页带入</button><button type="button" class="opf-btn primary" id="opf-rx-parse">🔍 解析语言格式（AI）</button><button type="button" class="opf-btn ghost" id="opf-rx-parse2">⚙ 脚本解析（离线）</button><button type="button" class="opf-btn ghost" id="opf-rx-gen">🎨 生成替换体</button><button type="button" class="opf-btn ghost" id="opf-rx-check">🔎 自检</button><button type="button" class="opf-btn ghost" id="opf-rx-copy1">⧉ 复制单条 JSON</button><button type="button" class="opf-btn ghost" id="opf-rx-copyall">⧉ 复制 JSON 数组</button><button type="button" class="opf-btn ghost" id="opf-rx-new">🗑 清空</button><button type="button" class="opf-btn ghost" id="opf-rx-ping">🩺 连通性自检</button></div><div class="opf-shx-cfg"><label class="opf-opt">生成传输<select id="opf-rx-transport" class="opf-ref-input"><option value="st">酒馆主 API（generateRaw，非流式）</option><option value="server">经酒馆服务端转发 + 流式（反代推荐）</option><option value="direct">浏览器直连 + 流式</option></select></label><label class="opf-opt">协议源<select id="opf-rx-source" class="opf-ref-input"><option value="makersuite">Google AI Studio (makersuite)</option><option value="vertexai">Vertex AI (vertexai)</option></select></label><label class="opf-opt">中转/反代地址<input id="opf-rx-reverse" class="opf-ref-input" placeholder="https://gcli.ggchan.dev"></label><label class="opf-opt">代理密码/密钥<input id="opf-rx-proxypass" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">模型名<input id="opf-rx-model" class="opf-ref-input" list="opf-rx-modellist" placeholder="点右侧按钮自动获取"><datalist id="opf-rx-modellist"></datalist></label><button type="button" class="opf-btn ghost" id="opf-rx-models">🔌 获取模型列表</button></div><div class="opf-shx-cfg"><label class="opf-opt">直连协议<select id="opf-rx-proto" class="opf-ref-input"><option value="openai">OpenAI 兼容 (/chat/completions)</option><option value="gemini">Google 原生 (:streamGenerateContent)</option></select></label><label class="opf-opt">直连地址<input id="opf-rx-base" class="opf-ref-input" placeholder="https://api.example.com/v1"></label><label class="opf-opt">直连密钥<input id="opf-rx-key" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">直连模型<input id="opf-rx-chatmodel" class="opf-ref-input" placeholder="直连时用；留空则用上面的模型名"></label></div><div class="opf-dim" id="opf-rx-statusline">就绪</div><div class="opf-sec"><div class="opf-sec-label">语言格式解析结果（只读核对）</div><pre id="opf-rx-parsed" class="opf-box opf-char-report">尚未解析</pre></div><div id="opf-rx-items"></div><div class="opf-sec"><div class="opf-sec-label">自检</div><pre id="opf-rx-issues" class="opf-box opf-char-report">尚未自检</pre></div></div>';
 
 function rxInit() {
   ST.rx = ST.rx || { core: '', coreName: '', parsed: null, items: [], _inited: false };
@@ -3633,6 +3633,15 @@ function bindRxPage() {
   getEl('opf-rx-copyall').addEventListener('click', function(){ rxCopy(true); });
   getEl('opf-rx-new').addEventListener('click', function(){ rxClear(); });
   getEl('opf-rx-ping').addEventListener('click', function(){ rxPing(); });
+  getEl('opf-rx-models').addEventListener('click', function(){ rxDoFetchModels(this); });
+  // 换了传输/反代/密码后，若模型名还是空的就自动拉一次
+  ['opf-rx-transport', 'opf-rx-reverse', 'opf-rx-proxypass', 'opf-rx-source'].forEach(function (id) {
+    var el = getEl(id); if (!el) return;
+    el.addEventListener('change', function () {
+      var cfg = rxCfg();
+      if (!String(cfg.model || '').trim() && cfg.reverseProxy) rxDoFetchModels(getEl('opf-rx-models'));
+    });
+  });
   var bindCfg = function (id, key) {
     var el = getEl(id); if (!el) return;
     el.addEventListener('change', function () { rxCfg()[key] = this.value; rxCacheSave(); });
@@ -3806,7 +3815,7 @@ function rxRenderItems() {
 }
 function rxLabel(t) { var d = document.createElement('div'); d.className = 'opf-dim'; d.textContent = t; return d; }
 function rxSetButtons() {
-  ['opf-rx-parse', 'opf-rx-parse2', 'opf-rx-check', 'opf-rx-pull', 'opf-rx-copy1', 'opf-rx-copyall', 'opf-rx-new', 'opf-rx-ping'].forEach(function (id) {
+  ['opf-rx-parse', 'opf-rx-parse2', 'opf-rx-check', 'opf-rx-pull', 'opf-rx-copy1', 'opf-rx-copyall', 'opf-rx-new', 'opf-rx-ping', 'opf-rx-models'].forEach(function (id) {
     var b = getEl(id); if (b) b.disabled = !!ST.running;
   });
   var ps = getEl('opf-rx-parse');
@@ -3986,6 +3995,77 @@ function rxStreamCall(messages, onNote) {
   var t0 = Date.now();
   var onDelta = function (t, len) { if (onNote && len % 900 < t.length) onNote('流式接收中… ' + len + ' 字符（' + Math.round((Date.now() - t0) / 1000) + 's）'); };
   return cfg.transport === 'server' ? rxServerStream(messages, onDelta) : rxDirectStream(messages, onDelta);
+}
+// 模型列表：服务端转发档走 ST 的 /status（同一反代通道，无 CORS）；直连档直接打 /models
+async function rxFetchModels() {
+  var cfg = rxCfg();
+  var origin = (typeof window !== 'undefined' && window.location) ? window.location.origin : '';
+  var h = { 'Content-Type': 'application/json' };
+  try {
+    var c = getCtx();
+    if (c && typeof c.getRequestHeaders === 'function') { var rh = c.getRequestHeaders(); for (var k in rh) h[k] = rh[k]; }
+  } catch (e) {}
+  if (cfg.transport === 'server') {
+    // 依据 ST 1.18.0 src/endpoints/backends/chat-completions.js：
+    //   POST /status 的 MAKERSUITE 分支 → 服务端拉 {reverse_proxy}/v1beta/models?key=…
+    //   按 supportedGenerationMethods 含 generateContent 过滤 → send({ data: models })
+    if (!cfg.reverseProxy) throw new Error('先填「中转/反代地址」，模型列表要从同一个通道拉');
+    var r = await fetch(origin + '/api/backends/chat-completions/status', {
+      method: 'POST', headers: h,
+      body: JSON.stringify({ chat_completion_source: cfg.source || 'makersuite', reverse_proxy: cfg.reverseProxy, proxy_password: cfg.proxyPassword || '' })
+    });
+    if (!r.ok) throw new Error('服务端返回 HTTP ' + r.status);
+    var j = await r.json();
+    var arr = Array.isArray(j.data) ? j.data : (j.data && Array.isArray(j.data.data) ? j.data.data : []);
+    var ids = arr.map(function (m) { return m && (m.id || m.name); }).filter(Boolean);
+    if (!ids.length) throw new Error('服务端没取到模型列表（' + (j.error ? '上游返回错误' : '列表为空') + '）——确认中转地址与代理密码是否正确');
+    return ids;
+  }
+  // 直连档
+  var base = String(cfg.baseUrl || '').trim().replace(/\/+$/, '');
+  if (!base) throw new Error('先填「直连地址」');
+  var key = String(cfg.apiKey || '').trim();
+  if (cfg.directProtocol === 'gemini') {
+    var r2 = await fetch(base + '/v1beta/models' + (key ? '?key=' + encodeURIComponent(key) : ''), { headers: key ? { 'x-goog-api-key': key } : {} });
+    if (!r2.ok) throw new Error('HTTP ' + r2.status);
+    var j2 = await r2.json();
+    return (j2.models || []).map(function (m) { return String(m.name || '').replace(/^models\//, ''); }).filter(Boolean);
+  }
+  var r3 = await fetch(base + '/models', { headers: key ? { 'Authorization': 'Bearer ' + key } : {} });
+  if (!r3.ok) throw new Error('HTTP ' + r3.status);
+  var j3 = await r3.json();
+  return ((j3 && (j3.data || j3.models)) || []).map(function (m) { return m.id || m.name; }).filter(Boolean);
+}
+function rxFillModelList(list) {
+  var dl = getEl('opf-rx-modellist');
+  if (dl) {
+    dl.textContent = '';
+    list.forEach(function (id) { var o = document.createElement('option'); o.value = id; dl.appendChild(o); });
+  }
+  var inp = getEl('opf-rx-model');
+  if (inp && !String(inp.value || '').trim() && list.length) {
+    var prefer = list.filter(function (x) { return /gemini-2\.5-pro|gemini-2\.5-flash|gemini-2\.0-flash|gemini-pro/i.test(x); })[0] || list[0];
+    inp.value = prefer;
+    rxCfg().model = prefer;
+    rxCacheSave();
+  }
+}
+async function rxDoFetchModels(btn) {
+  var old = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '获取中…'; }
+  var st = getEl('opf-rx-statusline');
+  try {
+    var list = await rxFetchModels();
+    rxFillModelList(list);
+    if (st) st.textContent = '取到 ' + list.length + ' 个模型：' + list.slice(0, 6).join('、') + (list.length > 6 ? ' …' : '');
+    toast('取到 ' + list.length + ' 个可用模型' + (getEl('opf-rx-model') && getEl('opf-rx-model').value ? '（已选 ' + getEl('opf-rx-model').value + '）' : ''));
+  } catch (e) {
+    var msg = rxDiagError(e);
+    if (st) st.textContent = '模型列表获取失败：' + msg;
+    toast('模型列表获取失败：' + msg, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = old || '🔌 获取模型列表'; }
+  }
 }
 // 连通性自检：一次极小请求，用于区分「中转站挂了」与「任务太重」
 async function rxPing() {

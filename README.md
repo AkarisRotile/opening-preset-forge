@@ -1,6 +1,6 @@
 # 始弦的魔法大典 · destiny 开局预设工坊
 
-SillyTavern（酒馆）/ Tavern Helper 浏览器扩展「悬浮窗」· 当前版本 **v1.10.3**
+SillyTavern（酒馆）/ Tavern Helper 浏览器扩展「悬浮窗」· 当前版本 **v1.10.4**
 
 为「始弦的魔法大典 + 命定之诗与黄昏之歌」一类角色卡提供**开局预设一键流水线**：
 
@@ -325,6 +325,13 @@ body: { chat_completion_source:'makersuite', reverse_proxy:'<你的中转>',
 | **经酒馆服务端转发 + 流式** | `/api/backends/chat-completions/generate` + `stream:true` | **反代场景推荐**：无 CORS 问题、密钥与反代地址由服务端处理、Google 协议由 ST 转换、真流式回传 |
 | **浏览器直连 + 流式** | 插件直接 `fetch`（OpenAI 兼容 `/chat/completions`，或 Google 原生 `:streamGenerateContent?alt=sse`） | 有 CORS 头的自建/本地接口 |
 
+**模型名不用手填**：点「🔌 获取模型列表」即可——服务端转发档会调 ST 的 `POST /api/backends/chat-completions/status`
+（依据 ST 1.18.0：该端点的 MAKERSUITE 分支由服务端去拉 `{reverse_proxy}/v1beta/models?key=…`，
+并按 `supportedGenerationMethods.includes('generateContent')` 过滤，只返回能聊天的模型，回包形状 `{ data: [ { id } ] }`），
+**走的是同一条反代通道，所以没有 CORS 问题**；直连档则按协议打 `/v1beta/models` 或 `/models`。
+模型名输入框同时是下拉框（`<datalist>`）：拉到就自动选中一个 `gemini-2.5-pro/flash`，也能随时手改。
+换传输/反代/密码后若模型名仍为空，会自动拉一次。
+
 配套：**同一份 SSE 解析器同时吃两种形状**（OpenAI 的 `choices[0].delta.content` 与 Google 原生的 `candidates[0].content.parts[].text`），三条路共用收流逻辑。
 
 **另外**：CSS 生成的系统提示已从"带整本世界书（最多 3 万字）"砍到 **484 字符**（只带 500 字气质摘录）——提示词越大，首字节越慢，这本身也是 524 的推手之一。
@@ -348,6 +355,7 @@ body: { chat_completion_source:'makersuite', reverse_proxy:'<你的中转>',
 ## 九、版本历史（简）
 | 版本 | 内容 |
 | --- | --- |
+| v1.10.4 | 模型名自动获取：服务端转发档调 `POST /api/backends/chat-completions/status`（ST 服务端经同一反代拉 `/v1beta/models` 并按 `generateContent` 过滤），直连档按协议打 `/v1beta/models` 或 `/models`；模型名输入框改为「可下拉可手填」，拉取后自动选中 `gemini-2.5-pro/flash`；换传输/反代/密码时若模型名为空自动拉取 |
 | v1.10.3 | 正则工坊新增「经酒馆服务端转发 + 流式」传输（`POST /api/backends/chat-completions/generate` + `stream:true` + `reverse_proxy`/`proxy_password`/`use_sysprompt`），直击类反向代理场景下的 Cloudflare 524：无 CORS 问题、协议转换与密钥由酒馆服务端处理、真流式回传；「生成传输」改为三档下拉（酒馆主 API / 服务端转发+流式 / 浏览器直连+流式），直连支持 OpenAI 兼容与 Google 原生双协议；SSE 解析器同时兼容 OpenAI 与 Google 两种分片形状 |
 | v1.10.2 | 针对 524 的**根因修复**：查明 `generateRaw` 在 ST 源码里固定走 `sendOpenAIRequest('quiet', …)`、而流式分支明确排除 `quiet`（`script.js` L4018 / L5326），即**永远非流式**；据此新增「🚀 直连 + 真流式生成」（插件内 `fetch /chat/completions` + 逐块读 SSE，绕开 100 秒墙）；新增自适应缩段（524 后后续段预算折半，最低 800 字符）；新增「🩺 连通性自检」；524 诊断把 Cloudflare HTML 压成一句人话 + 三条对策；失败保留已生成进度 |
 | v1.10.1 | 正则工坊替换体重构为「**结构由代码生成 + 样式按档位分段**」：骨架（含 `$n` 捕获组引用）由插件生成、模型只写 CSS；档位决定段数（1/3/4/6 段）与每段预算（1.3k~3.5k 字符）；花括号净差检测截断并自动续写（≤3 轮）；识别可重试错误退避重试；CSS 生成不再注入整本世界书；新增实时进度状态行 |
