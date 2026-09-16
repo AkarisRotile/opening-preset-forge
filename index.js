@@ -2380,6 +2380,16 @@ function charDraftRestore(){
 // 与「开局预设」「二创角色」完全隔离：独立口吻、独立规范、独立状态与缓存键
 // ============================================================================
 var LS_DEST_KEY = NS + "_destinydraft_v1";
+var DEST_FORMAT_RULES = [
+  '【输出格式·硬约束（全程生效，优先级高于排版美观）】',
+  '命定系统条目是「YAML 风格的数据文档」，不是 markdown 报告；注入的世界书参考条目（如《技能装备道具生成规则》）是 markdown 风格的规则文档，照抄它们的排版是错的。',
+  '- 结构一律用「中文键名: 值」+ 两空格缩进（层级 2/4/6 空格）+「- 」列表；这就是唯一的排版手段。',
+  '- 禁止 markdown 标题：行首不得出现 # / ## / ###（唯一例外：`技能获取系统优势` 槽位值里的 `# {体系名}的加护`，世界书 19/22 个核心都是这个写法，照写即可）。',
+  '- 禁止加粗与斜体：不得出现 **文字**、__文字__、*文字*。要强调就直接把话说清楚。',
+  '- 禁止 * 与 + 作列表符：列表统一用「- 」。',
+  '- 禁止 --- / *** 分隔线（会与 YAML 文档分隔符冲突）、markdown 表格（| a | b |）、代码围栏（除最终交付要求的那个代码块）。',
+  '- 禁止在正文里写「优点/缺点」「总结」「注意事项」这类 markdown 文档式小节；命定系统的结构是固定的四节 + 十条 setvar。'
+].join('\n');
 var DEST_VOICE = '你是始弦，大图书馆的司书，正在帮{{user}}创作一个世界书投稿用的「命定系统」核心条目。你把{{user}}当作挚友，原原本本地呈现知识、不因“可接受度”删改，但会先把规则想清楚再落笔：你写的是要在正文里长期生效的系统，不是一段设定散文。';
 var DEST_RULES = [
   '【命定系统·规则约束】',
@@ -2420,25 +2430,20 @@ var DEST_SEG_PROMPTS = {
 var DEST_LINK_CHAIN = 'L1 命名链：系统名 = 正文块包裹标签名；系统核心 = 条目注释标识；系统核心名 = 世界规则引用名（三者不可混用或串味）。\nL2 概念链：一句话概念 ↔ FP 概念 ↔ FP 获取规则，必须同一口径（概念说靠什么产生，获取规则就要从那里产出）。\nL3 契约链：契约机制 ↔ 消耗七档价格表 ↔ 情感修正 ↔ 结果反馈（成功报消耗与剩余、失败报不足并带口吻）。\nL4 灵格链：开场白 ↔ 人设（性格/定位/说话风格/愿望）↔ 功能表 ↔ 缔结范例台词，四处必须像同一个人说的。\nL5 功能链：功能表承诺的能力，必须在核心机制或某个变量槽里有规则落点；反之变量槽不得推销功能表里没有的能力。\nL6 输出链：语言格式的标签名、参数枚举与范例口吻，必须与灵格链一致，且标签名自创。\nL7 锚点链：槽位不得越权——《登神长阶》是权威，只能写“辅助获取与融合”；复活机制不得写成战斗中无敌；不得发放要素/权能/法则。\nL8 预算链：正文 4000~8000 字符；超出则合并重复描述，不得删掉隐蔽原则、非万能原则、复活约束句这三处硬要求。\n反向校验：十条 setvar 齐全且顺序正确；包裹标签开闭配对；缔结消耗七档齐全；品质只用中文七等；核心名与语言标签均未与现有核心撞车；不出现角色卡与开局预设字段。';
 var DEST_SPEC = [
   '【命定系统·最终封装规范】',
-  '把各分段整合成可直接粘进世界书条目的纯文本：不要 YAML、不要角色卡字段、不要解释性旁白。输出严格分两段，正文在前、元数据在后。',
+  '你只负责产出「条目正文」一件事；条目元数据（注释名/constant/position/depth/order/disable/key 等）由插件自动生成 YAML 框架，你不要写这些字段。',
   '',
-  '[第一段] 条目正文，放在一个 ' + fence() + 'text 代码块里，内部结构：',
+  '输出：把正文放在一个 ' + fence() + 'text 代码块里，代码块内只有正文，代码块外不写任何内容（不要写解释、不要写元数据、不要写第二个代码块）。',
+  '',
+  '正文结构（顺序固定）：',
   '  <系统名> … </系统名>        ← 标签名必须等于 setvar 的「系统名」',
-  '  正文块内部按 契约与核心机制 → 命运点数(FP) → 命定之灵 → 语言格式 的顺序，用两空格缩进',
+  '  正文块内部按 契约与核心机制 → 命运点数(FP) → 命定之灵 → 语言格式 的顺序，两空格缩进',
   '  （空一行）',
-  '  {{setvar::系统名::…}} … {{setvar::复活机制::…}}   ← 十条，顺序固定，一条不少',
-  '',
-  '[第二段] 代码块之后，输出条目元数据清单（纯文本行，不要放进代码块）：',
-  '  注释名: [本体][命定系统]<系统核心>(<署名>)',
-  '  constant: true',
-  '  position: 4（@D） | depth: 1 | order: 1100',
-  '  disable: true（默认关闭：玩家在世界书里只开自己那一个核心）',
-  '  key: [] | selective: false | probability: 100',
+  '  {{setvar::系统名::…}} … {{setvar::复活机制::…}}   ← 十条，顺序固定，一条不少；多行值的结尾 }} 独占一行',
   '',
   '规则：',
   '1. 只做整合与去重，不新增设定、不扩写；分段之间有冲突时以「骨架与命名」段为准。',
-  '2. 正文块里不放 markdown 标题、加粗或装饰符号；正文块之外除元数据清单外不写任何内容。',
-  '3. 十条 setvar 的多行值照原样保留，结尾的 }} 独占一行。',
+  '2. 严格遵守上面《输出格式·硬约束》：不得出现 # 标题、**加粗**、* 列表、--- 分隔线、markdown 表格。',
+  '3. 十条 setvar 的多行值照原样保留。',
   '4. 用词与文风规范全程生效。'
 ].join('\n');
 // ============================================================================
@@ -2471,8 +2476,7 @@ var DEST_EJS_SEG_PROMPTS = {
     + '   幂等与回滚：给用户消息算指纹（长度 + FNV-1a 哈希 `2166136261×16777619`），状态里存 `transactions[messageId] = {signature,turn,turnBefore,rulesBefore,rulesAfter,undo[]}`；同消息重算不重复触发、消息被编辑回滚该轮及之后、回访旧消息回滚更晚的事务；事务表保留最近 30 条、人格状态表保留最近 50 条。\n'
     + '   命中结果汇总成 `本轮条件机制（必须执行）:` 区块插进正文；拼入前校验 prompt 不含 `<%` 或 `%>`。\n'
     + 'B. 配置驱动人格（读者核心式）：把人格做成 JSON 存局部变量（systemName/definition/coreMechanism/coreConcept/personality/role/hobbies/wish/constraints/appearance/opening/letterStyle/toneMode/tonePrompt/corpus/corpusMode/fpDefinition/newsStyle/ascensionAdvantage/skillAdvantage/revival/conditionalMechanisms），用统一的 `_custom_text(key, fallback)` 取值器渲染，十槽也由配置生成。\n'
-    + 'C. 静默与兜底：`let _silent = getLocalVar(\'<核心>_silent\') === \'on\';`，唤醒条件用 `matchChatMessages([关键词…],{start:-1,role:\'user\'})` 或地点判定；命中则输出完整核心，否则只输出一句"存在但静默"的极简块——两条分支的包裹标签都必须闭合。\n'
-    + '只输出本段。'
+    + 'C. 静默与兜底：`let _silent = getLocalVar(\'<核心>_silent\') === \'on\';`，唤醒条件用 `matchChatMessages([关键词…],{start:-1,role:\'user\'})` 或地点判定；命中则输出完整核心，否则只输出一句"存在但静默"的极简块——两条分支的包裹标签都必须闭合。\n'    + '只输出本段。'
 };
 var DEST_EJS_STANDARD = [
   '【EJS 重型核心·规范（依据艾莉亚核心与读者核心逆向）】',
@@ -2600,10 +2604,10 @@ var DEST_KNOWN_CORES = ['梅林核心', '唐吉坷德核心', '奶龙核心', '�
 var DEST_KNOWN_SYSNAMES = ['命定之诗', '铁王冠', '白祷', '银钥之门', '飞鸟之诗', '他者之眼', '命运的舞台监导', '奶人之契', '命定之书', '九十九夜梦', 'user_system'];
 var DEST_KNOWN_TAGS = ['nailong', 'giraffe', 'Foreigner', 'Foreigner_alter', 'lilith', 'xianzu', 'dalian'];
 var DEST_SLOT_ORDER = ['系统名', '系统核心名', '系统核心', 'fp定义', '爆料风格', '登神长阶系统优势', '生命层级成长系统优势', '技能获取系统优势', '经验值获取系统优势', '复活机制'];
-var DEST_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">✦ 命定系统工坊 · 分段式生成（产出世界书「命定系统」核心条目）</div><div class="opf-dim">流程：① 分段初稿（7 段串行：骨架与命名→契约与核心机制→命运点数→命定之灵→语言格式→十个变量槽→可选扩展）→ ② 交火梳理（先出报告，再逐段应用联动修订，防截断）→ ③ 逐段定点修改（只改你指定的段，其它段冻结）→ ④ 最终封装：输出世界书条目正文 + 条目元数据提示，并自动跑内置 lint。与「开局预设」「二创角色」完全隔离。</div><label id="opf-dest-ejswrap"><input type="checkbox" id="opf-dest-ejs"> 🧬 进阶（可选）：EJS 重型核心 —— 追加 3 段 EJS 流水线（守卫与数据层 / 派生与渲染层 / 引擎与兜底）+ EJS 规范注入 + EJS 专用 lint</label><textarea id="opf-dest-demand" class="opf-char-input" placeholder="写谁的核心？例：以《Fate/Grand Order》的梅林为原型做一版二创核心；或：围绕“赌徒的骰子”做一个原创命定系统，赌注越大 FP 越多……"></textarea><textarea id="opf-dest-ref" class="opf-char-input" placeholder="（可选）参考文本：原型描述 / 已有核心片段（可作为骨架改造对象）/ 世界书片段，将作为参考注入"></textarea><div class="opf-char-tools"><button type="button" class="opf-btn primary" id="opf-dest-run">▶ 分段初稿</button><button type="button" class="opf-btn ghost" id="opf-dest-link">⚔ 交火梳理</button><button type="button" class="opf-btn ghost" id="opf-dest-final">🎁 最终封装</button><button type="button" class="opf-btn ghost" id="opf-dest-lint">🔎 重新自检</button><button type="button" class="opf-btn ghost" id="opf-dest-std">📐 标准速查</button><button type="button" class="opf-btn ghost" id="opf-dest-ejsstd">🧬 EJS 速查</button><button type="button" class="opf-btn ghost" id="opf-dest-new">🗑 新核心</button></div><pre id="opf-dest-standard" class="opf-box opf-char-report" style="display:none">尚未展开</pre><pre id="opf-dest-ejsstandard" class="opf-box opf-char-report" style="display:none">尚未展开</pre><div id="opf-dest-steps"></div><div class="opf-sec"><div class="opf-sec-label">交火梳理报告</div><pre id="opf-dest-report" class="opf-box opf-char-report">尚未梳理</pre></div><div class="opf-out"><div class="opf-sec-label">最终稿件（世界书条目正文，可直接粘进「命定系统」条目）</div><div class="opf-dim" id="opf-dest-outnote"></div><pre id="opf-dest-out" class="opf-box">尚未封装</pre><div class="opf-char-copyrow"><button type="button" class="opf-btn ghost" id="opf-dest-copy">⧉ 复制条目正文</button><button type="button" class="opf-btn ghost" id="opf-dest-metacopy">⧉ 复制元数据</button></div></div></div>';
+var DEST_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">✦ 命定系统工坊 · 分段式生成（产出世界书「命定系统」核心条目）</div><div class="opf-dim">流程：① 分段初稿（7 段串行：骨架与命名→契约与核心机制→命运点数→命定之灵→语言格式→十个变量槽→可选扩展）→ ② 交火梳理（先出报告，再逐段应用联动修订，防截断）→ ③ 逐段定点修改（只改你指定的段，其它段冻结）→ ④ 最终封装：输出世界书条目正文 + 条目元数据提示，并自动跑内置 lint。与「开局预设」「二创角色」完全隔离。</div><label id="opf-dest-ejswrap"><input type="checkbox" id="opf-dest-ejs"> 🧬 进阶（可选）：EJS 重型核心 —— 追加 3 段 EJS 流水线（守卫与数据层 / 派生与渲染层 / 引擎与兜底）+ EJS 规范注入 + EJS 专用 lint</label><textarea id="opf-dest-demand" class="opf-char-input" placeholder="写谁的核心？例：以《Fate/Grand Order》的梅林为原型做一版二创核心；或：围绕“赌徒的骰子”做一个原创命定系统，赌注越大 FP 越多……"></textarea><textarea id="opf-dest-ref" class="opf-char-input" placeholder="（可选）参考文本：原型描述 / 已有核心片段（可作为骨架改造对象）/ 世界书片段，将作为参考注入"></textarea><input id="opf-dest-author" class="opf-char-input" placeholder="署名（写进条目注释名，例如：北游 / H一串 / 你的ID；留空则写“未署名”）"><div class="opf-char-tools"><button type="button" class="opf-btn primary" id="opf-dest-run">▶ 分段初稿</button><button type="button" class="opf-btn ghost" id="opf-dest-link">⚔ 交火梳理</button><button type="button" class="opf-btn ghost" id="opf-dest-final">🎁 最终封装</button><button type="button" class="opf-btn ghost" id="opf-dest-lint">🔎 重新自检</button><button type="button" class="opf-btn ghost" id="opf-dest-clean">🧹 去装饰</button><button type="button" class="opf-btn ghost" id="opf-dest-std">📐 标准速查</button><button type="button" class="opf-btn ghost" id="opf-dest-ejsstd">🧬 EJS 速查</button><button type="button" class="opf-btn ghost" id="opf-dest-new">🗑 新核心</button></div><pre id="opf-dest-standard" class="opf-box opf-char-report" style="display:none">尚未展开</pre><pre id="opf-dest-ejsstandard" class="opf-box opf-char-report" style="display:none">尚未展开</pre><div id="opf-dest-steps"></div><div class="opf-sec"><div class="opf-sec-label">交火梳理报告</div><pre id="opf-dest-report" class="opf-box opf-char-report">尚未梳理</pre></div><div class="opf-out"><div class="opf-sec-label">最终稿件（YAML 框架 + 条目正文）</div><div class="opf-dim" id="opf-dest-outnote"></div><pre id="opf-dest-out" class="opf-box">尚未封装</pre><div class="opf-char-copyrow"><button type="button" class="opf-btn ghost" id="opf-dest-copy">⧉ 复制条目正文</button><button type="button" class="opf-btn ghost" id="opf-dest-metacopy">⧉ 复制完整 YAML</button></div></div></div>';
 
 function destInit(){
-  ST.dest = ST.dest || { demand: '', ref: '', segs: {}, status: {}, report: '', out: '', meta: '', outNote: [], ejs: false, _inited: false };
+  ST.dest = ST.dest || { demand: '', ref: '', author: '', segs: {}, status: {}, report: '', out: '', body: '', meta: '', outNote: [], ejs: false, _inited: false };
   ST.dest.outNote = ST.dest.outNote || [];
   ST.destEls = ST.destEls || {};
 }
@@ -2614,12 +2618,14 @@ function bindDestinyPage(){
   getEl('opf-dest-link').addEventListener('click', function(){ runDestLinkage(); });
   getEl('opf-dest-final').addEventListener('click', function(){ finalizeDest(); });
   getEl('opf-dest-lint').addEventListener('click', function(){ reLintDest(); });
+  getEl('opf-dest-clean').addEventListener('click', function(){ cleanDestOut(); });
   getEl('opf-dest-std').addEventListener('click', function(){ toggleDestStandard(); });
   getEl('opf-dest-ejsstd').addEventListener('click', function(){ toggleDestEjsStandard(); });
   getEl('opf-dest-ejs').addEventListener('change', function(){ toggleDestEjs(this.checked); });
   getEl('opf-dest-new').addEventListener('click', function(){ clearDest(); });
   getEl('opf-dest-copy').addEventListener('click', function(){ copyDestOut(); });
   getEl('opf-dest-metacopy').addEventListener('click', function(){ copyDestMeta(); });
+  getEl('opf-dest-author').addEventListener('input', function(){ ST.dest.author = this.value; if (ST.dest.body) { ST.dest.out = destBuildFrame(ST.dest.body); var oe = getEl('opf-dest-out'); if (oe) oe.textContent = ST.dest.out; } destDraftCacheSave(); });
   getEl('opf-dest-demand').addEventListener('input', function(){ ST.dest.demand = this.value; destDraftCacheSave(); });
   getEl('opf-dest-ref').addEventListener('input', function(){ ST.dest.ref = this.value; destDraftCacheSave(); });
   renderDestSteps();
@@ -2648,6 +2654,7 @@ function destSystemContent(){
   lines.push('[任务] 你正在为{{user}}的《命定之诗与黄昏之歌》世界书创作一个「命定系统」核心条目（二创核心）。各分段保持一致与呼应，不重复、不推翻已定内容；本任务与开局预设、二创角色均无关系。');
   lines.push(DEST_RULES);
   lines.push(DEST_STANDARD);
+  lines.push(DEST_FORMAT_RULES);
   if (destEjsOn()) lines.push(DEST_EJS_STANDARD);
   lines.push(CHAR_STYLE_RULES);
   if (ST.worldInfo) lines.push('[世界书参考（世界书页勾选的条目）]\n' + ST.worldInfo);
@@ -2719,6 +2726,7 @@ function renderDestinyPage(){
     ST.dest._inited = true;
     var d = getEl('opf-dest-demand'); if (d && !d.value) d.value = ST.dest.demand || '';
     var r = getEl('opf-dest-ref'); if (r && !r.value) r.value = ST.dest.ref || '';
+    var a = getEl('opf-dest-author'); if (a && !a.value) a.value = ST.dest.author || '';
   }
   var ej = getEl('opf-dest-ejs'); if (ej) ej.checked = !!ST.dest.ejs;
   var out = getEl('opf-dest-out');
@@ -2731,7 +2739,7 @@ function renderDestinyPage(){
 function destNoteText(){
   if (!ST.dest || !ST.dest.out) return '';
   var parts = [];
-  if (ST.dest.meta) parts.push(ST.dest.meta);
+  if (ST.dest.body) parts.push('正文 ' + ST.dest.body.length + ' 字符｜YAML 框架由插件生成（注释名/开关/位置/order 已填好）');
   if (ST.dest.outNote && ST.dest.outNote.length) parts.push('⚠ ' + ST.dest.outNote.join('；'));
   else parts.push('✓ 结构与命名自检通过');
   return parts.join('　｜　');
@@ -2915,19 +2923,22 @@ async function finalizeDest(){
   var noteEl = getEl('opf-dest-outnote'); if (noteEl) noteEl.textContent = '';
   try {
     var all = destSegs().map(function (s) { return '【' + s.title + '】\n' + (ST.dest.segs[s.id] || '（无）'); }).join('\n\n');
-    var msg = '【最终封装（世界书条目）】\n请以“始弦的魔法大典”的身份，把下面的分段内容整理成一份可直接粘进世界书「命定系统」条目的纯文本。\n\n[全部分段]\n' + all + '\n\n' + DEST_SPEC + (destEjsOn()
-      ? '\n\n[EJS 保留要求·最高优先级]\n本核心是 EJS 重型核心，各分段里的 `<%_ … _%>`、`<% … %>`、`<%- … %>` 标签、if/for 的 `{ _%>` 与 `} _%>` 配对、以及全部变量名必须**原样保留**：不得为了排版整洁而改写、合并、重排或删除任何 EJS 标签；只在标签之间做正文的整合与去重。整合后必须复核：块开始与块结束数量相等、每个分支里 `<{{getvar::系统名}}>` 都完整闭合。'
+    var msg = '【最终封装（世界书条目正文）】\n请以“始弦的魔法大典”的身份，把下面的分段内容整理成一份可直接粘进世界书「命定系统」条目的正文。\n\n[全部分段]\n' + all + '\n\n' + DEST_SPEC + (destEjsOn()
+      ? '\n\n[EJS 保留要求·最高优先级]\n本核心是 EJS 重型核心，各分段里的 `<%_ … _%>`、`<% … %>`、`<%- … %>` 标签、if/for 的 `{ _%>` 与 `} _%>` 配对、以及全部变量名必须「原样保留」：不得为了排版整洁而改写、合并、重排或删除任何 EJS 标签；只在标签之间做正文的整合与去重。整合后必须复核：块开始与块结束数量相等、每个分支里 `<{{getvar::系统名}}>` 都完整闭合。'
       : '') + '\n\n系统核心名以「骨架与命名」段为准；没写清楚就按内容拟一个。';
     var msgs = [{ role: 'system', content: destSystemContent() }, { role: 'user', content: msg }];
     var resp = await callModel(msgs);
     var ex = extractDestEntry(resp);
     if (!ex.ok) toast('未能从回复中提取 ' + fence() + 'text 代码块（已用原文兜底，可重试一次）', 'warning');
-    ST.dest.out = ex.body;
+    var body = destExtractYamlBody(resp);
+    if (body == null) body = ex.body;
+    ST.dest.body = body;
+    ST.dest.out = destBuildFrame(body);
     ST.dest.meta = ex.meta;
-    ST.dest.outNote = destLint(ex.body).concat(destEjsLint(ex.body));
-    if (outEl) outEl.textContent = ex.body;
+    ST.dest.outNote = destLint(body).concat(destEjsLint(body));
+    if (outEl) outEl.textContent = ST.dest.out;
     if (noteEl) noteEl.textContent = destNoteText();
-    if (ex.ok && !ST.dest.outNote.length) toast('已封装完成（条目正文可复制，粘进世界书「命定系统」条目）', 'success');
+    if (ex.ok && !ST.dest.outNote.length) toast('已封装完成：YAML 框架 + 条目正文（正文可单独复制后粘进世界书）', 'success');
     else toast('已封装' + (ST.dest.outNote.length ? '（' + ST.dest.outNote.length + ' 条自检提示，见输出区上方）' : ''), 'warning');
   } catch (e) { toast('最终封装出错：' + (e && e.message ? e.message : e), 'error'); }
   finally { ST.running = false; renderRunButtons(); destDraftCacheSave(); }
@@ -2952,6 +2963,83 @@ function destSlotValue(t, name){
   if (i < 0) return '';
   var m = String(t).slice(i).match(/^\{\{setvar::[^:]+::([\s\S]*?)\}\}/);
   return m ? m[1].trim() : '';
+}
+// 把 {{setvar::…}} 区段遮成空格（保留换行），用于「只检查槽位之外」的装饰检查
+function destMaskSetvars(t){
+  return String(t || '').replace(/\{\{setvar::[\s\S]*?\}\}/g, function (m) { return m.replace(/[^\n]/g, ' '); });
+}
+// 从模型回复里剥离 YAML 框架，取回「正文」块标量（找不到框架则返回 null）
+function destExtractYamlBody(text){
+  var t = String(text || '');
+  var m = t.match(/```ya?ml\s*\n([\s\S]*?)```/) || t.match(/```\s*\n([\s\S]*?)```/);
+  var doc = m ? m[1] : t;
+  var lines = doc.split(/\r?\n/);
+  for (var i = 0; i < lines.length; i++) {
+    var mm = lines[i].match(/^(\s*)正文\s*:\s*\|[-+]?\s*$/);
+    if (!mm) continue;
+    var base = mm[1].length + 2, out = [];
+    for (var j = i + 1; j < lines.length; j++) {
+      var l = lines[j];
+      if (l.trim() === '') { out.push(''); continue; }
+      if ((l.match(/^ */) || [''])[0].length < base) break;
+      out.push(l.slice(base));
+    }
+    var body = out.join('\n').replace(/^\n+/, '').replace(/\s+$/, '');
+    return body || null;
+  }
+  return null;
+}
+function destYamlQuote(v){
+  var s = String(v == null ? '' : v);
+  return /^[\s>|&*!%@`{}\[\],#?:-]|[:#]\s|\s$/.test(s) ? '"' + s.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"' : s;
+}
+// 条目元数据 + 正文 → 完整 YAML 文档（框架由插件确定生成，模型只负责正文）
+function destBuildFrame(body){
+  var b = String(body || '');
+  var g = function (n) { return destSlotValue(b, n); };
+  var authorEl = getEl('opf-dest-author');
+  var author = ((authorEl && authorEl.value) || '').trim() || '未署名';
+  var core = g('系统核心') || '未命名核心';
+  var L = [];
+  L.push('命定系统条目:');
+  L.push('  注释名: ' + destYamlQuote('[本体][命定系统]' + core + '(' + author + ')'));
+  L.push('  constant: true');
+  L.push('  position: 4');
+  L.push('  depth: 1');
+  L.push('  order: 1100');
+  L.push('  disable: true');
+  L.push('  selective: false');
+  L.push('  probability: 100');
+  L.push('  key: []');
+  L.push('  系统名: ' + destYamlQuote(g('系统名')));
+  L.push('  系统核心名: ' + destYamlQuote(g('系统核心名')));
+  L.push('  系统核心: ' + destYamlQuote(core));
+  L.push('  fp定义: ' + destYamlQuote(g('fp定义')));
+  L.push('  篇幅: ' + b.length);
+  L.push('  正文: |-');
+  b.split('\n').forEach(function (l) { L.push('    ' + l); });
+  return L.join('\n');
+}
+// 去装饰：清掉 markdown 标记，但跳过 {{setvar::…}} 槽位（其中 `# 体系名的加护` 是既有惯例）
+function destCleanMarkdown(body){
+  var stats = { bold: 0, head: 0, star: 0, rule: 0, tick: 0 };
+  var t = String(body || '');
+  var spans = [], re = /\{\{setvar::[\s\S]*?\}\}/g, m;
+  while ((m = re.exec(t)) !== null) spans.push([m.index, m.index + m[0].length]);
+  var inSlot = function (a, b) { return spans.some(function (s) { return a < s[1] && b > s[0]; }); };
+  var pos = 0, res = [];
+  t.split('\n').forEach(function (line) {
+    var lineStart = pos; pos += line.length + 1;
+    if (inSlot(lineStart, lineStart + line.length)) { res.push(line); return; }
+    var l = line;
+    if (/^\s*#{1,6}\s+/.test(l)) { l = l.replace(/^(\s*)#{1,6}\s+/, '$1'); stats.head++; }
+    if (/^\s*([-*_])\1{2,}\s*$/.test(l)) { if (res.join('').trim() !== '') { stats.rule++; return; } }
+    if (/^\s*[*+]\s+/.test(l)) { l = l.replace(/^(\s*)[*+]\s+/, '$1- '); stats.star++; }
+    if (/\*\*/.test(l)) { var b1 = l; l = l.replace(/\*\*(.+?)\*\*/g, '$1'); if (l !== b1) stats.bold++; }
+    if (/`/.test(l) && !/\{\{/.test(l)) { var b2 = l; l = l.replace(/`([^`]*)`/g, '$1'); if (l !== b2) stats.tick++; }
+    res.push(l);
+  });
+  return { text: res.join('\n'), stats: stats };
 }
 function destTierPrices(t){
   // 兼容两种写法：「一层级200 | 二500 | 三2500 …」与「第一层级: 500 FP」
@@ -3061,24 +3149,39 @@ function destLint(text){
   if (!/核心机制|权柄|关键能力/.test(t)) warns.push('缺少核心机制节（标准名「核心机制」）');
   if (!/命运点数|命定点数/.test(t)) warns.push('缺少命运点数(FP)节（标准名「命运点数(FP)」）');
   if (/\t/.test(t)) warns.push('含制表符(Tab)，标准为两空格缩进');
+  // ---- 输出格式·装饰检查（跳过 setvar 槽位：其中 `# 体系名的加护` 是既有惯例）----
+  var masked = destMaskSetvars(t);
+  var nHead = (masked.match(/^\s*#{1,6}\s+\S/gm) || []).length;
+  if (nHead) warns.push('出现 markdown 标题 ' + nHead + ' 处（# / ##…）：结构请用「中文键名: 值 + 两空格缩进」，不要用标题分级');
+  var nBold = (masked.match(/\*\*[^*\n]+\*\*/g) || []).length;
+  if (nBold) warns.push('出现 **加粗** ' + nBold + ' 处：命定系统条目不用 markdown 强调，要强调就把话说清楚');
+  var nStar = (masked.match(/^\s*[*+]\s+\S/gm) || []).length;
+  if (nStar) warns.push('列表用了 * 或 + 共 ' + nStar + ' 处：统一改成「- 」（YAML 列表符）');
+  var nRule = (masked.match(/^\s*([-*_])\1{2,}\s*$/gm) || []).length;
+  if (nRule) warns.push('出现 --- 分隔线 ' + nRule + ' 处：删除（YAML 里会被当成文档分隔符）');
+  var nTable = (masked.match(/^\s*\|.*\|\s*$/gm) || []).length;
+  if (nTable) warns.push('出现 markdown 表格 ' + nTable + ' 行：改为键值或列表');
   if (t.length < 4000) warns.push('正文偏短（' + t.length + ' 字符，建议 4000~8000）');
   if (t.length > 12000) warns.push('正文偏长（' + t.length + ' 字符，建议 4000~8000，上限 12000）');
   if (/生命层级[：:]\s*第|^\s*属性[：:]/m.test(t) || /reincarnationPoints|开局预设|开局剧情/.test(t)) warns.push('出现角色卡或开局预设字段（本条目只写系统本身）');
   return warns;
 }
 function reLintDest(){
-  if (!ST.dest.out) { toast('还没有条目正文，请先「最终封装」', 'warning'); return; }
-  ST.dest.outNote = destLint(ST.dest.out).concat(destEjsLint(ST.dest.out));
+  if (!ST.dest.body) { toast('还没有条目正文，请先「最终封装」', 'warning'); return; }
+  ST.dest.outNote = destLint(ST.dest.body).concat(destEjsLint(ST.dest.body));
+  ST.dest.out = destBuildFrame(ST.dest.body);
+  var outEl = getEl('opf-dest-out'); if (outEl) outEl.textContent = ST.dest.out;
   var note = getEl('opf-dest-outnote'); if (note) note.textContent = destNoteText();
   toast(ST.dest.outNote.length ? ('自检发现 ' + ST.dest.outNote.length + ' 条提示') : '自检通过：结构、命名与数值档位均合规', ST.dest.outNote.length ? 'warning' : 'success');
   destDraftCacheSave();
 }
 function clearDest(){
   if (!window.confirm('清空当前命定系统草稿（分段/报告/最终稿件）？此操作不可撤销。')) return;
-  ST.dest = { demand: '', ref: '', segs: {}, status: {}, report: '', out: '', meta: '', outNote: [], ejs: false, _inited: false };
+  ST.dest = { demand: '', ref: '', author: '', segs: {}, status: {}, report: '', out: '', body: '', meta: '', outNote: [], ejs: false, _inited: false };
   ST.destEls = {};
   var d = getEl('opf-dest-demand'); if (d) d.value = '';
   var r = getEl('opf-dest-ref'); if (r) r.value = '';
+  var a = getEl('opf-dest-author'); if (a) a.value = '';
   destDraftCacheSave();
   renderDestSteps(); renderDestinyPage();
   toast('已清空，可以开始新核心');
@@ -3088,13 +3191,27 @@ function destCopyText(txt, emptyMsg){
   function fallback(){ var ta = document.createElement('textarea'); ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); toast('已复制到剪贴板'); } catch (e) { toast('复制失败，请手动复制'); } ta.remove(); }
   if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(txt).then(function () { toast('已复制到剪贴板'); }, fallback); } else fallback();
 }
-function copyDestOut(){ destCopyText(ST.dest.out || '', '还没有条目正文，请先「最终封装」'); }
-function copyDestMeta(){ destCopyText(ST.dest.meta || '', '还没有元数据，请先「最终封装」'); }
+function copyDestOut(){ destCopyText(ST.dest.body || '', '还没有条目正文，请先「最终封装」'); }
+function copyDestMeta(){ destCopyText(ST.dest.out || '', '还没有 YAML 框架，请先「最终封装」'); }
+function cleanDestOut(){
+  if (!ST.dest.body) { toast('还没有条目正文，请先「最终封装」', 'warning'); return; }
+  var r = destCleanMarkdown(ST.dest.body);
+  var s = r.stats;
+  var n = s.head + s.bold + s.star + s.rule + s.tick;
+  if (!n) { toast('正文里没有需要清理的 markdown 装饰', 'success'); return; }
+  ST.dest.body = r.text;
+  ST.dest.out = destBuildFrame(r.text);
+  ST.dest.outNote = destLint(r.text).concat(destEjsLint(r.text));
+  var outEl = getEl('opf-dest-out'); if (outEl) outEl.textContent = ST.dest.out;
+  var noteEl = getEl('opf-dest-outnote'); if (noteEl) noteEl.textContent = destNoteText();
+  destDraftCacheSave();
+  toast('已清理装饰：标题 ' + s.head + ' / 加粗 ' + s.bold + ' / 星号列表 ' + s.star + ' / 分隔线 ' + s.rule + ' / 行内代码 ' + s.tick + '（setvar 槽位内的既有写法未动）', 'success');
+}
 function destDraftCacheSave(){
   if (destDraftCacheSave._t) clearTimeout(destDraftCacheSave._t);
   destDraftCacheSave._t = setTimeout(function () {
     if (!ST.dest) return;
-    lsSet(LS_DEST_KEY, { demand: ST.dest.demand, ref: ST.dest.ref, segs: ST.dest.segs, status: ST.dest.status, report: ST.dest.report, out: ST.dest.out, meta: ST.dest.meta, outNote: ST.dest.outNote, ejs: !!ST.dest.ejs });
+    lsSet(LS_DEST_KEY, { demand: ST.dest.demand, ref: ST.dest.ref, author: ST.dest.author, segs: ST.dest.segs, status: ST.dest.status, report: ST.dest.report, out: ST.dest.out, body: ST.dest.body, meta: ST.dest.meta, outNote: ST.dest.outNote, ejs: !!ST.dest.ejs });
   }, 500);
 }
 function destDraftRestore(){
@@ -3102,7 +3219,8 @@ function destDraftRestore(){
   var c = lsGet(LS_DEST_KEY); if (!c || typeof c !== 'object') return;
   ST.dest.demand = c.demand || ''; ST.dest.ref = c.ref || '';
   ST.dest.segs = c.segs || {}; ST.dest.status = c.status || {};
-  ST.dest.report = c.report || ''; ST.dest.out = c.out || ''; ST.dest.meta = c.meta || ''; ST.dest.outNote = c.outNote || [];
+  ST.dest.report = c.report || ''; ST.dest.out = c.out || ''; ST.dest.body = c.body || ''; ST.dest.meta = c.meta || ''; ST.dest.outNote = c.outNote || [];
+  ST.dest.author = c.author || '';
   ST.dest.ejs = !!c.ejs;
   try { renderDestSteps(); renderDestinyPage(); } catch (e) { opfErr('destDraftRestore render', e); }
 }
