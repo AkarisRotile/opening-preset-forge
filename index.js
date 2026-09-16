@@ -3590,7 +3590,7 @@ function rxExtractHtml(text) {
   return (end > start ? t.slice(start + 1, end) : t.slice(start + 1)).replace(/^\n+/, '').replace(/\s+$/, '');
 }
 // ---------- 页面 ----------
-var RX_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">✦ 正则工坊 · 命定系统对话美化</div><div class="opf-dim">流程：粘贴核心全文（或从 ④ 页带入）→ 解析语言格式 → 勾选要美化的格式 → 选用途与预算档位 → 匹配式由插件确定生成、替换体由模型产出 → 实时预览 → 自检 → 导出 JSON。字段名与你现有 4 条正则一致，可直接粘进预设的 regex_scripts。</div><textarea id="opf-rx-core" class="opf-char-input" placeholder="把命定系统核心条目全文粘在这里（必须含「语言格式」节）"></textarea><div class="opf-char-tools"><button type="button" class="opf-btn ghost" id="opf-rx-pull">⬅ 从 ④ 页带入</button><button type="button" class="opf-btn primary" id="opf-rx-parse">🔍 解析语言格式</button><button type="button" class="opf-btn ghost" id="opf-rx-gen">🎨 生成替换体</button><button type="button" class="opf-btn ghost" id="opf-rx-check">🔎 自检</button><button type="button" class="opf-btn ghost" id="opf-rx-copy1">⧉ 复制单条 JSON</button><button type="button" class="opf-btn ghost" id="opf-rx-copyall">⧉ 复制 JSON 数组</button><button type="button" class="opf-btn ghost" id="opf-rx-new">🗑 清空</button></div><div class="opf-sec"><div class="opf-sec-label">语言格式解析结果（只读核对）</div><pre id="opf-rx-parsed" class="opf-box opf-char-report">尚未解析</pre></div><div id="opf-rx-items"></div><div class="opf-sec"><div class="opf-sec-label">自检</div><pre id="opf-rx-issues" class="opf-box opf-char-report">尚未自检</pre></div></div>';
+var RX_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">✦ 正则工坊 · 命定系统对话美化</div><div class="opf-dim">流程：粘贴核心全文（或从 ④ 页带入）→ 解析语言格式 → 勾选要美化的格式 → 选用途与预算档位 → 匹配式由插件确定生成、替换体由模型产出 → 实时预览 → 自检 → 导出 JSON。字段名与你现有 4 条正则一致，可直接粘进预设的 regex_scripts。</div><textarea id="opf-rx-core" class="opf-char-input" placeholder="把命定系统核心条目全文粘在这里（必须含「语言格式」节）"></textarea><div class="opf-char-tools"><button type="button" class="opf-btn ghost" id="opf-rx-pull">⬅ 从 ④ 页带入</button><button type="button" class="opf-btn primary" id="opf-rx-parse">🔍 解析语言格式（AI）</button><button type="button" class="opf-btn ghost" id="opf-rx-parse2">⚙ 脚本解析（离线）</button><button type="button" class="opf-btn ghost" id="opf-rx-gen">🎨 生成替换体</button><button type="button" class="opf-btn ghost" id="opf-rx-check">🔎 自检</button><button type="button" class="opf-btn ghost" id="opf-rx-copy1">⧉ 复制单条 JSON</button><button type="button" class="opf-btn ghost" id="opf-rx-copyall">⧉ 复制 JSON 数组</button><button type="button" class="opf-btn ghost" id="opf-rx-new">🗑 清空</button></div><div class="opf-sec"><div class="opf-sec-label">语言格式解析结果（只读核对）</div><pre id="opf-rx-parsed" class="opf-box opf-char-report">尚未解析</pre></div><div id="opf-rx-items"></div><div class="opf-sec"><div class="opf-sec-label">自检</div><pre id="opf-rx-issues" class="opf-box opf-char-report">尚未自检</pre></div></div>';
 
 function rxInit() {
   ST.rx = ST.rx || { core: '', coreName: '', parsed: null, items: [], _inited: false };
@@ -3601,6 +3601,7 @@ function bindRxPage() {
   var p = getEl('opf-rx-parse'); if (!p || p._b) return; p._b = true;
   getEl('opf-rx-pull').addEventListener('click', function(){ rxPullFromDestiny(); });
   getEl('opf-rx-parse').addEventListener('click', function(){ rxDoParse(); });
+  getEl('opf-rx-parse2').addEventListener('click', function(){ rxDoParseScript(); });
   getEl('opf-rx-gen').addEventListener('click', function(){ rxGenerate(); });
   getEl('opf-rx-check').addEventListener('click', function(){ rxDoCheck(true); });
   getEl('opf-rx-copy1').addEventListener('click', function(){ rxCopy(false); });
@@ -3633,38 +3634,79 @@ function rxDecideCoreName(txt, parsed) {
   if (sp) return sp.speaker;
   return rxCoreNameFromText(txt);
 }
-function rxDoParse() {
+async function rxDoParse() {
+  var el = getEl('opf-rx-core');
+  var txt = (el && el.value || '').trim();
+  if (!txt) { toast('请先粘贴核心全文（含语言格式节）', 'warning'); return; }
+  if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
+  ST.rx.core = txt;
+  ST.running = true; renderRunButtons();
+  var box0 = getEl('opf-rx-parsed'); if (box0) box0.textContent = 'AI 解析中…（失败会自动回退到脚本解析）';
+  var parsed = null, engine = 'ai', notes = [];
+  try {
+    var ai = await rxParseByAi(txt);
+    if (ai && ai.formats.length) { parsed = ai; notes = ai.notes || []; if (ai.coreName) ST.rx.coreName = ai.coreName; }
+    else { engine = 'script'; notes = (ai && ai.notes) || []; notes.push('AI 解析未产出可用格式，已回退脚本解析'); }
+  } catch (e) {
+    engine = 'script';
+    notes.push('AI 解析失败（' + (e && e.message ? e.message : e) + '），已回退脚本解析');
+  }
+  if (!parsed) { parsed = rxParseLangFormat(txt); notes = (parsed.notes || []).concat(notes); }
+  ST.rx.engine = engine;
+  ST.rx.parsed = parsed;
+  if (!ST.rx.coreName || engine === 'script') ST.rx.coreName = rxDecideCoreName(txt, parsed);
+  rxShowParsed(parsed, engine, notes);
+  rxBuildItems(parsed);
+  ST.running = false; renderRunButtons(); rxCacheSave();
+  toast('解析完成（' + (engine === 'ai' ? 'AI' : '脚本') + '）：' + parsed.formats.length + ' 套格式，已生成 ' + ST.rx.items.length + ' 条正则草稿', parsed.formats.length ? 'success' : 'warning');
+}
+function rxDoParseScript() {
   var el = getEl('opf-rx-core');
   var txt = (el && el.value || '').trim();
   if (!txt) { toast('请先粘贴核心全文（含语言格式节）', 'warning'); return; }
   ST.rx.core = txt;
   var parsed = rxParseLangFormat(txt);
+  ST.rx.engine = 'script';
   ST.rx.parsed = parsed;
   ST.rx.coreName = rxDecideCoreName(txt, parsed);
+  rxShowParsed(parsed, 'script', parsed.notes || []);
+  rxBuildItems(parsed);
+  rxCacheSave();
+  toast('脚本解析完成：' + parsed.formats.length + ' 套格式', parsed.formats.length ? 'success' : 'warning');
+}
+function rxShowParsed(parsed, engine, notes) {
   var box = getEl('opf-rx-parsed');
-  var L = ['核心名：' + ST.rx.coreName, '语言格式节：' + (parsed.section ? parsed.section.length + ' 字符' : '未找到'), '识别到格式 ' + parsed.formats.length + ' 套'];
+  var L = ['引擎：' + (engine === 'ai' ? 'AI 解析（已通过脚本四项校验）' : '脚本解析（离线正则，AI 不可用时的后备）'),
+    '核心名：' + ST.rx.coreName,
+    '语言格式节：' + (parsed.section ? parsed.section.length + ' 字符' : '未找到'),
+    '识别到格式 ' + parsed.formats.length + ' 套'];
   parsed.formats.forEach(function (f, i) {
-    L.push('  [' + (i + 1) + '] ' + f.label + '  · 族=' + f.family + (f.nameValue ? ' · name固定值=' + f.nameValue : '') + (f.quote ? ' · 引号式' : ''));
+    L.push('  [' + (i + 1) + '] ' + f.label + '  · 族=' + f.family + (f.nameValue ? ' · name固定值=' + f.nameValue : '') + (f.innerTag ? ' · 内嵌<' + f.innerTag + '>' : '') + (f.quote ? ' · 引号式' : ''));
     f.params.forEach(function (p) { L.push('        参数 ' + p.name + '：' + (p.values.length ? p.values.join('、') : '（未识别枚举）')); });
-    L.push('        范例 ' + f.examples.length + ' 条' + (f.regex ? '' : '  ← 拒绝自动生成（裸引号式）'));
+    L.push('        范例 ' + f.examples.length + ' 条' + (f.regex ? '' : '  ← 拒绝自动生成（裸引号式会吃掉全文所有「」）'));
   });
-  parsed.notes.forEach(function (n) { L.push('  ⚠ ' + n); });
+  (notes || []).forEach(function (n) { L.push('  ⚠ ' + n); });
   if (box) box.textContent = L.join('\n');
-  // 为每个可生成的格式建一条正则草稿（保留已有编辑）
+}
+function rxBuildItems(parsed) {
   parsed.formats.forEach(function (f) {
     if (!f.regex) return;
     var exist = ST.rx.items.filter(function (it) { return it.formatKey === f.key && it.coreName === ST.rx.coreName; })[0];
-    if (exist) { exist.examples = f.examples; exist.hasMood = f.params.some(function (x) { return x.name === 'mood'; }); return; }
+    if (exist) {
+      exist.examples = f.examples;
+      exist.hasMood = f.params.some(function (x) { return x.name === 'mood'; });
+      if (!exist.testText) exist.testText = f.examples[0] || '';
+      return;
+    }
     ST.rx.items.push({
       id: rxUuid(), coreName: ST.rx.coreName, formatKey: f.key, label: f.label,
-      purpose: '对话美化', tier: 'fine', prefix: rxSlug(ST.rx.coreName) + '-box',
+      purpose: (RX_PURPOSES.indexOf(f.purposeHint) >= 0 ? f.purposeHint : '对话美化'), tier: 'fine', prefix: rxSlug(ST.rx.coreName) + '-box',
       findSource: '/' + f.regex.source + '/' + f.regex.flags,
       replaceHtml: '', testText: f.examples[0] || '', examples: f.examples,
       hasMood: f.params.some(function (x) { return x.name === 'mood'; }), issues: []
     });
   });
-  rxRenderItems(); rxCacheSave();
-  toast('解析完成：' + parsed.formats.length + ' 套格式，已生成 ' + ST.rx.items.length + ' 条正则草稿', parsed.formats.length ? 'success' : 'warning');
+  rxRenderItems();
 }
 function rxRenderItems() {
   var box = getEl('opf-rx-items'); if (!box) return;
@@ -3719,9 +3761,11 @@ function rxRenderItems() {
 }
 function rxLabel(t) { var d = document.createElement('div'); d.className = 'opf-dim'; d.textContent = t; return d; }
 function rxSetButtons() {
-  ['opf-rx-parse', 'opf-rx-check', 'opf-rx-pull', 'opf-rx-copy1', 'opf-rx-copyall', 'opf-rx-new'].forEach(function (id) {
+  ['opf-rx-parse', 'opf-rx-parse2', 'opf-rx-check', 'opf-rx-pull', 'opf-rx-copy1', 'opf-rx-copyall', 'opf-rx-new'].forEach(function (id) {
     var b = getEl(id); if (b) b.disabled = !!ST.running;
   });
+  var ps = getEl('opf-rx-parse');
+  if (ps) ps.textContent = ST.running ? '■ 解析中…' : '🔍 解析语言格式（AI）';
   var g = getEl('opf-rx-gen');
   if (g) { g.disabled = !!ST.running; g.textContent = ST.running ? '■ 运行中…' : '🎨 生成替换体'; }
 }
@@ -3845,7 +3889,136 @@ function rxDoParseSilent() {
   if (!ST.rx.core) return;
   ST.rx.parsed = rxParseLangFormat(ST.rx.core);
   var box = getEl('opf-rx-parsed');
-  if (box) box.textContent = '已从缓存恢复草稿（核心 ' + ST.rx.core.length + ' 字符，正则 ' + ST.rx.items.length + ' 条）。点「🔍 解析语言格式」可重新解析。';
+  if (box) box.textContent = '已从缓存恢复草稿（核心 ' + ST.rx.core.length + ' 字符，正则 ' + ST.rx.items.length + ' 条）。点「🔍 解析语言格式（AI）」可重新解析。';
+}
+
+// ---------- AI 解析：AI 负责理解，脚本负责精确与校验 ----------
+var RX_PARSE_SCHEMA = [
+  '{',
+  '  "核心名": "从核心里读出的核心名（优先 setvar 系统核心，其次语言格式里 name 的固定值）",',
+  '  "格式": [',
+  '    {',
+  '      "标签": "XML 标签名，没有则 null",',
+  '      "族": "xml | 引语 | 裸引号",',
+  '      "说话人": "引语式的说话人，没有则 null",',
+  '      "name固定值": "name 属性固定值，没有则 null",',
+  '      "参数": [ { "名": "mood", "枚举": ["慵懒", "愉悦"] } ],',
+  '      "引号": true,',
+  '      "内嵌标签": "格式里内嵌的 HTML 标签名（如大字报模式用 h2），没有则 null",',
+  '      "用途建议": "对话美化 | 登场/开场白 | 缔结契约成功 | 命运抽卡 | 咏唱/专属块",',
+  '      "范例": ["逐字摘自原文的整条范例"]',
+  '    }',
+  '  ],',
+  '  "疑点": ["写法含糊、无法确定的地方，逐条列出，不要猜"]',
+  '}'
+].join('\n');
+function rxParseSystemContent() {
+  var lines = [];
+  lines.push('[角色] 你是始弦，大图书馆的司书，正在把一份角色卡文本里的「语言格式」节解析成结构化数据。');
+  lines.push('[任务] 这是一次纯粹的抽取工作：只把原文已有的结构读出来，不做任何创作、改写、补全或翻译。');
+  lines.push([
+    '【抽取规则】',
+    '1. 只输出一个 ' + fence() + 'json 代码块，块内只有 JSON，块外不写任何解释。',
+    '2. 「范例」必须逐字摘自原文（含标签与引号），不得润色、不得截断、不得补全；只收「完整到能被正则匹配」的整条范例。找不到范例就写空数组。',
+    '3. 参数枚举必须逐字摘自原文；原文没写明枚举就写空数组 []。',
+    '4. 族判定：格式里有 <标签 name="..."> 的算 xml；形如 「> 名字:「…」」的算 引语；只有「…」既无说话人又无标签的算 裸引号。',
+    '5. 一个核心可能有多套格式（不同模式、不同说话人），逐套列出，不要合并。',
+    '6. 原文里出现的正文 HTML 标签（h1~h6、div、span、p、style、svg 等）不是对话标签，不得当成「标签」。',
+    '7. 任何写法含糊、你无法确定的地方，写进「疑点」数组，绝对不要猜。',
+    '8. 「核心名」优先取 setvar 系统核心 的值，其次取语言格式里 name 的固定值。'
+  ].join('\n'));
+  lines.push('[输出 schema]\n' + RX_PARSE_SCHEMA);
+  return macroFill(lines.join('\n\n'));
+}
+function rxExtractJson(text) {
+  var t = String(text || '');
+  var F = fence();
+  var i = t.indexOf(F + 'json');
+  if (i >= 0) {
+    var s = t.indexOf('\n', i), e = t.indexOf(F, s + 1);
+    if (s > 0) t = e > s ? t.slice(s + 1, e) : t.slice(s + 1);
+  }
+  var a = t.indexOf('{'), b = t.lastIndexOf('}');
+  if (a < 0 || b <= a) return null;
+  try { return JSON.parse(t.slice(a, b + 1)); } catch (err) { return null; }
+}
+function rxNormText(s) {
+  return String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
+}
+// 把 AI 结果规范化成下游统一使用的 formats[]，并做四道校验
+function rxNormalizeAiFormats(ai, coreText) {
+  var out = { coreName: '', formats: [], notes: [], dropped: 0 };
+  if (!ai || typeof ai !== 'object') { out.notes.push('AI 未返回可解析的 JSON'); return out; }
+  out.coreName = String(ai['核心名'] || '').trim();
+  var list = Array.isArray(ai['格式']) ? ai['格式'] : [];
+  var coreNorm = rxNormText(coreText);
+  list.forEach(function (raw, i) {
+    if (!raw || typeof raw !== 'object') return;
+    var tag = raw['标签'] ? String(raw['标签']).trim() : '';
+    var speaker = raw['说话人'] ? String(raw['说话人']).trim() : '';
+    var fam = String(raw['族'] || '').trim();
+    if (tag && (!/^[A-Za-z_]\w*$/.test(tag) || RX_HTML_TAGS.indexOf(tag.toLowerCase()) >= 0)) tag = '';   // 校验 2
+    var family = fam === 'xml' ? 'xml' : fam === '引语' ? 'quote' : fam === '裸引号' ? 'bare' : (tag ? 'xml' : speaker ? 'quote' : 'bare');
+    if (family === 'xml' && !tag) { out.notes.push('第 ' + (i + 1) + ' 套格式声明为 xml 但标签名非法，已跳过'); return; }
+    if (family === 'quote' && !speaker) { out.notes.push('第 ' + (i + 1) + ' 套格式声明为引语但没有说话人，已跳过'); return; }
+    var params = [];
+    (Array.isArray(raw['参数']) ? raw['参数'] : []).forEach(function (p) {                                  // 校验 3
+      if (!p || typeof p !== 'object') return;
+      var nm = String(p['名'] || '').trim();
+      if (!/^[A-Za-z_]\w*$/.test(nm) || nm === 'name') return;
+      var vals = (Array.isArray(p['枚举']) ? p['枚举'] : []).map(function (v) { return String(v == null ? '' : v).trim(); }).filter(Boolean);
+      vals = vals.filter(function (v, k) { return vals.indexOf(v) === k; });
+      params.push({ name: nm, placeholder: '{' + nm + '}', values: vals });
+    });
+    var examples = [];
+    (Array.isArray(raw['范例']) ? raw['范例'] : []).forEach(function (ex) {                                 // 校验 1：范例必须逐字存在于原文
+      var e = rxNormText(ex);
+      if (!e) return;
+      if (coreNorm.indexOf(e) < 0) { out.dropped++; return; }
+      if (examples.indexOf(e) < 0) examples.push(e);
+    });
+    out.formats.push({
+      family: family, tag: tag, speaker: speaker,
+      nameValue: raw['name固定值'] ? String(raw['name固定值']).trim() : '',
+      params: params, quote: raw['引号'] !== false,
+      innerTag: raw['内嵌标签'] && RX_HTML_TAGS.indexOf(String(raw['内嵌标签']).toLowerCase()) >= 0 ? String(raw['内嵌标签']) : '',
+      purposeHint: String(raw['用途建议'] || '').trim(),
+      examples: examples,
+      key: family === 'xml' ? ('xml:' + tag) : family === 'quote' ? ('q:' + speaker + '|') : 'bare:ai',
+      label: family === 'xml' ? tag : family === 'quote' ? speaker : '裸引号'
+    });
+  });
+  if (out.dropped) out.notes.push('AI 抽出的 ' + out.dropped + ' 条范例在原文中找不到，已丢弃（防改写/编造）');
+  var doubt = Array.isArray(ai['疑点']) ? ai['疑点'].filter(Boolean) : [];
+  doubt.forEach(function (d) { out.notes.push('AI 疑点：' + String(d).slice(0, 120)); });
+  // 校验 4：生成正则并当场用 AI 抽出的范例试跑
+  out.formats.forEach(function (f) {
+    if (f.family === 'quote') {
+      var sib = out.formats.filter(function (x) { return x.family === 'quote' && x.speaker === f.speaker && x.innerTag; })[0];
+      if (sib && !f.innerTag) f.siblingInnerTag = sib.innerTag;
+    }
+    f.regex = rxGenFindRegex(f);
+    if (!f.regex) return;
+    var keep = f.examples.filter(function (e) { return new RegExp(f.regex.source, f.regex.flags).test(e); });
+    if (f.examples.length && keep.length < f.examples.length) {
+      out.notes.push('格式「' + f.label + '」有 ' + (f.examples.length - keep.length) + ' 条范例匹配不上生成的正则（AI 解析可能不准）');
+    }
+    f.examples = keep;
+  });
+  out.examples = out.formats.reduce(function (acc, f) { f.examples.forEach(function (e) { if (acc.indexOf(e) < 0) acc.push(e); }); return acc; }, []);
+  return out;
+}
+async function rxParseByAi(txt) {
+  var sec = rxLangSection(txt);
+  var payload = sec ? sec : String(txt).slice(0, 6000);
+  var ctxIdx = sec ? txt.indexOf(sec) : 0;
+  var head = txt.slice(Math.max(0, ctxIdx - 400), ctxIdx);
+  var msg = '[核心条目文本]\n' + head + '\n' + payload + '\n\n请按 schema 输出 JSON。';
+  var msgs = [{ role: 'system', content: rxParseSystemContent() }, { role: 'user', content: msg }];
+  var resp = await callModel(msgs);
+  var ai = rxExtractJson(resp);
+  if (!ai) return null;
+  return rxNormalizeAiFormats(ai, txt);
 }
 
 // ============ boot ============
