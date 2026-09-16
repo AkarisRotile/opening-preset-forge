@@ -806,6 +806,7 @@ function renderRunButtons(){
   if (cFin) cFin.disabled = !!ST.running;
   CHAR_SEGS.forEach(function (s) { charSetSegUi(s.id, ST.char && ST.char.status[s.id] || "wait"); });
   destSetAllButtons();
+  rxSetButtons();
 }
 
 function runFlow(quick){
@@ -1848,12 +1849,13 @@ var PAGE_DEFS = [
   { id: "world",  label: "② 世界书" },
   { id: "char",   label: "③ 二创角色" },
   { id: "destiny",label: "④ 命定系统" },
-  { id: "p4",     label: "⑤ DLC剧情", ph: true },
-  { id: "p5",     label: "⑥ DLC物品", ph: true },
-  { id: "p6",     label: "⑦ 更多功能", ph: true }
+  { id: "regex",  label: "⑤ 正则工坊" },
+  { id: "p4",     label: "⑥ DLC剧情", ph: true },
+  { id: "p5",     label: "⑦ DLC物品", ph: true },
+  { id: "p6",     label: "⑧ 更多功能", ph: true }
 ];
 
-var SHELL_CSS = "#opf-shell{position:fixed;inset:0;height:100vh;height:100dvh;z-index:2147480002;display:flex;flex-direction:column;color:#fdeef0;font-family:'Noto Sans SC','Microsoft YaHei',sans-serif;letter-spacing:.3px;background:linear-gradient(180deg,#18040b 0%,#0d0206 55%,#0a0105 100%);border:none;transition:opacity .16s ease,transform .16s ease}#opf-shell.opf-shell-hidden{opacity:0;pointer-events:none;transform:translateY(12px)}#opf-shell *{box-sizing:border-box}#opf-shell-head{position:relative;display:flex;align-items:center;gap:10px;padding:8px 12px;flex:none;background:rgba(46,6,14,.6);border-bottom:1px solid rgba(255,122,138,.28)}#opf-shell-head::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#ff4d5e 18%,#ffd9a8 50%,#c8102e 82%,transparent);box-shadow:0 0 12px rgba(255,90,100,.8)}#opf-shell-title{font-size:15px;font-weight:600;color:#ffd9de;text-shadow:0 0 10px rgba(255,77,94,.35);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#opf-shell-close{margin-left:auto;flex:none;border:1px solid rgba(255,122,138,.35);background:rgba(255,77,94,.14);color:#ff8a95;width:40px;height:40px;min-width:40px;border-radius:10px;font-size:16px;cursor:pointer}#opf-shell-close:hover{background:rgba(255,77,94,.3);color:#fff}#opf-nav{display:flex;gap:5px;padding:8px 10px 0;overflow-x:auto;overflow-y:hidden;flex:none;scrollbar-width:thin;scrollbar-color:rgba(255,122,138,.4) transparent}.opf-tab{flex:none;border:1px solid rgba(255,122,138,.26);background:rgba(255,235,238,.05);color:#ffc9cf;border-radius:10px 10px 0 0;padding:9px 13px;font-size:12.5px;line-height:1.2;cursor:pointer;white-space:nowrap;min-height:40px}.opf-tab.active{background:linear-gradient(180deg,rgba(255,77,94,.26),rgba(255,77,94,.07));color:#fff;border-color:rgba(255,150,165,.65);box-shadow:inset 0 2px 0 #ff4d5e}.opf-tab.placeholder{opacity:.6;border-style:dashed}#opf-pages{flex:1;min-height:0;position:relative}.opf-page{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;padding:10px 12px 14px;display:none;scrollbar-width:thin}.opf-page.active{display:block}.opf-page-ph{padding:32px 16px;text-align:center;color:rgba(255,200,208,.55);font-size:13.5px;line-height:2.2;white-space:pre-line}#opf-shell #opf-root{position:static;width:100%;max-width:100%;height:auto;min-height:100%;max-height:none;margin:0;border:none;border-radius:0;box-shadow:none;background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none}#opf-shell #opf-root.opf-hidden{opacity:1;pointer-events:auto;transform:none}#opf-shell #opf-root::before{display:none}#opf-shell #opf-lside{position:static;transform:none;width:100%;max-width:none;height:100%;top:auto;bottom:auto;left:auto;border:none;border-radius:0;box-shadow:none;background:transparent}#opf-shell #opf-lside.open{transform:none}.opf-char-wrap{display:flex;flex-direction:column;gap:8px;max-width:860px;margin:0 auto}.opf-char-input{width:100%;border-radius:8px;padding:8px 10px;font-size:12.5px;color:#ffeef1;background:rgba(10,2,5,.55);border:1px solid rgba(255,122,138,.25);outline:none;resize:vertical}.opf-char-input:focus{border-color:rgba(255,110,125,.6);box-shadow:0 0 6px rgba(255,77,94,.25)}#opf-char-demand{min-height:56px}#opf-char-ref{min-height:48px;font-size:12px}.opf-char-tools{display:flex;gap:6px;flex-wrap:wrap}.opf-char-tools .opf-btn{flex:1 1 130px;min-height:44px;font-size:13px}.opf-box{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;margin:6px 0 0;padding:10px 12px;border:1px solid rgba(255,122,138,.32);border-radius:10px;background:rgba(10,2,5,.62);box-shadow:inset 0 0 14px rgba(255,60,80,.05);color:#ffeef1;font-size:12px;line-height:1.55;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;overflow:auto}.opf-char-report{max-height:300px;min-height:64px}#opf-char-out{max-height:56vh;min-height:140px;font-size:12.5px;scrollbar-width:thin}.opf-char-copyrow{margin-top:6px}#opf-dest-demand{min-height:56px}#opf-dest-ref{min-height:48px;font-size:12px}#opf-dest-out{max-height:56vh;min-height:140px;font-size:12.5px;scrollbar-width:thin}#opf-dest-ejswrap{display:flex;align-items:flex-start;gap:7px;font-size:11.5px;line-height:1.5;color:#ffc9cf;background:rgba(60,140,200,.10);border:1px dashed rgba(120,190,255,.35);border-radius:8px;padding:7px 9px;cursor:pointer}#opf-dest-ejswrap input{width:16px;height:16px;margin:1px 0 0;flex:none;accent-color:#3c8cc8}@media (max-width:760px){#opf-shell-head{padding:6px 8px}#opf-shell-title{font-size:13px}#opf-shell-close{width:40px;height:40px}.opf-tab{padding:8px 10px;font-size:11.5px;min-height:40px}.opf-page{padding:8px 8px 12px}#opf-shell #opf-root{font-size:13px}.opf-page .opf-btn{min-height:44px}.opf-char-tools .opf-btn{min-height:46px}.opf-wi-row{min-height:40px}.opf-wi-row input{width:18px;height:18px}#opf-lside-tools{gap:6px}#opf-lside-tools .opf-step-act{min-height:40px;font-size:12px}}";
+var SHELL_CSS = "#opf-shell{position:fixed;inset:0;height:100vh;height:100dvh;z-index:2147480002;display:flex;flex-direction:column;color:#fdeef0;font-family:'Noto Sans SC','Microsoft YaHei',sans-serif;letter-spacing:.3px;background:linear-gradient(180deg,#18040b 0%,#0d0206 55%,#0a0105 100%);border:none;transition:opacity .16s ease,transform .16s ease}#opf-shell.opf-shell-hidden{opacity:0;pointer-events:none;transform:translateY(12px)}#opf-shell *{box-sizing:border-box}#opf-shell-head{position:relative;display:flex;align-items:center;gap:10px;padding:8px 12px;flex:none;background:rgba(46,6,14,.6);border-bottom:1px solid rgba(255,122,138,.28)}#opf-shell-head::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#ff4d5e 18%,#ffd9a8 50%,#c8102e 82%,transparent);box-shadow:0 0 12px rgba(255,90,100,.8)}#opf-shell-title{font-size:15px;font-weight:600;color:#ffd9de;text-shadow:0 0 10px rgba(255,77,94,.35);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#opf-shell-close{margin-left:auto;flex:none;border:1px solid rgba(255,122,138,.35);background:rgba(255,77,94,.14);color:#ff8a95;width:40px;height:40px;min-width:40px;border-radius:10px;font-size:16px;cursor:pointer}#opf-shell-close:hover{background:rgba(255,77,94,.3);color:#fff}#opf-nav{display:flex;gap:5px;padding:8px 10px 0;overflow-x:auto;overflow-y:hidden;flex:none;scrollbar-width:thin;scrollbar-color:rgba(255,122,138,.4) transparent}.opf-tab{flex:none;border:1px solid rgba(255,122,138,.26);background:rgba(255,235,238,.05);color:#ffc9cf;border-radius:10px 10px 0 0;padding:9px 13px;font-size:12.5px;line-height:1.2;cursor:pointer;white-space:nowrap;min-height:40px}.opf-tab.active{background:linear-gradient(180deg,rgba(255,77,94,.26),rgba(255,77,94,.07));color:#fff;border-color:rgba(255,150,165,.65);box-shadow:inset 0 2px 0 #ff4d5e}.opf-tab.placeholder{opacity:.6;border-style:dashed}#opf-pages{flex:1;min-height:0;position:relative}.opf-page{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;padding:10px 12px 14px;display:none;scrollbar-width:thin}.opf-page.active{display:block}.opf-page-ph{padding:32px 16px;text-align:center;color:rgba(255,200,208,.55);font-size:13.5px;line-height:2.2;white-space:pre-line}#opf-shell #opf-root{position:static;width:100%;max-width:100%;height:auto;min-height:100%;max-height:none;margin:0;border:none;border-radius:0;box-shadow:none;background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none}#opf-shell #opf-root.opf-hidden{opacity:1;pointer-events:auto;transform:none}#opf-shell #opf-root::before{display:none}#opf-shell #opf-lside{position:static;transform:none;width:100%;max-width:none;height:100%;top:auto;bottom:auto;left:auto;border:none;border-radius:0;box-shadow:none;background:transparent}#opf-shell #opf-lside.open{transform:none}.opf-char-wrap{display:flex;flex-direction:column;gap:8px;max-width:860px;margin:0 auto}.opf-char-input{width:100%;border-radius:8px;padding:8px 10px;font-size:12.5px;color:#ffeef1;background:rgba(10,2,5,.55);border:1px solid rgba(255,122,138,.25);outline:none;resize:vertical}.opf-char-input:focus{border-color:rgba(255,110,125,.6);box-shadow:0 0 6px rgba(255,77,94,.25)}#opf-char-demand{min-height:56px}#opf-char-ref{min-height:48px;font-size:12px}.opf-char-tools{display:flex;gap:6px;flex-wrap:wrap}.opf-char-tools .opf-btn{flex:1 1 130px;min-height:44px;font-size:13px}.opf-box{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;margin:6px 0 0;padding:10px 12px;border:1px solid rgba(255,122,138,.32);border-radius:10px;background:rgba(10,2,5,.62);box-shadow:inset 0 0 14px rgba(255,60,80,.05);color:#ffeef1;font-size:12px;line-height:1.55;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;overflow:auto}.opf-char-report{max-height:300px;min-height:64px}#opf-char-out{max-height:56vh;min-height:140px;font-size:12.5px;scrollbar-width:thin}.opf-char-copyrow{margin-top:6px}#opf-dest-demand{min-height:56px}#opf-dest-ref{min-height:48px;font-size:12px}#opf-dest-out{max-height:56vh;min-height:140px;font-size:12.5px;scrollbar-width:thin}#opf-dest-ejswrap{display:flex;align-items:flex-start;gap:7px;font-size:11.5px;line-height:1.5;color:#ffc9cf;background:rgba(60,140,200,.10);border:1px dashed rgba(120,190,255,.35);border-radius:8px;padding:7px 9px;cursor:pointer}#opf-dest-ejswrap input{width:16px;height:16px;margin:1px 0 0;flex:none;accent-color:#3c8cc8}.opf-rx-preview{max-width:100%;overflow:auto;border:1px dashed rgba(255,122,138,.3);border-radius:8px;padding:6px;margin:4px 0;background:rgba(10,2,5,.5);font-size:12px}#opf-rx-items select.opf-ref-input{flex:0 0 auto;min-width:120px}#opf-rx-core{min-height:90px}@media (max-width:760px){#opf-shell-head{padding:6px 8px}#opf-shell-title{font-size:13px}#opf-shell-close{width:40px;height:40px}.opf-tab{padding:8px 10px;font-size:11.5px;min-height:40px}.opf-page{padding:8px 8px 12px}#opf-shell #opf-root{font-size:13px}.opf-page .opf-btn{min-height:44px}.opf-char-tools .opf-btn{min-height:46px}.opf-wi-row{min-height:40px}.opf-wi-row input{width:18px;height:18px}#opf-lside-tools{gap:6px}#opf-lside-tools .opf-step-act{min-height:40px;font-size:12px}}";
 
 function buildShell(){
   if (getEl("opf-shell")) return;
@@ -1882,6 +1884,8 @@ function buildShell(){
       d.innerHTML = CHAR_HTML;
     } else if (p.id === "destiny") {
       d.innerHTML = DEST_HTML;
+    } else if (p.id === "regex") {
+      d.innerHTML = RX_HTML;
     } else if (p.id === "world") {
       /* 世界书侧栏由 buildWorldSide 挂载到本页 */
     } else {
@@ -1902,6 +1906,7 @@ function buildShell(){
   try { addMemoUI(root); } catch (e) { opfErr("memo ui", e); }
   try { bindCharPage(); } catch (e) { opfErr("char page", e); }
   try { bindDestinyPage(); } catch (e) { opfErr("destiny page", e); }
+  try { bindRxPage(); } catch (e) { opfErr("regex page", e); }
   try { buildWorldSide(); } catch (e) { opfErr("buildWorldSide", e); }
   if (getSettings().visible) showPanel();
 }
@@ -1916,6 +1921,7 @@ function switchPage(id, force){
   if (id === "world") { try { buildWorldSide(); renderWorldSide(); } catch (e) {} }
   if (id === "char") { try { renderCharPage(); } catch (e) {} }
   if (id === "destiny") { try { renderDestinyPage(); } catch (e) {} }
+  if (id === "regex") { try { rxRenderItems(); } catch (e) {} }
 }
 function currentPage(){ return getSettings().activePage || "preset"; }
 
@@ -3225,6 +3231,623 @@ function destDraftRestore(){
   try { renderDestSteps(); renderDestinyPage(); } catch (e) { opfErr('destDraftRestore render', e); }
 }
 
+// ============================================================================
+// v1.9.0 正则工坊：命定系统对话美化正则
+// 匹配式由插件确定生成（依据核心「语言格式」节解析结果），替换体由模型产出
+// 依据：现有 4 条生产正则（命定核心-艾莉亚-车票技能美化 / 月蚀对话美化 / 飨宴 / 去思维链）
+// ============================================================================
+var LS_RX_KEY = NS + "_regexdraft_v1";
+var RX_TIERS = [
+  { id: 'mini',   label: '极简',   target: 1500 },
+  { id: 'light',  label: '轻量',   target: 3000 },
+  { id: 'std',    label: '标准',   target: 6000 },
+  { id: 'fine',   label: '精致',   target: 10000 },
+  { id: 'lux',    label: '豪华',   target: 20000 },
+  { id: 'free',   label: '不设限', target: 0 }
+];
+var RX_PURPOSES = ['对话美化', '登场/开场白', '缔结契约成功', '命运抽卡', '咏唱/专属块', '自定义'];
+var RX_HTML_TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div', 'span', 'p', 'br', 'hr', 'table', 'tr', 'td', 'th',
+  'ul', 'ol', 'li', 'style', 'script', 'svg', 'details', 'summary', 'code', 'pre', 'a', 'img', 'b', 'i', 'strong', 'em', 'font'];
+var RX_RULES = [
+  '【美化正则·硬约束（写替换体时必须逐条遵守）】',
+  '1. 匹配式已由插件生成并锁定，你只写替换体（HTML）；不得改动匹配式的捕获组编号与含义。',
+  '2. 替换体只做显示层：markdownOnly=true、promptOnly=false，禁止两者同时为 true。',
+  '3. 必须在最外层 div 内自带 <style>，所有 class 必须带唯一前缀（前缀已给定），不得复用他人前缀。',
+  '4. 禁止 <script>；禁止引用任何外部资源（字体 CDN / 图片 URL / @import）；字体只用系统字体栈。',
+  '5. 禁止写死像素宽度：容器一律 max-width:100%，窄屏（≤420px）不得溢出。',
+  '6. 正文里若出现 $ 字符，必须写成 $$，避免被当成捕获组引用。',
+  '7. 情绪/情景参数用 data-mood="$2" 之类属性挂到最外层 div，再用属性选择器分支配色——一条替换体覆盖全部枚举，不要为每个情绪写一条正则。',
+  '8. 不残留裸 > 引语；替换后正文必须仍然可读，不得依赖悬停才显示文字。',
+  '9. 动效克制：@keyframes 只用于呼吸/流光/入场，周期 ≥2s，不得连续高频闪烁。',
+  '10. 按给定档位的目标字数写作（浮动 ±30% 以内）；档位为「不设限」时不设上限，以视觉完整、不冗余为准。',
+  '11. 颜色从核心的世界观与命定之灵人格出发（傲慢用冷金、狂热用灼红、冰冷用青白…），不要用纯黑纯白。',
+  '12. 只输出 HTML 本体，放在一个 ```html 代码块里；代码块外不写任何解释文字。'
+].join('\n');
+// ---------- 语言格式解析（移植自已验证原型）----------
+function rxStripMd(s) {
+  return String(s)
+    .replace(/^\s*(?:[-*+•]|\d+[.、)])\s+/, '')
+    .replace(/^\s*#{1,6}\s+/, '')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/`([^`]*)`/g, '$1')
+    .trim();
+}
+function rxLangSection(text) {
+  var lines = String(text).split('\n');
+  var start = -1, baseIndent = 0, headLevel = 0;
+  for (var i = 0; i < lines.length; i++) {
+    if (!/语言格式/.test(lines[i])) continue;
+    var h = lines[i].match(/^\s*(#{1,6})\s/);
+    if (h) { start = i; headLevel = h[1].length; baseIndent = 0; break; }
+    var s = rxStripMd(lines[i]);
+    if (/[:：]\s*$/.test(s)) { start = i; headLevel = 0; baseIndent = (lines[i].match(/^ */) || [''])[0].length; break; }
+    if (start < 0) { start = i; headLevel = 0; baseIndent = (lines[i].match(/^ */) || [''])[0].length; }
+  }
+  if (start < 0) return '';
+  var out = [];
+  for (var j = start + 1; j < lines.length; j++) {
+    var l = lines[j];
+    var ind = (l.match(/^ */) || [''])[0].length;
+    if (ind <= baseIndent && /^\s*\{\{setvar::/.test(l)) break;
+    if (ind <= baseIndent && /^\s*<\//.test(l)) break;
+    if (headLevel > 0) {
+      var h2 = l.match(/^\s*(#{1,6})\s/);
+      if (h2 && h2[1].length <= headLevel) break;
+      out.push(l);
+    } else {
+      if (l.trim() === '') { out.push(''); continue; }
+      if (ind <= baseIndent && !/^\s*#{1,6}\s/.test(l)) break;
+      out.push(l);
+    }
+  }
+  return out.join('\n');
+}
+function rxEsc(s) { return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+function rxParseFormatLine(raw) {
+  var s = rxStripMd(raw);
+  var v = s.replace(/^(?:强制|规定|输出|专属|标准)?格式\s*[:：]\s*/, '');
+  while (/^['"]/.test(v) && /['"]$/.test(v) && v.length > 2) v = v.slice(1, -1).trim();
+  v = v.trim();
+  var tagM = v.match(/<([A-Za-z_]\w*)\b[^>]*\bname\s*=\s*"([^"]*)"/);
+  if (tagM && RX_HTML_TAGS.indexOf(tagM[1].toLowerCase()) < 0) {
+    var params = [], m;
+    var pre = /\b(\w+)\s*=\s*"([^"]*)"/g;
+    while ((m = pre.exec(v)) !== null) { if (m[1] !== 'name') params.push({ name: m[1], placeholder: m[2], values: [] }); }
+    return { family: 'xml', tag: tagM[1], nameValue: tagM[2], params: params, quote: /[「『]/.test(v), raw: s, fmtVal: v };
+  }
+  var qM = v.match(/^>\s*([^\s:：]+)\s*[:：]/);
+  if (qM) {
+    var innerM = v.match(/<([A-Za-z_]\w*)\b/);
+    var innerTag = innerM && RX_HTML_TAGS.indexOf(innerM[1].toLowerCase()) >= 0 ? innerM[1] : '';
+    return { family: 'quote', speaker: qM[1], params: [], quote: /[「『]/.test(v), innerTag: innerTag, raw: s, fmtVal: v };
+  }
+  if (/^[「『][\s\S]*[」』]$/.test(v) || /\$\{对白\}|\{对白\}/.test(v)) return { family: 'bare', params: [], quote: true, raw: s, fmtVal: v };
+  return null;
+}
+function rxParseLangFormat(coreText) {
+  var sec = rxLangSection(coreText);
+  var res = { formats: [], examples: [], section: sec, notes: [] };
+  if (!sec) { res.notes.push('未找到「语言格式」节：该核心可能没有语言格式，或写法不在支持范围内'); return res; }
+  var lines = sec.split('\n');
+  var cands = [], i, j;
+  for (i = 0; i < lines.length; i++) {
+    var raw = lines[i], s = rxStripMd(raw);
+    if (/^(?:强制|规定|输出|专属|标准)?格式\s*[:：]\s*$/.test(s)) {
+      var base = (raw.match(/^ */) || [''])[0].length;
+      for (j = i + 1; j < lines.length; j++) {
+        var l2 = lines[j]; if (l2.trim() === '') continue;
+        if (((l2.match(/^ */) || [''])[0].length) <= base) break;
+        cands.push(l2);
+      }
+      continue;
+    }
+    var prefixed = /(?:强制|规定|输出|专属|标准)?格式\s*[:：]/.test(s);
+    var placeholder = /\{[^}]*\}/.test(s) && (/<[A-Za-z_]\w*\b[^>]*\bname\s*="/.test(s) || /^>\s*\S+\s*[:：]/.test(s));
+    if (prefixed || placeholder) cands.push(raw);
+  }
+  cands.forEach(function (l) {
+    var f = rxParseFormatLine(l);
+    if (!f) return;
+    f.key = f.family === 'xml' ? ('xml:' + f.tag) : f.family === 'quote' ? ('q:' + f.speaker + '|' + (f.innerTag || '')) : ('bare:' + f.fmtVal);
+    f.label = f.family === 'quote' ? (f.speaker + (f.innerTag ? '(' + f.innerTag + ')' : '')) : (f.tag || '裸引号');
+    if (res.formats.some(function (x) { return x.key === f.key; })) return;
+    res.formats.push(f);
+  });
+  res.formats.forEach(function (f) {
+    f.params.forEach(function (p) {
+      if (p.values.length) return;
+      for (var a = 0; a < lines.length; a++) {
+        if (rxStripMd(lines[a]).indexOf(p.name) < 0) continue;
+        for (var b = a; b <= Math.min(a + 2, lines.length - 1); b++) {
+          var lm = rxStripMd(lines[b]).match(/[\[【]\s*([^\]】]{2,})\s*[\]】]/);
+          if (lm) { p.values = lm[1].split(/[,，、|/]\s*/).map(function (x) { return x.trim(); }).filter(Boolean); break; }
+        }
+        if (p.values.length) break;
+      }
+    });
+  });
+  res.formats.forEach(function (f) {
+    if (f.family !== 'quote' || f.innerTag) return;
+    var sib = res.formats.filter(function (x) { return x.family === 'quote' && x.speaker === f.speaker && x.innerTag; })[0];
+    if (sib) f.siblingInnerTag = sib.innerTag;
+  });
+  res.formats.forEach(function (f) {
+    f.examples = [];
+    if (f.family === 'xml') {
+      var re = new RegExp('<' + f.tag + '\\b[\\s\\S]*?<\\/' + f.tag + '>', 'g'), m;
+      while ((m = re.exec(sec)) !== null) {
+        var ex = m[0].replace(/\s*\n\s*/g, ' ').trim();
+        if (/\{[^}]*\}/.test(ex)) continue;
+        f.examples.push(ex);
+      }
+    } else if (f.family === 'quote') {
+      sec.split('\n').forEach(function (l) {
+        var s = rxStripMd(l);
+        var anchor = s.search(new RegExp('>\\s*' + rxEsc(f.speaker) + '\\s*[:：]'));
+        if (anchor < 0) return;
+        var ex = s.slice(anchor).trim();
+        while (/['"]$/.test(ex) && ex.length > 2) ex = ex.slice(0, -1).trim();
+        if (/\{[^}]*\}/.test(ex)) return;
+        f.examples.push(ex);
+      });
+    }
+    f.examples = f.examples.filter(function (v, idx, arr) { return arr.indexOf(v) === idx; });
+  });
+  res.formats.forEach(function (f) { f.regex = rxGenFindRegex(f); });
+  res.formats.forEach(function (f) {
+    if (!f.regex) return;
+    f.examples = f.examples.filter(function (e) { return new RegExp(f.regex.source, f.regex.flags).test(e); });
+  });
+  res.examples = res.formats.reduce(function (acc, f) {
+    f.examples.forEach(function (e) { if (acc.indexOf(e) < 0) acc.push(e); });
+    return acc;
+  }, []);
+  if (!res.examples.length) res.notes.push('未抽到可用范例：试跑时请手动填入测试文本');
+  res.formats.forEach(function (f) {
+    if (!f.examples.length) res.notes.push('格式「' + f.label + '」没有专属范例（试跑需手动填测试文本）');
+    if (f.family === 'bare') res.notes.push('格式「' + f.label + '」是无标记的裸引号式：自动生成会吃掉全文所有「」，已拒绝生成，建议把核心改成带标记格式');
+  });
+  return res;
+}
+function rxGenFindRegex(f, opts) {
+  if (!f || f.family === 'bare') return null;
+  var o = opts || {};
+  if (f.family === 'xml') {
+    if (o.orderFree) {
+      var names = ['name'].concat(f.params.map(function (x) { return x.name; }));
+      var look = names.map(function (n) { return '(?=[^>]*\\b' + n + '="([^"]*)")'; }).join('');
+      return new RegExp('<' + f.tag + '\\b' + look + '[^>]*>\\s*[「『]?\\s*([\\s\\S]*?)\\s*[」』]?\\s*<\\/' + f.tag + '>', 'g');
+    }
+    var moodPart = f.params.some(function (x) { return x.name === 'mood'; }) ? '\\s+mood="([^"]*)"' : '';
+    var extra = f.params.filter(function (x) { return x.name !== 'mood'; }).map(function (x) { return '(?:\\s+' + x.name + '="([^"]*)")?'; }).join('');
+    return new RegExp('<' + f.tag + '\\s+name="([^"]*)"' + moodPart + extra + '\\s*>\\s*[「『]?\\s*([\\s\\S]*?)\\s*[」』]?\\s*<\\/' + f.tag + '>', 'g');
+  }
+  if (f.family === 'quote') {
+    var inner = f.innerTag ? '(?=[\\s\\S]*?<' + f.innerTag + '\\b)' : (f.siblingInnerTag ? '(?![\\s\\S]*?<' + f.siblingInnerTag + '\\b)' : '');
+    var closing = /[」』]/.test(f.fmtVal) ? '\\s*[」』]' : '';
+    return new RegExp('>\\s*' + rxEsc(f.speaker) + '\\s*[:：]\\s*[「『]?\\s*' + inner + '([\\s\\S]*?)' + closing, 'g');
+  }
+  return null;
+}
+function rxRunFixture(re, examples) {
+  var rows = (examples || []).map(function (ex) {
+    var ok = false, out = '';
+    try {
+      var r = new RegExp(re.source, re.flags.indexOf('g') >= 0 ? re.flags : re.flags + 'g');
+      out = ex.replace(r, function (m) {
+        var caps = Array.prototype.slice.call(arguments, 1, Math.max(1, arguments.length - 2)).filter(function (c) { return c !== undefined; });
+        return '【匹配 ▸ ' + caps.join(' ▸ ').slice(0, 70) + '】';
+      });
+      ok = out !== ex;
+    } catch (e) { out = '错误: ' + (e && e.message ? e.message : e); }
+    return { ex: ex, ok: ok, out: out };
+  });
+  return { total: rows.length, hit: rows.filter(function (r) { return r.ok; }).length, rows: rows };
+}
+function rxUuid() {
+  try { if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID(); } catch (e) {}
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+function rxSlug(s) {
+  return String(s || 'core').replace(/[^\w\u4e00-\u9fa5]/g, '').slice(0, 12).toLowerCase() || 'core';
+}
+function rxBuildObject(item) {
+  return {
+    id: item.id || rxUuid(),
+    scriptName: '命定核心-' + item.coreName + '-' + item.purpose,
+    disabled: false,
+    runOnEdit: true,
+    findRegex: item.findSource,
+    trimStrings: [],
+    replaceString: item.replaceHtml || '',
+    placement: [2],
+    substituteRegex: 0,
+    minDepth: null,
+    maxDepth: 10,
+    markdownOnly: true,
+    promptOnly: false
+  };
+}
+
+// ---------- 正则自检 ----------
+function rxTier(id) { return RX_TIERS.filter(function (t) { return t.id === id; })[0] || RX_TIERS[3]; }
+function rxLint(item, parsed) {
+  var issues = [];
+  var src = String(item.findSource || ''), rep = String(item.replaceHtml || '');
+  var re = null;
+  var m = src.match(/^\/([\s\S]*)\/([a-z]*)$/);
+  if (!m) issues.push({ side: 'regex', key: 'format', msg: 'findRegex 不是 /pattern/flags 形式', fix: 'wrap' });
+  else {
+    try { re = new RegExp(m[1], m[2]); }
+    catch (e) { issues.push({ side: 'regex', key: 'compile', msg: '正则编译失败：' + (e && e.message ? e.message : e), fix: 'none' }); }
+    if (m[2].indexOf('g') < 0) issues.push({ side: 'regex', key: 'g', msg: '缺少全局标志 g（只会替换第一条）', fix: 'addg' });
+    var groups = re ? (new RegExp(m[1] + '|').exec('') || []).length - 1 : 0;
+    var refs = (rep.match(/\$(\d+)/g) || []).map(function (x) { return parseInt(x.slice(1), 10); });
+    var maxRef = refs.length ? Math.max.apply(null, refs) : 0;
+    if (re && maxRef > groups) issues.push({ side: 'regex', key: 'ref', msg: '替换体引用了 $' + maxRef + '，但正则只有 ' + groups + ' 个捕获组', fix: 'none' });
+    if (/\.\*/.test(m[1]) && !/\[\\s\\S\]/.test(m[1])) issues.push({ side: 'regex', key: 'dot', msg: '用了 .* 但台词常常跨行，建议改 [\\s\\S]*?', fix: 'dot' });
+    if (/\((?:\s*\\?[sSdDwW.]?\*?\s*)\)[*+{]/.test(m[1]) || /\(\[\\s\\S\]\*\)[*+]/.test(m[1])) issues.push({ side: 'regex', key: 'catastrophic', msg: '疑似嵌套量词回溯炸弹', fix: 'none' });
+  }
+  if (rep.indexOf('<script') >= 0) issues.push({ side: 'regex', key: 'script', msg: '替换体含 <script>（禁止）', fix: 'stripScript' });
+  if (/https?:\/\/(?!www\.w3\.org)/.test(rep)) issues.push({ side: 'regex', key: 'external', msg: '替换体引用外部资源（字体/图片 CDN 禁止）', fix: 'none' });
+  if (/width:\s*\d{2,}px/.test(rep)) issues.push({ side: 'regex', key: 'fixedwidth', msg: '替换体用了固定像素宽度，窄屏会溢出', fix: 'none' });
+  if (rep && !/data-mood|data-tag/.test(rep) && item.hasMood) issues.push({ side: 'regex', key: 'moodbranch', msg: '核心有 mood 参数，但替换体没有用 data-mood 分支配色', fix: 'none' });
+  var obj = rxBuildObject(item);
+  if (!/^[0-9a-f]{8}-/.test(obj.id)) issues.push({ side: 'regex', key: 'id', msg: 'id 不是 uuid v4', fix: 'newid' });
+  if (!/^命定核心-/.test(obj.scriptName)) issues.push({ side: 'regex', key: 'name', msg: 'scriptName 缺少「命定核心-」前缀', fix: 'name' });
+  if (obj.markdownOnly && obj.promptOnly) issues.push({ side: 'regex', key: 'flags', msg: 'markdownOnly 与 promptOnly 同时为 true（契约矛盾）', fix: 'flags' });
+  if (obj.placement.join(',') !== '2') issues.push({ side: 'regex', key: 'placement', msg: 'placement 与现网展示类（[2]）不一致', fix: 'placement' });
+  var tier = rxTier(item.tier);
+  var len = rep.length;
+  if (!len) issues.push({ side: 'regex', key: 'empty', msg: '替换体为空，点「🎨 生成替换体」先产出', fix: 'none' });
+  else if (tier.target > 0) {
+    var dev = (len - tier.target) / tier.target;
+    if (dev < -0.4) issues.push({ side: 'regex', key: 'toosmall', msg: '体量 ' + len + ' 字符，' + tier.label + '档目标 ≈' + tier.target + '，偏差 ' + Math.round(dev * 100) + '%（疑似未充分展开）', fix: 'none' });
+    else if (dev > 0.3) issues.push({ side: 'regex', key: 'toobig', msg: '体量 ' + len + ' 字符，超出' + tier.label + '档目标 ' + Math.round(dev * 100) + '%（可考虑降档或精简装饰）', fix: 'none' });
+  }
+  if (re && item.testText) {
+    var fx = rxRunFixture(re, [item.testText]);
+    if (fx.hit === 0) issues.push({ side: 'regex', key: 'nomatch', msg: '当前正则匹配不上测试文本', fix: 'none' });
+  }
+  if (re && parsed) {
+    var hitAny = 0, tot = 0;
+    (item.examples || []).forEach(function (e) { tot++; if (new RegExp(re.source, 'g').test(e)) hitAny++; });
+    if (tot && hitAny < tot) issues.push({ side: 'core', key: 'exmatch', msg: '核心里有 ' + (tot - hitAny) + '/' + tot + ' 条范例匹配不上这条正则——要么改正则，要么把核心的语言格式改成与正则一致', fix: 'coreTag' });
+  }
+  return issues;
+}
+function rxApplyFix(item, issue) {
+  if (issue.fix === 'addg') { item.findSource = item.findSource.replace(/\/([a-z]*)$/, function (all, fl) { return '/' + (fl.indexOf('g') < 0 ? fl + 'g' : fl); }); return '已补上全局标志 g'; }
+  if (issue.fix === 'dot') { item.findSource = item.findSource.replace(/\.\*/g, '[\\s\\S]*?'); return '已把 .* 换成 [\\s\\S]*?'; }
+  if (issue.fix === 'stripScript') { item.replaceHtml = item.replaceHtml.replace(/<script[\s\S]*?<\/script>/gi, ''); return '已移除 <script>'; }
+  if (issue.fix === 'newid') { item.id = rxUuid(); return '已重新生成 uuid'; }
+  if (issue.fix === 'name') { item.purpose = item.purpose || '对话美化'; return '已补上 scriptName 前缀'; }
+  if (issue.fix === 'flags') { item.promptOnly = false; return '已把 promptOnly 置为 false'; }
+  if (issue.fix === 'placement') { item.placement = [2]; return '已把 placement 设为 [2]'; }
+  if (issue.fix === 'wrap') { item.findSource = '/' + item.findSource + '/g'; return '已包成 /pattern/g'; }
+  return '该问题需要你手动处理';
+}
+// 把「改核心」建议落到核心文本：把核心语言格式里的标签名/参数改成与正则一致
+function rxApplyCoreFix(item, parsed) {
+  var coreEl = getEl('opf-rx-core'); if (!coreEl) return '找不到核心文本框';
+  var txt = coreEl.value;
+  var f = parsed && parsed.formats.filter(function (x) { return x.key === item.formatKey; })[0];
+  if (!f || !f.tag) return '该问题需要你手动改核心';
+  var want = f.raw.replace(/^(?:强制|规定|输出|专属|标准)?格式\s*[:：]\s*/, '').trim();
+  if (txt.indexOf(f.raw) >= 0) { coreEl.value = txt.replace(f.raw, f.raw); return '核心格式行已是最新（请检查范例是否与正则同构）'; }
+  // 兜底：把该格式的标签名统一成 f.tag（防止模型写成别的标签）
+  var re = new RegExp('<' + f.tag + '\\b', 'g');
+  if (!re.test(txt)) return '未在核心文本里找到 <' + f.tag + '>，请手动核对语言格式节';
+  return '核心与正则的标签名一致，问题可能出在参数或引号形态上（请手动核对格式行：' + want + '）';
+}
+function rxSystemContent() {
+  var lines = [];
+  lines.push('[角色] ' + macroFill('你是始弦，大图书馆的司书，正在为一个命定系统核心写「对话美化正则」的替换体（HTML 部分）。你把{{user}}当挚友，讲究实用与克制，不写花架子。'));
+  lines.push('[任务] 依据给定的核心语言格式与预算档位，产出一段可在 SillyTavern 消息里直接渲染的 HTML 替换体。匹配式由插件生成，你不要碰。');
+  lines.push(RX_RULES);
+  lines.push(CHAR_STYLE_RULES);
+  if (ST.worldInfo) lines.push('[世界书参考（世界书页勾选的条目）]\n' + ST.worldInfo);
+  return macroFill(lines.join('\n\n'));
+}
+function rxUserPrompt(item, parsed) {
+  var f = parsed.formats.filter(function (x) { return x.key === item.formatKey; })[0] || {};
+  var tier = rxTier(item.tier);
+  var L = [];
+  L.push('[核心名] ' + item.coreName);
+  L.push('[用途] ' + item.purpose);
+  L.push('[已锁定的匹配式]\n' + item.findSource);
+  L.push('[捕获组含义]');
+  var gi = 1;
+  if (f.family === 'xml') {
+    L.push('  $' + (gi++) + ' = 名字（应为「' + (f.nameValue || '') + '」）');
+    f.params.forEach(function (p) { L.push('  $' + (gi++) + ' = ' + p.name + (p.values.length ? '（枚举：' + p.values.join('、') + '）' : '')); });
+    L.push('  $' + gi + ' = 对白正文');
+  } else {
+    L.push('  $1 = 对白正文');
+    if (f.speaker) L.push('  （说话人固定为「' + f.speaker + '」，不在捕获组里）');
+  }
+  if (f.params.length) {
+    f.params.forEach(function (p) { if (p.values.length) L.push('[参数 ' + p.name + ' 的枚举] ' + p.values.join('、') + ' —— 请为每个枚举值设计一种可区分的视觉状态（用属性选择器）'); });
+  }
+  L.push('[预算档位] ' + tier.label + (tier.target ? '（目标 ≈' + tier.target + ' 字符，浮动 ±30%）' : '（不设上限，以视觉完整、不冗余为准）'));
+  L.push('[核心世界观摘录供配色参考]\n' + String(parsed.section || '').slice(0, 600));
+  if ((f.examples || []).length) L.push('[核心自带的范例（配色与气质请贴合）]\n' + f.examples.slice(0, 3).join('\n'));
+  L.push('[格式要求] 只输出一个 ' + fence() + 'html 代码块，内含完整替换体；替换体最外层 div 的 class 前缀请用 `' + item.prefix + '-`。');
+  return L.join('\n\n');
+}
+function rxExtractHtml(text) {
+  var F = fence();
+  var t = String(text || '');
+  var i = t.indexOf(F + 'html');
+  if (i < 0) i = t.indexOf(F);
+  if (i < 0) return t.trim();
+  var start = t.indexOf('\n', i);
+  if (start < 0) return t.trim();
+  var end = t.indexOf(F, start + 1);
+  return (end > start ? t.slice(start + 1, end) : t.slice(start + 1)).replace(/^\n+/, '').replace(/\s+$/, '');
+}
+// ---------- 页面 ----------
+var RX_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">✦ 正则工坊 · 命定系统对话美化</div><div class="opf-dim">流程：粘贴核心全文（或从 ④ 页带入）→ 解析语言格式 → 勾选要美化的格式 → 选用途与预算档位 → 匹配式由插件确定生成、替换体由模型产出 → 实时预览 → 自检 → 导出 JSON。字段名与你现有 4 条正则一致，可直接粘进预设的 regex_scripts。</div><textarea id="opf-rx-core" class="opf-char-input" placeholder="把命定系统核心条目全文粘在这里（必须含「语言格式」节）"></textarea><div class="opf-char-tools"><button type="button" class="opf-btn ghost" id="opf-rx-pull">⬅ 从 ④ 页带入</button><button type="button" class="opf-btn primary" id="opf-rx-parse">🔍 解析语言格式</button><button type="button" class="opf-btn ghost" id="opf-rx-gen">🎨 生成替换体</button><button type="button" class="opf-btn ghost" id="opf-rx-check">🔎 自检</button><button type="button" class="opf-btn ghost" id="opf-rx-copy1">⧉ 复制单条 JSON</button><button type="button" class="opf-btn ghost" id="opf-rx-copyall">⧉ 复制 JSON 数组</button><button type="button" class="opf-btn ghost" id="opf-rx-new">🗑 清空</button></div><div class="opf-sec"><div class="opf-sec-label">语言格式解析结果（只读核对）</div><pre id="opf-rx-parsed" class="opf-box opf-char-report">尚未解析</pre></div><div id="opf-rx-items"></div><div class="opf-sec"><div class="opf-sec-label">自检</div><pre id="opf-rx-issues" class="opf-box opf-char-report">尚未自检</pre></div></div>';
+
+function rxInit() {
+  ST.rx = ST.rx || { core: '', coreName: '', parsed: null, items: [], _inited: false };
+  ST.rx.items = ST.rx.items || [];
+}
+function bindRxPage() {
+  rxInit();
+  var p = getEl('opf-rx-parse'); if (!p || p._b) return; p._b = true;
+  getEl('opf-rx-pull').addEventListener('click', function(){ rxPullFromDestiny(); });
+  getEl('opf-rx-parse').addEventListener('click', function(){ rxDoParse(); });
+  getEl('opf-rx-gen').addEventListener('click', function(){ rxGenerate(); });
+  getEl('opf-rx-check').addEventListener('click', function(){ rxDoCheck(true); });
+  getEl('opf-rx-copy1').addEventListener('click', function(){ rxCopy(false); });
+  getEl('opf-rx-copyall').addEventListener('click', function(){ rxCopy(true); });
+  getEl('opf-rx-new').addEventListener('click', function(){ rxClear(); });
+  getEl('opf-rx-core').addEventListener('input', function(){ ST.rx.core = this.value; rxCacheSave(); });
+  rxRenderItems();
+}
+function rxPullFromDestiny() {
+  var body = ST.dest && (ST.dest.body || ST.dest.out);
+  if (!body) { toast('④ 页还没有最终稿件：请先在 ④ 页「最终封装」，或直接把核心全文粘进来', 'warning'); return; }
+  var el = getEl('opf-rx-core'); if (el) el.value = body;
+  ST.rx.core = body;
+  toast('已从 ④ 页带入条目正文，点「🔍 解析语言格式」继续');
+  rxDoParse();
+}
+function rxCoreNameFromText(txt) {
+  var m = String(txt).match(/\{\{setvar::系统核心::\s*([^\n}]+)\}\}/);
+  if (m) return m[1].trim();
+  var w = String(txt).match(/<([A-Za-z_]\w*)\b/);
+  return w ? w[1] : '未命名核心';
+}
+// 解析后再定名：setvar 系统核心 > 语言格式里 name 的固定值 > 第一个标签名
+function rxDecideCoreName(txt, parsed) {
+  var m = String(txt).match(/\{\{setvar::系统核心::\s*([^\n}]+)\}\}/);
+  if (m) return m[1].trim();
+  var named = ((parsed && parsed.formats) || []).filter(function (f) { return f.nameValue && !/\{/.test(f.nameValue); })[0];
+  if (named) return named.nameValue;
+  var sp = ((parsed && parsed.formats) || []).filter(function (f) { return f.speaker; })[0];
+  if (sp) return sp.speaker;
+  return rxCoreNameFromText(txt);
+}
+function rxDoParse() {
+  var el = getEl('opf-rx-core');
+  var txt = (el && el.value || '').trim();
+  if (!txt) { toast('请先粘贴核心全文（含语言格式节）', 'warning'); return; }
+  ST.rx.core = txt;
+  var parsed = rxParseLangFormat(txt);
+  ST.rx.parsed = parsed;
+  ST.rx.coreName = rxDecideCoreName(txt, parsed);
+  var box = getEl('opf-rx-parsed');
+  var L = ['核心名：' + ST.rx.coreName, '语言格式节：' + (parsed.section ? parsed.section.length + ' 字符' : '未找到'), '识别到格式 ' + parsed.formats.length + ' 套'];
+  parsed.formats.forEach(function (f, i) {
+    L.push('  [' + (i + 1) + '] ' + f.label + '  · 族=' + f.family + (f.nameValue ? ' · name固定值=' + f.nameValue : '') + (f.quote ? ' · 引号式' : ''));
+    f.params.forEach(function (p) { L.push('        参数 ' + p.name + '：' + (p.values.length ? p.values.join('、') : '（未识别枚举）')); });
+    L.push('        范例 ' + f.examples.length + ' 条' + (f.regex ? '' : '  ← 拒绝自动生成（裸引号式）'));
+  });
+  parsed.notes.forEach(function (n) { L.push('  ⚠ ' + n); });
+  if (box) box.textContent = L.join('\n');
+  // 为每个可生成的格式建一条正则草稿（保留已有编辑）
+  parsed.formats.forEach(function (f) {
+    if (!f.regex) return;
+    var exist = ST.rx.items.filter(function (it) { return it.formatKey === f.key && it.coreName === ST.rx.coreName; })[0];
+    if (exist) { exist.examples = f.examples; exist.hasMood = f.params.some(function (x) { return x.name === 'mood'; }); return; }
+    ST.rx.items.push({
+      id: rxUuid(), coreName: ST.rx.coreName, formatKey: f.key, label: f.label,
+      purpose: '对话美化', tier: 'fine', prefix: rxSlug(ST.rx.coreName) + '-box',
+      findSource: '/' + f.regex.source + '/' + f.regex.flags,
+      replaceHtml: '', testText: f.examples[0] || '', examples: f.examples,
+      hasMood: f.params.some(function (x) { return x.name === 'mood'; }), issues: []
+    });
+  });
+  rxRenderItems(); rxCacheSave();
+  toast('解析完成：' + parsed.formats.length + ' 套格式，已生成 ' + ST.rx.items.length + ' 条正则草稿', parsed.formats.length ? 'success' : 'warning');
+}
+function rxRenderItems() {
+  var box = getEl('opf-rx-items'); if (!box) return;
+  rxInit();
+  box.textContent = '';
+  ST.rx.items.forEach(function (item, idx) {
+    var card = document.createElement('div'); card.className = 'opf-step open';
+    var head = document.createElement('div'); head.className = 'opf-step-head';
+    var idxEl = document.createElement('span'); idxEl.className = 'opf-idx'; idxEl.textContent = String(idx + 1);
+    var ttl = document.createElement('span'); ttl.className = 'opf-step-title'; ttl.textContent = item.label + ' · ' + item.purpose;
+    var sub = document.createElement('span'); sub.className = 'opf-step-sub'; sub.textContent = (item.replaceHtml || '').length + ' 字符 / ' + rxTier(item.tier).label;
+    var del = document.createElement('button'); del.type = 'button'; del.className = 'opf-step-act'; del.textContent = '删除';
+    del.addEventListener('click', function (ev) { ev.stopPropagation(); ST.rx.items.splice(idx, 1); rxRenderItems(); rxCacheSave(); });
+    head.appendChild(idxEl); head.appendChild(ttl); head.appendChild(sub); head.appendChild(del);
+    head.addEventListener('click', function () { card.classList.toggle('open'); });
+    card.appendChild(head);
+
+    var body = document.createElement('div'); body.className = 'opf-step-body';
+    // 用途 / 档位
+    var row1 = document.createElement('div'); row1.className = 'opf-step-ref-row';
+    var psel = document.createElement('select'); psel.className = 'opf-ref-input';
+    RX_PURPOSES.forEach(function (p) { var o = document.createElement('option'); o.value = p; o.textContent = p; if (p === item.purpose) o.selected = true; psel.appendChild(o); });
+    psel.addEventListener('change', function () { item.purpose = this.value; rxRenderItems(); rxCacheSave(); });
+    var tsel = document.createElement('select'); tsel.className = 'opf-ref-input';
+    RX_TIERS.forEach(function (t) { var o = document.createElement('option'); o.value = t.id; o.textContent = t.label + (t.target ? '（≈' + t.target + '）' : '（不设上限）'); if (t.id === item.tier) o.selected = true; tsel.appendChild(o); });
+    tsel.addEventListener('change', function () { item.tier = this.value; rxRenderItems(); rxCacheSave(); });
+    row1.appendChild(psel); row1.appendChild(tsel);
+    body.appendChild(row1);
+    // 匹配式
+    body.appendChild(rxLabel('匹配式（插件生成，可手改）'));
+    var fin = document.createElement('input'); fin.type = 'text'; fin.className = 'opf-ref-input'; fin.value = item.findSource;
+    fin.addEventListener('input', function () { item.findSource = this.value; item.issues = []; rxPreviewInto(item); rxCacheSave(); });
+    body.appendChild(fin);
+    // 替换体
+    body.appendChild(rxLabel('替换体（模型产出，可手改）'));
+    var ta = document.createElement('textarea'); ta.className = 'opf-char-input'; ta.style.minHeight = '80px'; ta.value = item.replaceHtml;
+    ta.addEventListener('input', function () { item.replaceHtml = this.value; rxPreviewInto(item); rxCacheSave(); });
+    body.appendChild(ta);
+    // 测试文本 + 预览
+    body.appendChild(rxLabel('测试文本（默认取核心自带范例）'));
+    var tt = document.createElement('textarea'); tt.className = 'opf-char-input'; tt.style.minHeight = '48px'; tt.value = item.testText;
+    tt.addEventListener('input', function () { item.testText = this.value; rxPreviewInto(item); rxCacheSave(); });
+    body.appendChild(tt);
+    var pv = document.createElement('div'); pv.className = 'opf-rx-preview'; pv.id = 'opf-rx-pv-' + idx;
+    body.appendChild(pv);
+    var stat = document.createElement('div'); stat.className = 'opf-dim'; stat.id = 'opf-rx-st-' + idx;
+    body.appendChild(stat);
+    card.appendChild(body);
+    box.appendChild(card);
+    rxPreviewInto(item);
+  });
+}
+function rxLabel(t) { var d = document.createElement('div'); d.className = 'opf-dim'; d.textContent = t; return d; }
+function rxSetButtons() {
+  ['opf-rx-parse', 'opf-rx-check', 'opf-rx-pull', 'opf-rx-copy1', 'opf-rx-copyall', 'opf-rx-new'].forEach(function (id) {
+    var b = getEl(id); if (b) b.disabled = !!ST.running;
+  });
+  var g = getEl('opf-rx-gen');
+  if (g) { g.disabled = !!ST.running; g.textContent = ST.running ? '■ 运行中…' : '🎨 生成替换体'; }
+}
+function rxPreviewInto(item) {
+  rxInit();
+  var idx = ST.rx.items.indexOf(item);
+  var pv = getEl('opf-rx-pv-' + idx), st = getEl('opf-rx-st-' + idx);
+  if (!pv || !st) return;
+  var m = String(item.findSource).match(/^\/([\s\S]*)\/([a-z]*)$/);
+  if (!m) { st.textContent = '匹配式格式应为 /pattern/flags'; pv.textContent = ''; return; }
+  var re;
+  try { re = new RegExp(m[1], m[2].indexOf('g') >= 0 ? m[2] : m[2] + 'g'); }
+  catch (e) { st.textContent = '正则编译失败：' + (e && e.message ? e.message : e); pv.textContent = ''; return; }
+  var txt = item.testText || '';
+  var hits = 0;
+  var out = txt.replace(re, function () {
+    hits++;
+    var caps = Array.prototype.slice.call(arguments, 1, Math.max(1, arguments.length - 2)).filter(function (c) { return c !== undefined; });
+    if (!item.replaceHtml) return '【此处将替换为美化框：' + caps.join(' ▸ ').slice(0, 50) + '】';
+    return item.replaceHtml.replace(/\$(\d+)/g, function (all, n) { return caps[Number(n) - 1] != null ? caps[Number(n) - 1] : ''; });
+  });
+  if (hits > 0 && item.replaceHtml) {
+    // 预览渲染：移除 script 与事件属性后再插入
+    var safe = out.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/\son\w+\s*=\s*("[^"]*"|'[^']*')/gi, '');
+    pv.innerHTML = safe;
+  } else {
+    pv.textContent = out;
+  }
+  st.textContent = '匹配 ' + hits + ' 处' + (item.replaceHtml ? ' ｜ 替换体 ' + item.replaceHtml.length + ' 字符（' + rxTier(item.tier).label + '档）' : ' ｜ 尚未生成替换体');
+}
+async function rxGenerate() {
+  if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
+  if (!ST.rx.parsed || !ST.rx.items.length) { toast('请先「🔍 解析语言格式」', 'warning'); return; }
+  var todo = ST.rx.items.filter(function (it) { return !it.replaceHtml; });
+  if (!todo.length) todo = ST.rx.items.slice();
+  ST.running = true; renderRunButtons();
+  try {
+    for (var i = 0; i < todo.length; i++) {
+      if (isStop()) break;
+      var it = todo[i];
+      var msgs = [{ role: 'system', content: rxSystemContent() }, { role: 'user', content: macroFill(rxUserPrompt(it, ST.rx.parsed)) }];
+      var resp = await callModel(msgs);
+      it.replaceHtml = rxExtractHtml(resp);
+      it.issues = rxLint(it, ST.rx.parsed);
+      await waitTick();
+    }
+    rxRenderItems(); rxCacheSave();
+    if (isStop()) toast('已停止');
+    else toast('替换体生成完成：可查看右侧预览与自检', 'success');
+  } catch (e) { toast('生成替换体出错：' + (e && e.message ? e.message : e), 'error'); }
+  finally { ST.running = false; renderRunButtons(); }
+}
+function rxDoCheck(showToast) {
+  rxInit();
+  if (!ST.rx.items.length) { if (showToast) toast('还没有正则草稿，请先解析', 'warning'); return; }
+  var all = [];
+  ST.rx.items.forEach(function (it) {
+    it.issues = rxLint(it, ST.rx.parsed);
+    it.issues.forEach(function (is) { all.push({ item: it, issue: is }); });
+  });
+  var box = getEl('opf-rx-issues'); if (box) box.textContent = '';
+  if (box) {
+    if (!all.length) box.textContent = '✓ 全部合规：编译、标志、捕获组引用、体量档位、命名与放置位置均通过';
+    all.forEach(function (x, i) {
+      var row = document.createElement('div'); row.className = 'opf-step-ref-row';
+      var t = document.createElement('span'); t.className = 'opf-ref-tag' + (x.issue.side === 'core' ? ' dirty' : '');
+      t.textContent = (x.issue.side === 'core' ? '改核心' : '改正则');
+      var msg = document.createElement('span'); msg.className = 'opf-dim'; msg.textContent = '[' + x.item.label + '] ' + x.issue.msg;
+      row.appendChild(t); row.appendChild(msg);
+      if (x.issue.fix && x.issue.fix !== 'none' && x.issue.side === 'regex') {
+        var b1 = document.createElement('button'); b1.type = 'button'; b1.className = 'opf-step-act'; b1.textContent = '改正则';
+        b1.addEventListener('click', function () { var r = rxApplyFix(x.item, x.issue); toast(r); rxDoCheck(false); rxRenderItems(); rxCacheSave(); });
+        row.appendChild(b1);
+      }
+      if (x.issue.side === 'core') {
+        var b2 = document.createElement('button'); b2.type = 'button'; b2.className = 'opf-step-act'; b2.textContent = '改核心';
+        b2.addEventListener('click', function () { var r = rxApplyCoreFix(x.item, ST.rx.parsed); toast(r); });
+        row.appendChild(b2);
+        var b3 = document.createElement('button'); b3.type = 'button'; b3.className = 'opf-step-act'; b3.textContent = '改正则';
+        b3.addEventListener('click', function () { toast('请按核心的语言格式手工调整匹配式，或在核心侧统一格式后重新解析'); });
+        row.appendChild(b3);
+      }
+      box.appendChild(row);
+    });
+  }
+  if (showToast) toast(all.length ? ('自检发现 ' + all.length + ' 条问题（每条都给了改正则/改核心两个处理入口）') : '自检通过：全部合规', all.length ? 'warning' : 'success');
+  rxCacheSave();
+}
+function rxCopy(all) {
+  rxInit();
+  if (!ST.rx.items.length) { toast('还没有正则草稿', 'warning'); return; }
+  var objs = ST.rx.items.map(function (it) { return rxBuildObject(it); });
+  var txt = all ? JSON.stringify(objs, null, 2) : JSON.stringify(objs[0], null, 2);
+  destCopyText(txt, '没有可复制的内容');
+}
+function rxClear() {
+  if (!window.confirm('清空正则工坊（核心文本与全部正则草稿）？此操作不可撤销。')) return;
+  ST.rx = { core: '', coreName: '', parsed: null, items: [], _inited: false };
+  var el = getEl('opf-rx-core'); if (el) el.value = '';
+  var pb = getEl('opf-rx-parsed'); if (pb) pb.textContent = '尚未解析';
+  var ib = getEl('opf-rx-issues'); if (ib) ib.textContent = '尚未自检';
+  rxRenderItems(); rxCacheSave();
+  toast('已清空');
+}
+function rxCacheSave() {
+  if (rxCacheSave._t) clearTimeout(rxCacheSave._t);
+  rxCacheSave._t = setTimeout(function () {
+    if (!ST.rx) return;
+    lsSet(LS_RX_KEY, { core: ST.rx.core, coreName: ST.rx.coreName, items: ST.rx.items });
+  }, 500);
+}
+function rxCacheRestore() {
+  rxInit();
+  var c = lsGet(LS_RX_KEY); if (!c || typeof c !== 'object') return;
+  ST.rx.core = c.core || ''; ST.rx.coreName = c.coreName || ''; ST.rx.items = c.items || [];
+  var el = getEl('opf-rx-core'); if (el && !el.value) el.value = ST.rx.core;
+  if (ST.rx.core) { try { rxDoParseSilent(); } catch (e) { opfErr('rxDoParseSilent', e); } }
+  try { rxRenderItems(); } catch (e) { opfErr('rxRenderItems', e); }
+}
+function rxDoParseSilent() {
+  if (!ST.rx.core) return;
+  ST.rx.parsed = rxParseLangFormat(ST.rx.core);
+  var box = getEl('opf-rx-parsed');
+  if (box) box.textContent = '已从缓存恢复草稿（核心 ' + ST.rx.core.length + ' 字符，正则 ' + ST.rx.items.length + ' 条）。点「🔍 解析语言格式」可重新解析。';
+}
+
 // ============ boot ============
 function boot(){
   injectStyle();
@@ -3233,6 +3856,7 @@ function boot(){
   try { worldCacheRestore(); } catch (e) { opfErr("worldCacheRestore", e); }
   try { charDraftRestore(); } catch (e) { opfErr("charDraftRestore", e); }
   try { destDraftRestore(); } catch (e) { opfErr("destDraftRestore", e); }
+  try { rxCacheRestore(); } catch (e) { opfErr("rxCacheRestore", e); }
   initMemo();
   opfLog("loaded. context ready:", !!getCtx());
 }
