@@ -615,7 +615,7 @@ function refineParseGenBlocks(raw){
       else if (n1 >= 0) { truncated++; continue; }
     }
     if (!content.trim()) { truncated++; continue; }
-    units.push({ '类型': String(type).trim(), '意图': String(intent).trim(), '内容': content });
+    units.push({ '类型': String(type).trim(), '意图': String(intent).trim(), '内容': refineFromPrompt(content) });   // 还原 &lt;% → <%
   }
   var tailM = t.match(/^[ \t]*(后续|冲突)[ \t]*[:：][ \t]*(.+)$/gm);
   if (tailM) tail = tailM.join('\n');
@@ -638,7 +638,7 @@ function refineParseLocate(raw){
     if (a1 >= 0 && a2 >= 0) anchor = body.slice(a1 + 3, a2).replace(/^\n/, '').replace(/\n$/, '').trim();
     else if (a1 >= 0) { truncated++; anchors.push({ i: i, '锚点': '', '说明': String(note).trim() }); continue; }
     if (/^[（(]\s*找不到\s*[)）]$/.test(anchor)) anchor = '';
-    anchors.push({ i: i, '锚点': anchor, '说明': String(note).trim() });
+    anchors.push({ i: i, '锚点': refineFromPrompt(anchor), '说明': String(note).trim() });   // 还原 &lt;% → <%（锚点要跟真实文本对得上）
   }
   return { ok: anchors.length > 0, why: anchors.length ? '' : '没有解析出定位', anchors: anchors, truncated: truncated };
 }
@@ -783,6 +783,75 @@ function refinePatchTaint(changes, pool, names){
     });
   });
   return out;
+}
+
+// ============================================================================
+// 读取待改文本：唯一入口（v1.14.1）
+// 起因：用户粘贴了正文，但发出去的请求里 src 只有换行 —— 读到的内容为空。
+// 现在两边兜底：框里有就用框里的；框里空的但状态里有（粘贴被清掉/页面重渲染）就用状态里的，
+// 并把它写回框里（让你看得见插件到底拿到了什么）。同时给出体检，供"一键诊断"。
+// ============================================================================
+function refineReadSrc(syncBack){
+  var el = getEl('opf-rf-src');
+  var dom = (el && typeof el.value === 'string') ? el.value : '';
+  var st = String((ST.refine && ST.refine.src) || '');
+  var use;
+  if (dom.trim()) use = dom;
+  else if (st.trim()) use = st;
+  else use = dom || st;
+  if (ST.refine) ST.refine.src = use;
+  if (syncBack !== false && el && use && el.value !== use) el.value = use;   // 状态里有、框里没有 → 补回框里
+  return String(use || '');
+}
+// 待改文本的体检（长度/行数/首尾行/包裹标签/十槽），用于随时核对"插件到底读到了什么"
+function refineSrcHealth(src){
+  var t = String(src || '');
+  var lines = t.split(/\r?\n/);
+  var first = '', last = '';
+  for (var i = 0; i < lines.length; i++) { if (lines[i].trim()) { first = lines[i].trim(); break; } }
+  for (var j = lines.length - 1; j >= 0; j--) { if (lines[j].trim()) { last = lines[j].trim(); break; } }
+  var wrap = (t.match(/^<([^>\s{}]+)>/m) || [])[1] || '';
+  var slots = 0;
+  try { slots = destExtractSlots(t).order.length; } catch (e) {}
+  return { chars: t.length, lines: lines.length, first: first, last: last, wrapper: wrap, slots: slots,
+    ok: t.trim().length >= 100 };
+}
+function refineSrcDiag(){
+  var el = getEl('opf-rf-src');
+  var dom = (el && typeof el.value === 'string') ? el.value : '(找不到输入框)';
+  var st = String((ST.refine && ST.refine.src) || '');
+  var use = refineReadSrc(false);
+  var h = refineSrcHealth(use);
+  var L = [];
+  L.push('【文本框里的内容】' + (el ? (dom.length + ' 字符') : '找不到 #opf-rf-src'));
+  L.push('【插件状态里的内容】' + st.length + ' 字符');
+  L.push('【本次会真正发给 AI 的】' + use.length + ' 字符' + (use === dom && dom ? '（取文本框）' : (use === st && st ? '（取状态；已回填到文本框）' : '（都为空）')));
+  L.push('');
+  L.push('字符 ' + h.chars + ' ｜ 行数 ' + h.lines + ' ｜ 包裹标签 ' + (h.wrapper ? '<' + h.wrapper + '>' : '未识别') + ' ｜ 十槽 ' + h.slots + '/10');
+  L.push('第一行：' + JSON.stringify(h.first.slice(0, 80)));
+  L.push('最后一行：' + JSON.stringify(h.last.slice(0, 80)));
+  if (!h.ok) L.push('\n⚠ 内容过短或不含正文：如果你明明粘了东西，请把上面这两行数字发我（文本框 X 字符 / 状态 Y 字符）。');
+  return L.join('\n');
+}
+
+// ============================================================================
+// EJS 转义（v1.14.1）：命定核心里几乎全是 `<%_ … _%>`，而提示词在发送前要经过酒馆的
+// 提示词管线 —— 若装了 ST-Prompt-Template，它会把这些标签**当 EJS 执行掉**：
+// 代码被吃、输出只剩空白，模型看到的就是"你发来的是空的"（本地结构体检却一切正常，
+// 因为那是直接读文本框算的）。所以：嵌入提示词时统一转义，拿回结果再还原。
+//   `<%` → `&lt;%`    `%>` → `%&gt;`
+// 只做这两条窄映射，避免误伤正文里本来就有的 &lt; 之类。
+// ============================================================================
+function refineForPrompt(t){
+  return String(t == null ? '' : t).replace(/<%!/g, '&lt;%!').replace(/<%/g, '&lt;%').replace(/%>/g, '%&gt;');
+}
+function refineFromPrompt(t){
+  return String(t == null ? '' : t).replace(/&lt;%/g, '<%').replace(/%&gt;/g, '%>');
+}
+function refineEjsEscNote(t){
+  var n = (String(t || '').match(/<%/g) || []).length;
+  return n ? ('（本文含 ' + n + ' 处 EJS 标签，已转义为 &lt;% … %&gt; 以免被宿主引擎执行；'
+    + '你输出新内容时请沿用同样的转义写法，插件会自动还原成 <% %>）') : '';
 }
 
 function refineInit(){
@@ -1076,8 +1145,8 @@ function refineApplyPatch(src, changes, opts){
   var o = opts || {};
   (changes || []).forEach(function (ch, i) {
     var type = String(ch['类型'] || ch['type'] || '替换');
-    var anchor = String(ch['锚点'] || ch['anchor'] || '');
-    var next = ch['新内容'] != null ? String(ch['新内容']) : (ch['content'] != null ? String(ch['content']) : '');
+    var anchor = refineFromPrompt(String(ch['锚点'] || ch['anchor'] || ''));
+    var next = refineFromPrompt(ch['新内容'] != null ? String(ch['新内容']) : (ch['content'] != null ? String(ch['content']) : ''));
     var why = String(ch['理由'] || '');
     if (!anchor) { failed.push({ i: i, why: '锚点为空', ch: ch }); return; }
     if (!next.trim()) { failed.push({ i: i, why: '新内容为空', ch: ch }); return; }

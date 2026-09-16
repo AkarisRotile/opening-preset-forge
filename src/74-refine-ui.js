@@ -74,9 +74,10 @@ var REFINE_HTML = '<div class="opf-char-wrap">'
   + '<div class="opf-char-tools">'
   + '<label class="opf-btn ghost" style="margin:0">📂 打开文件<input type="file" id="opf-rf-file" accept=".yaml,.yml,.txt,.json,.md" style="display:none"></label>'
   + '<button type="button" class="opf-btn ghost" id="opf-rf-fromdest">⬅ 从 ④ 页带入成品</button>'
-  + '<button type="button" class="opf-btn ghost" id="opf-rf-fromworld">📚 从世界书命定系统条目挑一份</button>'
   + '<button type="button" class="opf-btn ghost" id="opf-rf-clear">🗑 清空</button>'
+  + '<button type="button" class="opf-btn ghost" id="opf-rf-srcchk">🔍 读一下文本框</button>'
   + '</div>'
+  + '<pre id="opf-rf-srcout" class="opf-box opf-char-report" style="display:none">尚未诊断</pre>'
   + '<div class="opf-dim" id="opf-rf-status">还没载入核心</div>'
   + '<div class="opf-sec"><div class="opf-sec-label">结构体检（脚本，零 AI）</div><pre id="opf-rf-scan" class="opf-box opf-char-report">尚未载入</pre></div>'
   + '<div class="opf-char-tools"><button type="button" class="opf-btn primary" id="opf-rf-analyze">① 整体分析</button>'
@@ -122,22 +123,28 @@ function bindRefinePage(){
     fr.readAsText(file, 'utf-8');
     this.value = '';
   });
-  getEl('opf-rf-src').addEventListener('input', function () { refineInit(); ST.refine.src = this.value; ST.refine.scan = refineScan(this.value).text; var s = getEl('opf-rf-scan'); if (s) s.textContent = ST.refine.scan; refineCacheSave(); });
+  getEl('opf-rf-src').addEventListener('input', function () {
+    refineInit(); ST.refine.src = this.value; ST.refine.scan = refineScan(this.value).text;
+    var s = getEl('opf-rf-scan'); if (s) s.textContent = ST.refine.scan;
+    var c = getEl('opf-rf-status');
+    if (c) c.textContent = '文本框 ' + this.value.length + ' 字符 / ' + this.value.split(/\r?\n/).length + ' 行' + (this.value.trim() ? '' : '（空）');
+    refineCacheSave();
+  });
+  getEl('opf-rf-srcchk').addEventListener('click', function () {
+    var box = getEl('opf-rf-srcout'); if (!box) return;
+    var open = box.style.display !== 'none';
+    box.textContent = open ? '尚未诊断' : refineSrcDiag();
+    box.style.display = open ? 'none' : 'block';
+    var h = refineSrcHealth(refineReadSrc(false));
+    toast('文本框 ' + h.chars + ' 字符 / ' + h.lines + ' 行' + (h.wrapper ? '｜包裹标签 <' + h.wrapper + '>' : '｜未识别到包裹标签'), h.ok ? 'success' : 'warning');
+  });
+  // 页面打开时：若框里是空的而缓存里有内容，补回框里（绝不覆盖你已粘贴的内容）
+  try { if (!refineReadSrc(false).trim()) refineCacheRestore(); } catch (e) { opfErr('refineCacheRestore', e); }
   getEl('opf-rf-fromdest').addEventListener('click', function () {
     var body = ST.dest && ST.dest.body;
     if (!body) { toast('④ 页还没有成品：先去 ④ 页「🎁 脚本封装」，或直接把核心粘进来', 'warning'); return; }
     refineLoad(body, '④页成品-' + (ST.dest.asmInfo && ST.dest.asmInfo.wrapper || '核心'));
     toast('已从 ④ 页带入成品（' + body.length + ' 字符）');
-  });
-  getEl('opf-rf-fromworld').addEventListener('click', function () {
-    var list = refineCoreList();
-    if (!list.length) { toast('还没有可选的命定系统条目：请先在 ② 世界书页导入世界书（勾选影响的是发给 AI 的上下文，这里只用来挑文本）', 'warning'); return; }
-    var names = list.slice(0, 40).map(function (x, i) { return (i + 1) + '. ' + x.name; }).join('\n');
-    var pick = window.prompt('选择要修改的命定系统条目（输入序号）：\n' + names, '1');
-    var i2 = parseInt(pick, 10);
-    if (!i2 || !list[i2 - 1]) return;
-    refineLoad(list[i2 - 1].content, list[i2 - 1].name);
-    toast('已带入「' + list[i2 - 1].name + '」');
   });
   getEl('opf-rf-clear').addEventListener('click', function () {
     if (!window.confirm('清空本页的载入内容、分析与成品？（不影响其它页面）')) return;
@@ -224,21 +231,6 @@ function bindRefinePage(){
   });
   refineRender();
 }
-function refineCoreList(){
-  var out = [];
-  try {
-    var wb = ST.world;
-    var entries = wb && wb.entries ? wb.entries : (wb && wb.data && wb.data.entries ? wb.data.entries : null);
-    if (entries) {
-      Object.keys(entries).forEach(function (k) {
-        var e = entries[k];
-        if (e && e.content && /命定系统/.test(String(e.comment || ''))) out.push({ name: String(e.comment || k).replace('[本体][命定系统]', ''), content: String(e.content) });
-      });
-    }
-  } catch (e) {}
-  out.sort(function (a, b) { return a.name < b.name ? -1 : 1; });
-  return out;
-}
 function refineRender(){
   refineInit();
   var s = ST.refine;
@@ -255,14 +247,19 @@ function refineRender(){
 }
 async function refineAnalyze(){
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
-  var src = String((getEl('opf-rf-src') || {}).value || ST.refine.src || '');
-  if (!src.trim()) { toast('先把核心文本粘进来（或打开文件）', 'warning'); return; }
+  var src = refineReadSrc();
+  if (!refineSrcHealth(src).ok) {
+    refineNote('① 读到的内容为空或过短，已拒绝发送（点「🔍 读一下文本框」看诊断）');
+    toast('读到的内容为空或过短，没有发送请求——点「🔍 读一下文本框」可看诊断', 'error');
+    var d0 = getEl('opf-rf-srcout'); if (d0) { d0.textContent = refineSrcDiag(); d0.style.display = 'block'; }
+    return;
+  }
   refineInit(); ST.refine.src = src;
   if (!ST.refine.scan) ST.refine.scan = refineScan(src).text;
   ST.running = true; renderRunButtons(); refineNote('① 整体分析中…（只读，不会改动任何内容）');
   try {
     var msg = '[待修改的二创核心（唯一的分析对象；下面的【世界设定参考】不是它的一部分）]\n'
-      + '<<<二创核心原文\n' + src.slice(0, 60000) + '\n二创核心原文结束>>>'
+      + '<<<二创核心原文\n' + refineForPrompt(src.slice(0, 60000)) + '\n二创核心原文结束>>>' + refineEjsEscNote(src)
       + '\n\n' + REFINE_ANALYZE_SPEC;
     var resp = await callModel([{ role: 'system', content: refineSystem() }, { role: 'user', content: macroFill(msg) }]);
     var j = rxExtractJson(resp);
@@ -325,14 +322,14 @@ function refineSystem(){
 }
 async function refinePlan(){
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
-  var src = String((getEl('opf-rf-src') || {}).value || ST.refine.src || '');
+  var src = refineReadSrc();
   var req = String((getEl('opf-rf-req') || {}).value || '').trim();
   if (!src.trim()) { toast('先载入核心文本', 'warning'); return; }
   if (!req) { toast('先写下你的修改意见', 'warning'); return; }
   ST.refine.src = src; ST.refine.request = req;
   ST.running = true; renderRunButtons(); refineNote('② 分析你的意见中…（仍然不会改动正文）');
   try {
-    var msg = '[待修改的二创核心（唯一会被改动的对象）]\n<<<二创核心原文\n' + src.slice(0, 60000) + '\n二创核心原文结束>>>'
+    var msg = '[待修改的二创核心（唯一会被改动的对象）]\n<<<二创核心原文\n' + refineForPrompt(src.slice(0, 60000)) + '\n二创核心原文结束>>>' + refineEjsEscNote(src)
       + '\n\n[已完成的整体分析]\n' + (ST.refine.analysis || '（无，可先点①）')
       + '\n\n[用户的修改意见]\n' + req + '\n\n' + REFINE_PLAN_SPEC;
     var resp = await callModel([{ role: 'system', content: refineSystem() }, { role: 'user', content: macroFill(msg) }]);
@@ -347,7 +344,7 @@ async function refinePlan(){
     if (!ST.refine.steps.length && j) {
       ST.refine.steps = [{ i: 0, title: '一次完成', detail: String(j['确认提示'] || '按已确认的改法一次落地'), est: 0, done: false }];
     }
-    ST.refine.working = String((getEl('opf-rf-src') || {}).value || ST.refine.src || '');
+    ST.refine.working = refineReadSrc();
     ST.refine.stepIndex = 0;
     ST.refine.lastFailed = null;
     ST.refine.applied = []; ST.refine.result = ''; ST.refine.diff = ''; ST.refine.fidelity = null;
@@ -391,11 +388,11 @@ function refineFormatPlan(j){
 }
 async function refineSuggest(){
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
-  var src = String((getEl('opf-rf-src') || {}).value || ST.refine.src || '');
+  var src = refineReadSrc();
   if (!src.trim()) { toast('先载入核心文本', 'warning'); return; }
   ST.running = true; renderRunButtons();
   try {
-    var msg = '[待修改的二创核心（只针对它提方向；不要提世界参考里的规则）]\n<<<二创核心原文\n' + src.slice(0, 60000) + '\n二创核心原文结束>>>'
+    var msg = '[待修改的二创核心（只针对它提方向；不要提世界参考里的规则）]\n<<<二创核心原文\n' + refineForPrompt(src.slice(0, 60000)) + '\n二创核心原文结束>>>' + refineEjsEscNote(src)
       + '\n\n请给出 3~5 条**不破坏现有设计**的优化方向（每条一行、≤40字、具体可执行），例如补齐缺口、让某条规则更自洽、增加与既有功能的联动。不要输出正文，不要提"重写/重构"，也不要建议"补上世界规则里的某某"（那是参考资料，不属于这个核心）。';
     var resp = await callModel([{ role: 'system', content: refineSystem() }, { role: 'user', content: macroFill(msg) }]);
     var list = [];
@@ -413,7 +410,7 @@ async function refineSuggest(){
 async function refineApply(mode){
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
   var locateOnly = (mode === 'locate') && ST.refine.pendingGen && ST.refine.pendingGen.length;
-  var src = String((getEl('opf-rf-src') || {}).value || ST.refine.src || '');
+  var src = refineReadSrc();
   var req = String((getEl('opf-rf-req') || {}).value || ST.refine.request || '').trim();
   if (!src.trim()) { toast('先载入核心文本', 'warning'); return; }
   if (!ST.refine.plan) { toast('请先点「② 分析这条意见」并确认改法', 'warning'); return; }
@@ -446,7 +443,7 @@ async function refineApply(mode){
       : null;
     if (locateOnly) refineNote('③ ' + stepLabel + '：只重跑定位（沿用上次已生成的内容，不重新写）…');
     else {
-    var genMsg = '[你之前提供的系统核心 · 当前稿（仅供你了解既有写法与上下文；本阶段不要定位）]\n<<<二创核心当前稿\n' + ctxText + '\n二创核心当前稿结束>>>'
+    var genMsg = '[你之前提供的系统核心 · 当前稿（仅供你了解既有写法与上下文；本阶段不要定位）]\n<<<二创核心当前稿\n' + refineForPrompt(ctxText) + '\n二创核心当前稿结束>>>' + refineEjsEscNote(ctxText)
       + (ctxTrunc ? '\n\n（注意：当前稿过长已截断显示，超出部分你看不到）' : '')
       + '\n\n[用户意见]\n' + req
       + '\n\n[已确认的改法分析]\n' + ST.refine.plan
@@ -488,11 +485,11 @@ async function refineApply(mode){
     var ao = getEl('opf-rf-applyout');
     // ---- 阶段 B：只定位（只给「核心当前稿 + 本次改动清单」，不带世界参考）----
     refineNote('③ ' + stepLabel + '：阶段 B · 正在定位插入位置…');
-    var locMsg = '[你之前提供的系统核心 · 当前稿（**只有这份文本**；本阶段不要读任何其它资料、不要改写任何内容）]\n<<<二创核心当前稿\n' + ctxText + '\n二创核心当前稿结束>>>'
+    var locMsg = '[你之前提供的系统核心 · 当前稿（**只有这份文本**；本阶段不要读任何其它资料、不要改写任何内容）]\n<<<二创核心当前稿\n' + refineForPrompt(ctxText) + '\n二创核心当前稿结束>>>' + refineEjsEscNote(ctxText)
       + '\n\n[本次写好的改动清单（编号顺序不可变）]\n'
       + gen.units.map(function (u, i) {
         return '###改动' + (i + 1) + '\n类型: ' + (u['类型'] || '后插') + '\n意图: ' + (u['意图'] || '') + '\n内容预览:\n<<<\n'
-          + String(u['内容']).slice(0, 400) + (String(u['内容']).length > 400 ? '\n…（已截断预览，你不需要看到全文，只需要定位）' : '') + '\n>>>';
+          + refineForPrompt(String(u['内容']).slice(0, 400)) + (String(u['内容']).length > 400 ? '\n…（已截断预览，你不需要看到全文，只需要定位）' : '') + '\n>>>';
       }).join('\n\n')
       + hintBlock
       + '\n\n' + REFINE_LOCATE_SPEC;
