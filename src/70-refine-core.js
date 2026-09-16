@@ -548,8 +548,245 @@ var REFINE_PATCH_SPEC = [
   '若某条改动实在无法用唯一锚点表达，就不要放进变更块，写进末尾的「冲突:」一行并说明。'
 ].join('\n');
 
+// ============================================================================
+// 两阶段：先「生成内容」再「定位锚点」（v1.14.0）
+// 起因：让模型在同一次输出里既写内容又写锚点，锚点一写错（凭记忆抄原文）整轮就报废，
+// 用户看到的是"AI 直接不继续生成"。改成：
+//   阶段 A（生成）：只写"要加/要改成什么"，**不许写锚点**，也不许读世界参考；
+//   阶段 B（定位）：**只**拿「核心当前稿 + 本次改动清单」决定每处改动插到哪里，不改写内容。
+// 这样内容一定会产出，定位失败也只是"位置待定"，可以只重跑定位（便宜）。
+// ============================================================================
+var REFINE_GEN_SPEC = [
+  '【本步只做一件事：把要写的内容写出来】',
+  '你现在**不要**去原文里找位置、**不要**写锚点、**不要**输出任何定位信息——那是下一步的事。你只负责写内容。',
+  '按下面的分块格式输出（对"输出被截断"最友好；不要用 json 包裹）：',
+  '',
+  '###改动1',
+  '类型: 前插|后插|替换',
+  '意图: 一句话说清"这处改动是干什么的、大概想放在哪一节"（例如：在「初始觉醒」列表之后加入状态机判定）',
+  '内容:',
+  '<<<',
+  '（要插入或替换的完整内容；可以是纯文本，也可以是 EJS 代码）',
+  '>>>',
+  '',
+  '###改动2 …（需要多处改动就重复这个块）',
+  '',
+  '类型语义：前插=把内容放在某处之前；后插=放在某处之后；替换=用内容替换掉某一段。类型只表达"相对位置关系"，具体锚点由下一步决定，所以这里写错不影响正确性。',
+  '【输出上限】本步内容合计**不要超过 ' + '1200' + ' 字符**；超了就只写前半部分，并在末尾写 `后续: 还需要……`，下一轮继续。',
+  '【内容要求】① 只写为了满足用户意见而需要的内容，不要顺手重构；② 不新增用户没要求的设定；③ 保留既有写法（缩进风格、变量命名、口令）；④ EJS 代码要自洽（花括号配对、标签闭合）；⑤ **不要**把世界设定参考里的内容抄进来（那些是世界规则，不属于这个核心）。',
+  '【不要做的事】不要在内容里附带"这是插在某某之后"的说明文字；不要输出原文片段；不要输出锚点。'
+].join('\n');
+var REFINE_LOCATE_SPEC = [
+  '【本步只做一件事：定位】',
+  '你手上只有两样东西：① 用户之前提供的**核心当前稿**；② 本次已经写好的**改动清单**。',
+  '你的任务：为清单里的每一处改动，在核心当前稿里找出**一个逐字存在且唯一**的锚点片段，说明它应该插到哪里。',
+  '**不要改写、不要补充、不要润色任何内容**；不要输出核心正文；不要引用任何世界设定或参考资料。',
+  '按下面的分块格式输出，编号必须与改动清单一一对应：',
+  '',
+  '###定位1',
+  '锚点:',
+  '<<<',
+  '（核心当前稿里逐字存在、且只出现一次的片段：20~80 字符，最好从你要定位的那一行开头开始，往后多带一两行）',
+  '>>>',
+  '说明: 一句话（例如：放在「初始觉醒」整段末尾之后）',
+  '',
+  '###定位2 …',
+  '',
+  '【找不到时怎么办】如果某一处确实无法定位，就照常输出 `###定位N`，把锚点写成 `（找不到）`，并在说明里写清你判断的原因（例如"当前稿里没有与之对应的章节"）。**不要**编一个原文里不存在的锚点。',
+  '【锚点纪律】锚点请从核心当前稿里**复制粘贴**，不要凭记忆手打；若一行不够唯一，就多带相邻的一两行。'
+].join('\n');
+// 阶段 A 解析：###改动N / 类型 / 意图 / 内容 <<< … >>>
+function refineParseGenBlocks(raw){
+  var t = String(raw || '');
+  var F = fence();
+  t = t.replace(new RegExp(F + '[a-zA-Z]*\\s*\\n', 'g'), '').replace(new RegExp('\\n?' + F, 'g'), '');
+  var marks = t.split(/^[ \t]*#{2,4}[ \t]*改动[ \t]*\d*[ \t]*$/m);
+  if (marks.length < 2) return { ok: false, why: '没有找到 `###改动` 分块', units: [], truncated: 0, tail: '' };
+  var units = [], truncated = 0, tail = '';
+  for (var i = 1; i < marks.length; i++) {
+    var body = marks[i];
+    var type = (body.match(/^[ \t]*类型[ \t]*[:：][ \t]*(.+)$/m) || [])[1] || '后插';
+    var intent = (body.match(/^[ \t]*意图[ \t]*[:：][ \t]*(.+)$/m) || [])[1] || '';
+    var nKey = body.search(/^[ \t]*内容[ \t]*[:：]/m);
+    var content = '';
+    if (nKey >= 0) {
+      var n1 = body.indexOf('<<<', nKey), n2 = n1 >= 0 ? body.indexOf('>>>', n1 + 3) : -1;
+      if (n1 >= 0 && n2 >= 0) content = body.slice(n1 + 3, n2).replace(/^\n/, '').replace(/\n$/, '');
+      else if (n1 >= 0) { truncated++; continue; }
+    }
+    if (!content.trim()) { truncated++; continue; }
+    units.push({ '类型': String(type).trim(), '意图': String(intent).trim(), '内容': content });
+  }
+  var tailM = t.match(/^[ \t]*(后续|冲突)[ \t]*[:：][ \t]*(.+)$/gm);
+  if (tailM) tail = tailM.join('\n');
+  var lastBlk = marks[marks.length - 1];
+  if (lastBlk.indexOf('<<<') >= 0 && lastBlk.indexOf('>>>', lastBlk.lastIndexOf('<<<')) < 0 && !truncated) truncated = 1;
+  return { ok: units.length > 0, why: units.length ? '' : '分块里没有解析出可用的"内容"', units: units, truncated: truncated, tail: tail };
+}
+// 阶段 B 解析：###定位N / 锚点 <<< … >>> / 说明
+function refineParseLocate(raw){
+  var t = String(raw || '');
+  var marks = t.split(/^[ \t]*#{2,4}[ \t]*定位[ \t]*\d*[ \t]*$/m);
+  if (marks.length < 2) return { ok: false, why: '没有找到 `###定位` 分块', anchors: [], truncated: 0 };
+  var anchors = [], truncated = 0;
+  for (var i = 0; i < marks.length - 1; i++) {
+    var body = marks[i + 1];
+    var note = (body.match(/^[ \t]*说明[ \t]*[:：][ \t]*(.+)$/m) || [])[1] || '';
+    var a1 = body.indexOf('<<<');
+    var a2 = a1 >= 0 ? body.indexOf('>>>', a1 + 3) : -1;
+    var anchor = '';
+    if (a1 >= 0 && a2 >= 0) anchor = body.slice(a1 + 3, a2).replace(/^\n/, '').replace(/\n$/, '').trim();
+    else if (a1 >= 0) { truncated++; anchors.push({ i: i, '锚点': '', '说明': String(note).trim() }); continue; }
+    if (/^[（(]\s*找不到\s*[)）]$/.test(anchor)) anchor = '';
+    anchors.push({ i: i, '锚点': anchor, '说明': String(note).trim() });
+  }
+  return { ok: anchors.length > 0, why: anchors.length ? '' : '没有解析出定位', anchors: anchors, truncated: truncated };
+}
+// 脚本兜底定位：用"意图"里提到的节名/标签名在当前稿里找唯一的一行
+function refineLocateByIntent(work, intent){
+  var t = String(work || ''), s = String(intent || '');
+  if (!t.trim() || !s.trim()) return '';
+  var cands = [];
+  var re = /[「『【\["']([^」』】\]"'\n]{2,24})[」』】\]"']/g, m;
+  while ((m = re.exec(s)) !== null) cands.push(m[1].trim());
+  s.split(/[\s，,、：:；;（）()]+/).forEach(function (w) { if (w.length >= 3 && w.length <= 16) cands.push(w); });
+  for (var i = 0; i < cands.length; i++) {
+    var name = cands[i];
+    if (!name) continue;
+    var lines = t.split(/\r?\n/);
+    var hits = [];
+    for (var k = 0; k < lines.length; k++) {
+      var l = lines[k].trim();
+      if (!l) continue;
+      if (l === name || l === name + ':' || l === name + '：' || l.indexOf(name + ':') === 0 || l.indexOf(name + '：') === 0) hits.push(k);
+    }
+    if (hits.length === 1) return lines.slice(hits[0], hits[0] + 2).join('\n').trim();
+  }
+  return '';
+}
+
+// ============================================================================
+// 材料隔离（v1.14.0）：② 页勾选的世界书是「只读参考资料」，⑦ 页载入的文本才是
+// 「要修改的二创核心」。两者混在同一上下文里，模型会把世界规则（变量更新规则、
+// 好感度规则等）当成"我这个核心的一部分"，导致逻辑混乱。
+// 两层隔离：① 提示词里把两种材料的角色写死（模板在 74 号分块）；
+//          ② 代码按"整行只在参考里出现"做机械核对，抓真实搬运。
+// ============================================================================
+var REFINE_TAINT_MIN = 24;            // 判定"搬运"的最短片段
+function refineRefText(){
+  try { return String(ST.worldInfo || ''); } catch (e) { return ''; }
+}
+// 取"明显属于参考材料"的整行（够长，且不在目标文本里出现）
+function refineTaintPool(target, ref){
+  var t = String(target || ''), r = String(ref || '');
+  if (!r.trim()) return [];
+  var pool = [], seen = {};
+  r.split(/\r?\n/).forEach(function (l) {
+    var s = l.trim();
+    if (s.length < REFINE_TAINT_MIN) return;
+    if (t.indexOf(s) >= 0) return;                      // 目标里也有 → 不算参考独有
+    if (seen[s]) return;
+    seen[s] = 1; pool.push(s);
+  });
+  return pool;
+}
+// 二元组相似度：b 的二元组有多大比例出现在 a 里（对"换句话重述"也敏感）
+function refineSim(a, b){
+  var A = String(a || ''), B = String(b || '');
+  if (B.length < REFINE_TAINT_MIN) return 0;
+  var bg = [];
+  for (var i = 0; i < B.length - 1; i++) bg.push(B.slice(i, i + 2));
+  if (!bg.length) return 0;
+  var hit = 0;
+  for (var k = 0; k < bg.length; k++) if (A.indexOf(bg[k]) >= 0) hit++;
+  return hit / bg.length;
+}
+// 参考独有的"结构性名字"：小节名、规则名、键名（如「变量更新规则」「好感度」）。
+// 这些短名字是串台最典型的痕迹——核心原文里根本没有它们，模型只能是从参考里看到的。
+function refineNamePool(target, ref){
+  var t = String(target || ''), r = String(ref || '');
+  if (!r.trim()) return [];
+  var out = [], seen = {};
+  r.split(/\r?\n/).forEach(function (l) {
+    var s = l.replace(/^\s*(?:[-*•]|\d+[.、)])\s*/, '').trim();
+    if (!s) return;
+    var isKeyLine = /[:：]\s*$/.test(s);
+    var name = s.replace(/[:：]\s*$/, '').trim();
+    if (!isKeyLine) {
+      // 非标题行：只看"像名字"的整行（无句读、够短）
+      if (/[。；！？]/.test(s) || name.length < 2 || name.length > 24) return;
+    }
+    if (!/^[\w\u4e00-\u9fa5.\[\]（）()&·\-\s]{2,30}$/.test(name)) return;
+    if (name.length < 2 || name.length > 24) return;
+    if (t.indexOf(name) >= 0) return;                       // 目标里也有 → 不算参考独有
+    if (seen[name]) return;
+    seen[name] = 1; out.push(name);
+  });
+  return out.slice(0, 400);
+}
+function refineFindNames(text, names){
+  var t = String(text || ''), hits = [];
+  (names || []).forEach(function (n) {
+    if (hits.length >= 6 || hits.indexOf(n) >= 0) return;
+    if (n && t.indexOf(n) >= 0) hits.push(n);
+  });
+  return hits;
+}
+// 在一段模型输出里找"只可能来自参考材料"的片段：先查逐字，再查高度相似（≥65%）
+function refineFindTaint(text, pool){
+  var t = String(text || ''), hits = [];
+  if (!t.trim()) return hits;
+  var lines = t.split(/\r?\n/).map(function (x) { return x.trim(); }).filter(function (x) { return x.length >= REFINE_TAINT_MIN; });
+  (pool || []).forEach(function (s) {
+    if (hits.length >= 6 || hits.indexOf(s) >= 0) return;
+    var probe = s.slice(0, Math.min(40, s.length));                 // 逐字探针
+    if (probe.length >= REFINE_TAINT_MIN && t.indexOf(probe) >= 0) { hits.push(s); return; }
+    for (var i = 0; i < lines.length && i < 200; i++) {             // 相似：任何一行与它对得上
+      if (refineSim(lines[i], s) >= 0.65) { hits.push(s); return; }
+    }
+  });
+  return hits;
+}
+// ① 分析结果核对：模型报的字段里，是否混进了只存在于参考材料的内容
+function refineAnalysisTaint(j, pool, names){
+  var out = [];
+  var hasP = pool && pool.length, hasN = names && names.length;
+  if (!j || (!hasP && !hasN)) return out;
+  var fields = ['条目名', '系统名', '系统核心名', '系统核心', '包裹标签', '一级节', '功能清单', '机制要点', '硬约束', '状态与变量', '口令与关键词'];
+  var bag = [];
+  fields.forEach(function (k) {
+    var v = j[k];
+    if (v == null) return;
+    if (Array.isArray(v)) { v.forEach(function (x) { bag.push(String(x)); }); }
+    else if (typeof v === 'object') { Object.keys(v).forEach(function (kk) { bag.push(String(v[kk] == null ? '' : v[kk])); }); }
+    else bag.push(String(v));
+  });
+  if (j['人设要点'] && typeof j['人设要点'] === 'object') {
+    Object.keys(j['人设要点']).forEach(function (k2) { bag.push(String(j['人设要点'][k2] || '')); });
+  }
+  bag.forEach(function (s) {
+    refineFindTaint(s, pool).forEach(function (h) { if (out.indexOf(h) < 0 && out.length < 6) out.push(h); });
+    refineFindNames(s, names).forEach(function (n) { if (out.indexOf('（名字）' + n) < 0 && out.length < 6) out.push('（名字）' + n); });
+  });
+  return out;
+}
+// ③ 补丁核对：新内容里是否整段搬了参考材料（把它搬进核心＝最典型的串台）
+function refinePatchTaint(changes, pool, names){
+  var out = [];
+  (changes || []).forEach(function (ch) {
+    var next = String(ch['新内容'] != null ? ch['新内容'] : (ch['content'] || ''));
+    refineFindTaint(next, pool).forEach(function (h) {
+      if (out.length < 6 && out.indexOf(h) < 0) out.push(h);
+    });
+    refineFindNames(next, names).forEach(function (n) {
+      if (out.length < 6 && out.indexOf('（名字）' + n) < 0) out.push('（名字）' + n);
+    });
+  });
+  return out;
+}
+
 function refineInit(){
-  ST.refine = ST.refine || { src: '', name: '', scan: '', analysis: '', analysisObj: null, request: '', plan: '', planObj: null, result: '', diff: '', fidelity: null, applied: [], status: 'idle', _inited: false, working: '', steps: [], stepIndex: 0, sizeCap: 1200, ejsNote: '', lastFailed: null };
+  ST.refine = ST.refine || { src: '', name: '', scan: '', analysis: '', analysisObj: null, request: '', plan: '', planObj: null, result: '', diff: '', fidelity: null, applied: [], status: 'idle', _inited: false, working: '', steps: [], stepIndex: 0, sizeCap: 1200, ejsNote: '', lastFailed: null, pendingGen: null, pendingTail: '' };
 }
 // ---------- 本地结构体检（零 AI）：先让脚本把事实摆出来 ----------
 function refineScan(src){

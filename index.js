@@ -3807,8 +3807,245 @@ var REFINE_PATCH_SPEC = [
   '若某条改动实在无法用唯一锚点表达，就不要放进变更块，写进末尾的「冲突:」一行并说明。'
 ].join('\n');
 
+// ============================================================================
+// 两阶段：先「生成内容」再「定位锚点」（v1.14.0）
+// 起因：让模型在同一次输出里既写内容又写锚点，锚点一写错（凭记忆抄原文）整轮就报废，
+// 用户看到的是"AI 直接不继续生成"。改成：
+//   阶段 A（生成）：只写"要加/要改成什么"，**不许写锚点**，也不许读世界参考；
+//   阶段 B（定位）：**只**拿「核心当前稿 + 本次改动清单」决定每处改动插到哪里，不改写内容。
+// 这样内容一定会产出，定位失败也只是"位置待定"，可以只重跑定位（便宜）。
+// ============================================================================
+var REFINE_GEN_SPEC = [
+  '【本步只做一件事：把要写的内容写出来】',
+  '你现在**不要**去原文里找位置、**不要**写锚点、**不要**输出任何定位信息——那是下一步的事。你只负责写内容。',
+  '按下面的分块格式输出（对"输出被截断"最友好；不要用 json 包裹）：',
+  '',
+  '###改动1',
+  '类型: 前插|后插|替换',
+  '意图: 一句话说清"这处改动是干什么的、大概想放在哪一节"（例如：在「初始觉醒」列表之后加入状态机判定）',
+  '内容:',
+  '<<<',
+  '（要插入或替换的完整内容；可以是纯文本，也可以是 EJS 代码）',
+  '>>>',
+  '',
+  '###改动2 …（需要多处改动就重复这个块）',
+  '',
+  '类型语义：前插=把内容放在某处之前；后插=放在某处之后；替换=用内容替换掉某一段。类型只表达"相对位置关系"，具体锚点由下一步决定，所以这里写错不影响正确性。',
+  '【输出上限】本步内容合计**不要超过 ' + '1200' + ' 字符**；超了就只写前半部分，并在末尾写 `后续: 还需要……`，下一轮继续。',
+  '【内容要求】① 只写为了满足用户意见而需要的内容，不要顺手重构；② 不新增用户没要求的设定；③ 保留既有写法（缩进风格、变量命名、口令）；④ EJS 代码要自洽（花括号配对、标签闭合）；⑤ **不要**把世界设定参考里的内容抄进来（那些是世界规则，不属于这个核心）。',
+  '【不要做的事】不要在内容里附带"这是插在某某之后"的说明文字；不要输出原文片段；不要输出锚点。'
+].join('\n');
+var REFINE_LOCATE_SPEC = [
+  '【本步只做一件事：定位】',
+  '你手上只有两样东西：① 用户之前提供的**核心当前稿**；② 本次已经写好的**改动清单**。',
+  '你的任务：为清单里的每一处改动，在核心当前稿里找出**一个逐字存在且唯一**的锚点片段，说明它应该插到哪里。',
+  '**不要改写、不要补充、不要润色任何内容**；不要输出核心正文；不要引用任何世界设定或参考资料。',
+  '按下面的分块格式输出，编号必须与改动清单一一对应：',
+  '',
+  '###定位1',
+  '锚点:',
+  '<<<',
+  '（核心当前稿里逐字存在、且只出现一次的片段：20~80 字符，最好从你要定位的那一行开头开始，往后多带一两行）',
+  '>>>',
+  '说明: 一句话（例如：放在「初始觉醒」整段末尾之后）',
+  '',
+  '###定位2 …',
+  '',
+  '【找不到时怎么办】如果某一处确实无法定位，就照常输出 `###定位N`，把锚点写成 `（找不到）`，并在说明里写清你判断的原因（例如"当前稿里没有与之对应的章节"）。**不要**编一个原文里不存在的锚点。',
+  '【锚点纪律】锚点请从核心当前稿里**复制粘贴**，不要凭记忆手打；若一行不够唯一，就多带相邻的一两行。'
+].join('\n');
+// 阶段 A 解析：###改动N / 类型 / 意图 / 内容 <<< … >>>
+function refineParseGenBlocks(raw){
+  var t = String(raw || '');
+  var F = fence();
+  t = t.replace(new RegExp(F + '[a-zA-Z]*\\s*\\n', 'g'), '').replace(new RegExp('\\n?' + F, 'g'), '');
+  var marks = t.split(/^[ \t]*#{2,4}[ \t]*改动[ \t]*\d*[ \t]*$/m);
+  if (marks.length < 2) return { ok: false, why: '没有找到 `###改动` 分块', units: [], truncated: 0, tail: '' };
+  var units = [], truncated = 0, tail = '';
+  for (var i = 1; i < marks.length; i++) {
+    var body = marks[i];
+    var type = (body.match(/^[ \t]*类型[ \t]*[:：][ \t]*(.+)$/m) || [])[1] || '后插';
+    var intent = (body.match(/^[ \t]*意图[ \t]*[:：][ \t]*(.+)$/m) || [])[1] || '';
+    var nKey = body.search(/^[ \t]*内容[ \t]*[:：]/m);
+    var content = '';
+    if (nKey >= 0) {
+      var n1 = body.indexOf('<<<', nKey), n2 = n1 >= 0 ? body.indexOf('>>>', n1 + 3) : -1;
+      if (n1 >= 0 && n2 >= 0) content = body.slice(n1 + 3, n2).replace(/^\n/, '').replace(/\n$/, '');
+      else if (n1 >= 0) { truncated++; continue; }
+    }
+    if (!content.trim()) { truncated++; continue; }
+    units.push({ '类型': String(type).trim(), '意图': String(intent).trim(), '内容': content });
+  }
+  var tailM = t.match(/^[ \t]*(后续|冲突)[ \t]*[:：][ \t]*(.+)$/gm);
+  if (tailM) tail = tailM.join('\n');
+  var lastBlk = marks[marks.length - 1];
+  if (lastBlk.indexOf('<<<') >= 0 && lastBlk.indexOf('>>>', lastBlk.lastIndexOf('<<<')) < 0 && !truncated) truncated = 1;
+  return { ok: units.length > 0, why: units.length ? '' : '分块里没有解析出可用的"内容"', units: units, truncated: truncated, tail: tail };
+}
+// 阶段 B 解析：###定位N / 锚点 <<< … >>> / 说明
+function refineParseLocate(raw){
+  var t = String(raw || '');
+  var marks = t.split(/^[ \t]*#{2,4}[ \t]*定位[ \t]*\d*[ \t]*$/m);
+  if (marks.length < 2) return { ok: false, why: '没有找到 `###定位` 分块', anchors: [], truncated: 0 };
+  var anchors = [], truncated = 0;
+  for (var i = 0; i < marks.length - 1; i++) {
+    var body = marks[i + 1];
+    var note = (body.match(/^[ \t]*说明[ \t]*[:：][ \t]*(.+)$/m) || [])[1] || '';
+    var a1 = body.indexOf('<<<');
+    var a2 = a1 >= 0 ? body.indexOf('>>>', a1 + 3) : -1;
+    var anchor = '';
+    if (a1 >= 0 && a2 >= 0) anchor = body.slice(a1 + 3, a2).replace(/^\n/, '').replace(/\n$/, '').trim();
+    else if (a1 >= 0) { truncated++; anchors.push({ i: i, '锚点': '', '说明': String(note).trim() }); continue; }
+    if (/^[（(]\s*找不到\s*[)）]$/.test(anchor)) anchor = '';
+    anchors.push({ i: i, '锚点': anchor, '说明': String(note).trim() });
+  }
+  return { ok: anchors.length > 0, why: anchors.length ? '' : '没有解析出定位', anchors: anchors, truncated: truncated };
+}
+// 脚本兜底定位：用"意图"里提到的节名/标签名在当前稿里找唯一的一行
+function refineLocateByIntent(work, intent){
+  var t = String(work || ''), s = String(intent || '');
+  if (!t.trim() || !s.trim()) return '';
+  var cands = [];
+  var re = /[「『【\["']([^」』】\]"'\n]{2,24})[」』】\]"']/g, m;
+  while ((m = re.exec(s)) !== null) cands.push(m[1].trim());
+  s.split(/[\s，,、：:；;（）()]+/).forEach(function (w) { if (w.length >= 3 && w.length <= 16) cands.push(w); });
+  for (var i = 0; i < cands.length; i++) {
+    var name = cands[i];
+    if (!name) continue;
+    var lines = t.split(/\r?\n/);
+    var hits = [];
+    for (var k = 0; k < lines.length; k++) {
+      var l = lines[k].trim();
+      if (!l) continue;
+      if (l === name || l === name + ':' || l === name + '：' || l.indexOf(name + ':') === 0 || l.indexOf(name + '：') === 0) hits.push(k);
+    }
+    if (hits.length === 1) return lines.slice(hits[0], hits[0] + 2).join('\n').trim();
+  }
+  return '';
+}
+
+// ============================================================================
+// 材料隔离（v1.14.0）：② 页勾选的世界书是「只读参考资料」，⑦ 页载入的文本才是
+// 「要修改的二创核心」。两者混在同一上下文里，模型会把世界规则（变量更新规则、
+// 好感度规则等）当成"我这个核心的一部分"，导致逻辑混乱。
+// 两层隔离：① 提示词里把两种材料的角色写死（模板在 74 号分块）；
+//          ② 代码按"整行只在参考里出现"做机械核对，抓真实搬运。
+// ============================================================================
+var REFINE_TAINT_MIN = 24;            // 判定"搬运"的最短片段
+function refineRefText(){
+  try { return String(ST.worldInfo || ''); } catch (e) { return ''; }
+}
+// 取"明显属于参考材料"的整行（够长，且不在目标文本里出现）
+function refineTaintPool(target, ref){
+  var t = String(target || ''), r = String(ref || '');
+  if (!r.trim()) return [];
+  var pool = [], seen = {};
+  r.split(/\r?\n/).forEach(function (l) {
+    var s = l.trim();
+    if (s.length < REFINE_TAINT_MIN) return;
+    if (t.indexOf(s) >= 0) return;                      // 目标里也有 → 不算参考独有
+    if (seen[s]) return;
+    seen[s] = 1; pool.push(s);
+  });
+  return pool;
+}
+// 二元组相似度：b 的二元组有多大比例出现在 a 里（对"换句话重述"也敏感）
+function refineSim(a, b){
+  var A = String(a || ''), B = String(b || '');
+  if (B.length < REFINE_TAINT_MIN) return 0;
+  var bg = [];
+  for (var i = 0; i < B.length - 1; i++) bg.push(B.slice(i, i + 2));
+  if (!bg.length) return 0;
+  var hit = 0;
+  for (var k = 0; k < bg.length; k++) if (A.indexOf(bg[k]) >= 0) hit++;
+  return hit / bg.length;
+}
+// 参考独有的"结构性名字"：小节名、规则名、键名（如「变量更新规则」「好感度」）。
+// 这些短名字是串台最典型的痕迹——核心原文里根本没有它们，模型只能是从参考里看到的。
+function refineNamePool(target, ref){
+  var t = String(target || ''), r = String(ref || '');
+  if (!r.trim()) return [];
+  var out = [], seen = {};
+  r.split(/\r?\n/).forEach(function (l) {
+    var s = l.replace(/^\s*(?:[-*•]|\d+[.、)])\s*/, '').trim();
+    if (!s) return;
+    var isKeyLine = /[:：]\s*$/.test(s);
+    var name = s.replace(/[:：]\s*$/, '').trim();
+    if (!isKeyLine) {
+      // 非标题行：只看"像名字"的整行（无句读、够短）
+      if (/[。；！？]/.test(s) || name.length < 2 || name.length > 24) return;
+    }
+    if (!/^[\w\u4e00-\u9fa5.\[\]（）()&·\-\s]{2,30}$/.test(name)) return;
+    if (name.length < 2 || name.length > 24) return;
+    if (t.indexOf(name) >= 0) return;                       // 目标里也有 → 不算参考独有
+    if (seen[name]) return;
+    seen[name] = 1; out.push(name);
+  });
+  return out.slice(0, 400);
+}
+function refineFindNames(text, names){
+  var t = String(text || ''), hits = [];
+  (names || []).forEach(function (n) {
+    if (hits.length >= 6 || hits.indexOf(n) >= 0) return;
+    if (n && t.indexOf(n) >= 0) hits.push(n);
+  });
+  return hits;
+}
+// 在一段模型输出里找"只可能来自参考材料"的片段：先查逐字，再查高度相似（≥65%）
+function refineFindTaint(text, pool){
+  var t = String(text || ''), hits = [];
+  if (!t.trim()) return hits;
+  var lines = t.split(/\r?\n/).map(function (x) { return x.trim(); }).filter(function (x) { return x.length >= REFINE_TAINT_MIN; });
+  (pool || []).forEach(function (s) {
+    if (hits.length >= 6 || hits.indexOf(s) >= 0) return;
+    var probe = s.slice(0, Math.min(40, s.length));                 // 逐字探针
+    if (probe.length >= REFINE_TAINT_MIN && t.indexOf(probe) >= 0) { hits.push(s); return; }
+    for (var i = 0; i < lines.length && i < 200; i++) {             // 相似：任何一行与它对得上
+      if (refineSim(lines[i], s) >= 0.65) { hits.push(s); return; }
+    }
+  });
+  return hits;
+}
+// ① 分析结果核对：模型报的字段里，是否混进了只存在于参考材料的内容
+function refineAnalysisTaint(j, pool, names){
+  var out = [];
+  var hasP = pool && pool.length, hasN = names && names.length;
+  if (!j || (!hasP && !hasN)) return out;
+  var fields = ['条目名', '系统名', '系统核心名', '系统核心', '包裹标签', '一级节', '功能清单', '机制要点', '硬约束', '状态与变量', '口令与关键词'];
+  var bag = [];
+  fields.forEach(function (k) {
+    var v = j[k];
+    if (v == null) return;
+    if (Array.isArray(v)) { v.forEach(function (x) { bag.push(String(x)); }); }
+    else if (typeof v === 'object') { Object.keys(v).forEach(function (kk) { bag.push(String(v[kk] == null ? '' : v[kk])); }); }
+    else bag.push(String(v));
+  });
+  if (j['人设要点'] && typeof j['人设要点'] === 'object') {
+    Object.keys(j['人设要点']).forEach(function (k2) { bag.push(String(j['人设要点'][k2] || '')); });
+  }
+  bag.forEach(function (s) {
+    refineFindTaint(s, pool).forEach(function (h) { if (out.indexOf(h) < 0 && out.length < 6) out.push(h); });
+    refineFindNames(s, names).forEach(function (n) { if (out.indexOf('（名字）' + n) < 0 && out.length < 6) out.push('（名字）' + n); });
+  });
+  return out;
+}
+// ③ 补丁核对：新内容里是否整段搬了参考材料（把它搬进核心＝最典型的串台）
+function refinePatchTaint(changes, pool, names){
+  var out = [];
+  (changes || []).forEach(function (ch) {
+    var next = String(ch['新内容'] != null ? ch['新内容'] : (ch['content'] || ''));
+    refineFindTaint(next, pool).forEach(function (h) {
+      if (out.length < 6 && out.indexOf(h) < 0) out.push(h);
+    });
+    refineFindNames(next, names).forEach(function (n) {
+      if (out.length < 6 && out.indexOf('（名字）' + n) < 0) out.push('（名字）' + n);
+    });
+  });
+  return out;
+}
+
 function refineInit(){
-  ST.refine = ST.refine || { src: '', name: '', scan: '', analysis: '', analysisObj: null, request: '', plan: '', planObj: null, result: '', diff: '', fidelity: null, applied: [], status: 'idle', _inited: false, working: '', steps: [], stepIndex: 0, sizeCap: 1200, ejsNote: '', lastFailed: null };
+  ST.refine = ST.refine || { src: '', name: '', scan: '', analysis: '', analysisObj: null, request: '', plan: '', planObj: null, result: '', diff: '', fidelity: null, applied: [], status: 'idle', _inited: false, working: '', steps: [], stepIndex: 0, sizeCap: 1200, ejsNote: '', lastFailed: null, pendingGen: null, pendingTail: '' };
 }
 // ---------- 本地结构体检（零 AI）：先让脚本把事实摆出来 ----------
 function refineScan(src){
@@ -4620,6 +4857,7 @@ var REFINE_HTML = '<div class="opf-char-wrap">'
   + '<div class="opf-sec"><div class="opf-sec-label">③ 确认后置入（模型只出补丁，插件落刀）</div></div>'
   + '<div class="opf-char-tools"><button type="button" class="opf-btn primary" id="opf-rf-apply">✓ 确认无误，置入</button>'
   + '<button type="button" class="opf-btn ghost" id="opf-rf-retrystep">↻ 重新生成这一步</button>'
+  + '<button type="button" class="opf-btn ghost" id="opf-rf-relocate">📍 只重跑定位</button>'
   + '<button type="button" class="opf-btn ghost" id="opf-rf-splitstep">✂ 拆细本步（更小上限）</button>'
   + '<button type="button" class="opf-btn ghost" id="opf-rf-skipstep">⏭ 跳过本步</button>'
   + '<button type="button" class="opf-btn ghost" id="opf-rf-rollback">↩ 回退到原文</button></div>'
@@ -4685,6 +4923,11 @@ function bindRefinePage(){
   getEl('opf-rf-suggest').addEventListener('click', function () { refineSuggest(); });
   getEl('opf-rf-apply').addEventListener('click', function () { refineApply(); });
   getEl('opf-rf-retrystep').addEventListener('click', function () { refineApply(); });
+  getEl('opf-rf-relocate').addEventListener('click', function () {
+    refineInit();
+    if (!ST.refine.pendingGen || !ST.refine.pendingGen.length) { toast('还没有"已生成但未定位"的内容——先点「✓」跑一轮', 'warning'); return; }
+    refineApply('locate');
+  });
   getEl('opf-rf-splitstep').addEventListener('click', function () {
     refineInit();
     var cur = ST.refine.sizeCap || 1200;
@@ -4781,13 +5024,24 @@ async function refineAnalyze(){
   if (!ST.refine.scan) ST.refine.scan = refineScan(src).text;
   ST.running = true; renderRunButtons(); refineNote('① 整体分析中…（只读，不会改动任何内容）');
   try {
-    var msg = '[分析对象]\n' + src.slice(0, 60000) + '\n\n' + REFINE_ANALYZE_SPEC;
+    var msg = '[待修改的二创核心（唯一的分析对象；下面的【世界设定参考】不是它的一部分）]\n'
+      + '<<<二创核心原文\n' + src.slice(0, 60000) + '\n二创核心原文结束>>>'
+      + '\n\n' + REFINE_ANALYZE_SPEC;
     var resp = await callModel([{ role: 'system', content: refineSystem() }, { role: 'user', content: macroFill(msg) }]);
     var j = rxExtractJson(resp);
     ST.refine.analysisObj = j || null;
-    ST.refine.analysis = j ? refineFormatAnalysis(j) : ('（没能解析成 JSON，原文如下）\n\n' + String(resp || '').slice(0, 6000));
+    // 材料隔离核对：模型报的字段里若出现"只在世界参考里才有"的整段内容 → 判为串台
+    var pool0 = refineTaintPool(src, refineRefText());
+    var names0 = refineNamePool(src, refineRefText());
+    var taint0 = refineAnalysisTaint(j, pool0, names0);
+    ST.refine.taint = taint0;
+    ST.refine.analysis = (j ? refineFormatAnalysis(j) : ('（没能解析成 JSON，原文如下）\n\n' + String(resp || '').slice(0, 6000)))
+      + (taint0.length
+        ? ('\n\n⚠ 材料隔离核对：以下 ' + taint0.length + ' 段内容**只存在于②页的世界设定参考里**，却出现在了对"这个核心"的描述中——说明模型把参考当成了核心的一部分（串台）。请核对，或重跑一次：\n'
+          + taint0.map(function (s, i) { return '   ' + (i + 1) + '. ' + s.slice(0, 110); }).join('\n'))
+        : (pool0.length ? '\n\n✓ 材料隔离核对通过：分析结果里没有出现"只在世界参考里才有"的内容（参考池 ' + pool0.length + ' 段）' : ''));
     refineRender(); refineCacheSave();
-    toast(j ? '① 分析完成（概况已列在下方）' : '① 模型返回的不是 JSON，已原样显示', j ? 'success' : 'warning');
+    toast(j ? (taint0.length ? ('① 分析完成，但材料隔离核对发现 ' + taint0.length + ' 段疑似串台（见分析面板）') : '① 分析完成（概况已列在下方）') : '① 模型返回的不是 JSON，已原样显示', (j && !taint0.length) ? 'success' : 'warning');
   } catch (e) { toast('分析出错：' + (e && e.message ? e.message : e), 'error'); refineNote('分析失败'); }
   finally { ST.running = false; renderRunButtons(); }
 }
@@ -4812,10 +5066,25 @@ function refineFormatAnalysis(j){
   line('可优化方向', j['可优化方向']);
   return L.join('\n') || '（分析结果为空）';
 }
+// 材料隔离条款：把"参考"与"待改"两种材料的角色写死（v1.14.0）
+var REFINE_ISOLATION = [
+  '【两种材料，角色不同，绝不能混】',
+  '你在这轮对话里会看到两种材料，它们的关系是「参考资料 → 作用于 → 待改对象」，不是同一份东西：',
+  '  A. 待修改的二创核心 ＝ 用户在消息里提供的那一份文本（插件用 `<<<二创核心原文` 与 `二创核心原文结束>>>` 包住，或标为"当前工作稿"）。它是**唯一的修改对象**，你要动的只有它。',
+  '  B. 世界设定参考 ＝ 用户在世界书页勾选的条目（插件标为"[世界设定参考·不可修改]"，附在其后）。它是**不可变的参考资料**，只用来核对口径（例如数值档位、变量路径、写法习惯是否与世界规则一致）。',
+  '隔离铁律：',
+  'R1. 参考不是核心的一部分：分析时不要把参考里的节标题、功能、人设、变量、规则列成"这个核心的一级节/功能清单/机制要点/十槽"；那些只属于参考，不属于这个核心。',
+  'R2. 参考不可修改、也不会被修改：你的任何输出都不要包含参考条目的内容（可以提它的名字来对照口径，但不要把它抄进核心，也不要改它）。',
+  'R3. 不要"补全"：不要因为参考里有某条规则（变量更新规则、好感度规则、战斗规则等），就认为这个核心应该也有它、或替它补上。只有核心原文写了的东西才属于它。',
+  'R4. 两者口径不一致时（核心的写法与参考里的世界规则不同）：**不要自作主张改核心**，只在"影响评估/脆弱点"里指出差异与风险；确有必要改时，写进"冲突"里由用户决定。',
+  'R5. 引用时标明来源：说某条内容时写清是"核心原文"还是"世界参考"；报告里不要把两者混在一段里。',
+  'R6. 修改范围只在核心原文之内：新增内容必须是为了满足用户这次的要求，而不是把参考里的东西搬进来。'
+].join('\n');
 function refineSystem(){
   return macroFill('你是「始弦的魔法大典」的司书，正在帮{{user}}修改一份**已经存在的**命定系统核心。'
     + '你的第一职责是「不弄坏它」：这份核心正在被使用，任何未要求的变化都会破坏玩家的存档与叙事。'
-    + REFINE_RULES + '\n\n' + (ST.worldInfo ? '[世界书参考]\n' + ST.worldInfo : ''));
+    + REFINE_RULES + '\n\n' + REFINE_ISOLATION
+    + (ST.worldInfo ? '\n\n[世界设定参考·不可修改｜不是修改对象，只是核对口径用]\n' + ST.worldInfo : '\n\n（本轮没有附带世界设定参考）'));
 }
 async function refinePlan(){
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
@@ -4826,7 +5095,7 @@ async function refinePlan(){
   ST.refine.src = src; ST.refine.request = req;
   ST.running = true; renderRunButtons(); refineNote('② 分析你的意见中…（仍然不会改动正文）');
   try {
-    var msg = '[核心全文]\n' + src.slice(0, 60000)
+    var msg = '[待修改的二创核心（唯一会被改动的对象）]\n<<<二创核心原文\n' + src.slice(0, 60000) + '\n二创核心原文结束>>>'
       + '\n\n[已完成的整体分析]\n' + (ST.refine.analysis || '（无，可先点①）')
       + '\n\n[用户的修改意见]\n' + req + '\n\n' + REFINE_PLAN_SPEC;
     var resp = await callModel([{ role: 'system', content: refineSystem() }, { role: 'user', content: macroFill(msg) }]);
@@ -4889,8 +5158,8 @@ async function refineSuggest(){
   if (!src.trim()) { toast('先载入核心文本', 'warning'); return; }
   ST.running = true; renderRunButtons();
   try {
-    var msg = '[核心全文]\n' + src.slice(0, 60000)
-      + '\n\n请给出 3~5 条**不破坏现有设计**的优化方向（每条一行、≤40字、具体可执行），例如补齐缺口、让某条规则更自洽、增加与既有功能的联动。不要输出正文，不要提"重写/重构"。';
+    var msg = '[待修改的二创核心（只针对它提方向；不要提世界参考里的规则）]\n<<<二创核心原文\n' + src.slice(0, 60000) + '\n二创核心原文结束>>>'
+      + '\n\n请给出 3~5 条**不破坏现有设计**的优化方向（每条一行、≤40字、具体可执行），例如补齐缺口、让某条规则更自洽、增加与既有功能的联动。不要输出正文，不要提"重写/重构"，也不要建议"补上世界规则里的某某"（那是参考资料，不属于这个核心）。';
     var resp = await callModel([{ role: 'system', content: refineSystem() }, { role: 'user', content: macroFill(msg) }]);
     var list = [];
     String(resp || '').split(/\r?\n/).forEach(function (ln) {
@@ -4904,8 +5173,9 @@ async function refineSuggest(){
   } catch (e) { toast('生成方向失败：' + (e && e.message ? e.message : e), 'error'); }
   finally { ST.running = false; renderRunButtons(); }
 }
-async function refineApply(){
+async function refineApply(mode){
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
+  var locateOnly = (mode === 'locate') && ST.refine.pendingGen && ST.refine.pendingGen.length;
   var src = String((getEl('opf-rf-src') || {}).value || ST.refine.src || '');
   var req = String((getEl('opf-rf-req') || {}).value || ST.refine.request || '').trim();
   if (!src.trim()) { toast('先载入核心文本', 'warning'); return; }
@@ -4933,48 +5203,118 @@ async function refineApply(){
             + '\n失败原因：' + f.why;
         }).join('\n\n');
     }
-    var msg = '[当前工作稿（已包含此前各步的改动；锚点必须逐字来自这份文本）]\n' + ctxText
-      + (ctxTrunc ? '\n\n（注意：工作稿过长已截断显示，超出部分你看不到；请只在上面出现的范围内取锚点）' : '')
+    // ---- 阶段 A：只生成内容（不写锚点、不看世界参考）----
+    var gen = locateOnly
+      ? { units: ST.refine.pendingGen, tail: ST.refine.pendingTail || '', truncated: 0 }
+      : null;
+    if (locateOnly) refineNote('③ ' + stepLabel + '：只重跑定位（沿用上次已生成的内容，不重新写）…');
+    else {
+    var genMsg = '[你之前提供的系统核心 · 当前稿（仅供你了解既有写法与上下文；本阶段不要定位）]\n<<<二创核心当前稿\n' + ctxText + '\n二创核心当前稿结束>>>'
+      + (ctxTrunc ? '\n\n（注意：当前稿过长已截断显示，超出部分你看不到）' : '')
       + '\n\n[用户意见]\n' + req
       + '\n\n[已确认的改法分析]\n' + ST.refine.plan
-      + (doneList.length ? '\n\n[本次要执行的分步计划 / 已完成情况]\n' + steps.map(function (s, i) { return (i + 1) + '. ' + (s.title || '') + '：' + (s.detail || '') + (i < si ? '（已完成，不要重复做）' : (i === si ? '　← 现在只做这一步' : '（待做，本轮不要碰）')); }).join('\n') : '')
+      + (doneList.length ? '\n\n[分步计划 / 已完成情况]\n' + steps.map(function (s, i) { return (i + 1) + '. ' + (s.title || '') + '：' + (s.detail || '') + (i < si ? '（已完成，不要重复做）' : (i === si ? '　← 现在只做这一步' : '（待做，本轮不要碰）')); }).join('\n') : '')
       + (cur ? ('\n\n[本次只做这一步]\n第 ' + (si + 1) + ' 步：' + (cur.title || '') + '\n' + (cur.detail || '') + '\n请只完成这一步，不要顺手做后面的步骤。') : '')
-      + '\n\n[本步输出上限]新内容合计不超过 ' + sizeCap + ' 字符；超了就只做前半部分，并在末尾写 `后续: 还需要……`。'
-      + hintBlock
-      + '\n\n[锚点纪律]锚点请从上面的「当前工作稿」里**复制粘贴**，不要凭记忆手打；不确定就先在稿子里找到那一行，再从那一行开始往后多带一两行。'
-      + '\n\n' + REFINE_PATCH_SPEC;
-    var resp = await callModel([{ role: 'system', content: refineSystem() }, { role: 'user', content: macroFill(msg) }]);
-    var parsed = refineParsePatch(resp);
+      + '\n\n[本步内容上限]合计不超过 ' + sizeCap + ' 字符；超了就只写前半部分，并在末尾写 `后续: 还需要……`。'
+      + '\n\n' + REFINE_GEN_SPEC;
+    refineNote('③ ' + stepLabel + '：阶段 A · 正在生成内容…');
+    var genResp = await callModel([{ role: 'system', content: refineSystem() }, { role: 'user', content: macroFill(genMsg) }]);
+    gen = refineParseGenBlocks(genResp);
     var ao = getEl('opf-rf-applyout');
-    if (!parsed.changes.length) {
-      var diag = refineTruncDiag(resp);
-      var hLines = [];
-      hLines.push('❌ ' + stepLabel + '：没能解析出可用的变更（原文一个字符都没动）。');
-      hLines.push('【诊断】' + diag);
-      hLines.push('【解析说明】' + (parsed.why || '未按 `###变更N` 分块格式输出'));
-      hLines.push('');
-      hLines.push('两种常见原因与对策：');
-      hLines.push('  · 输出被截断 → 点「↻ 拆细本步（更小上限）」重试，或回 ② 页把执行步骤拆得更细；');
-      hLines.push('  · 模型没按格式写 → 点「↻ 重新生成这一步」；连续两次失败就换个说法描述本步。');
-      hLines.push('');
-      hLines.push('【模型原始回复（前 4000 字符）】\n' + String(resp || '').slice(0, 4000));
-      if (ao) ao.textContent = hLines.join('\n');
-      ST.refine.appliedText = hLines.join('\n');
-      toast('本步没拿到补丁，原文未被改动（诊断见下方）', 'warning');
-      refineNote('③ ' + stepLabel + ' 未产出补丁'); return;
+    if (!gen.units.length) {
+      var diag0 = refineTruncDiag(genResp);
+      var h0 = [];
+      h0.push('❌ ' + stepLabel + ' 阶段 A（生成内容）：没能解析出可用的内容（原文一个字符都没动）。');
+      h0.push('【诊断】' + diag0);
+      h0.push('【解析说明】' + (gen.why || '未按 `###改动N` 分块格式输出'));
+      h0.push('');
+      h0.push('对策：输出被截断 → 点「✂ 拆细本步（更小上限）」；模型没按格式写 → 点「↻ 重新生成这一步」。');
+      h0.push('');
+      h0.push('【模型原始回复（前 4000 字符）】\n' + String(genResp || '').slice(0, 4000));
+      if (ao) ao.textContent = h0.join('\n');
+      ST.refine.appliedText = h0.join('\n');
+      toast('阶段 A 没拿到内容，原文未被改动（诊断见下方）', 'warning');
+      refineNote('③ ' + stepLabel + ' 阶段 A 未产出内容'); return;
     }
-    // 截断处理：完整的块可用，但要不要先落地由用户决定
-    var usable = parsed.changes;
-    if (parsed.truncated) {
-      var ask2 = (typeof window !== 'undefined' && window.confirm) ? window.confirm : function () { return false; };
-      if (!ask2('模型这次的输出疑似被截断（检测到 ' + parsed.truncated + ' 个不完整的变更块）。\n\n'
-        + '· 点「确定」＝先落地已完整的 ' + usable.length + ' 个变更，剩下的下次再做（推荐）\n'
-        + '· 点「取消」＝这一轮整体放弃，原文不动\n\n（无论哪种，原始文本都不会被破坏，随时可「↩ 回退」）')) {
-        if (ao) ao.textContent = '本轮因截断放弃，未做任何改动。\n\n' + refineTruncDiag(resp) + '\n\n【模型原始回复（前 3000 字符）】\n' + String(resp || '').slice(0, 3000);
-        refineNote('③ ' + stepLabel + ' 因截断放弃');
-        return;
+    if (gen.truncated) {
+      var askG = (typeof window !== 'undefined' && window.confirm) ? window.confirm : function () { return false; };
+      if (!askG('阶段 A 的输出疑似被截断（检测到 ' + gen.truncated + ' 个不完整的分块）。\n\n'
+        + '· 点「确定」＝先只处理已完整的 ' + gen.units.length + ' 块，剩下的下次再做（推荐）\n'
+        + '· 点「取消」＝本轮整份放弃\n\n（内容已写好，不会丢失）')) {
+        if (ao) ao.textContent = '本轮因截断放弃。\n\n' + refineTruncDiag(genResp);
+        refineNote('③ ' + stepLabel + ' 阶段 A 因截断放弃'); return;
       }
     }
+    ST.refine.pendingGen = gen.units;                        // 内容先留住：定位失败也不用重写
+    ST.refine.pendingTail = gen.tail || '';
+    }
+    var ao = getEl('opf-rf-applyout');
+    // ---- 阶段 B：只定位（只给「核心当前稿 + 本次改动清单」，不带世界参考）----
+    refineNote('③ ' + stepLabel + '：阶段 B · 正在定位插入位置…');
+    var locMsg = '[你之前提供的系统核心 · 当前稿（**只有这份文本**；本阶段不要读任何其它资料、不要改写任何内容）]\n<<<二创核心当前稿\n' + ctxText + '\n二创核心当前稿结束>>>'
+      + '\n\n[本次写好的改动清单（编号顺序不可变）]\n'
+      + gen.units.map(function (u, i) {
+        return '###改动' + (i + 1) + '\n类型: ' + (u['类型'] || '后插') + '\n意图: ' + (u['意图'] || '') + '\n内容预览:\n<<<\n'
+          + String(u['内容']).slice(0, 400) + (String(u['内容']).length > 400 ? '\n…（已截断预览，你不需要看到全文，只需要定位）' : '') + '\n>>>';
+      }).join('\n\n')
+      + hintBlock
+      + '\n\n' + REFINE_LOCATE_SPEC;
+    var locResp = await callModel([{ role: 'system', content: '你只负责"在给定文本里定位"，不改写、不补充、不引用任何其它资料。' }, { role: 'user', content: macroFill(locMsg) }]);
+    var loc = refineParseLocate(locResp);
+    // 合并：内容来自阶段 A，锚点来自阶段 B（缺失的用脚本兜底，再不行就标为待定位）
+    var merged = gen.units.map(function (u, i) {
+      var a = (loc.anchors[i] && loc.anchors[i]['锚点']) || '';
+      var byIntent = a ? '' : refineLocateByIntent(ST.refine.working, u['意图']);
+      return { '类型': u['类型'], '锚点': a || byIntent || '', '新内容': u['内容'], '理由': u['意图'],
+        '_how': a ? '模型定位' : (byIntent ? '脚本按意图兜底定位' : '未定位'),
+        '_note': (loc.anchors[i] && loc.anchors[i]['说明']) || '' };
+    });
+    var unlocated = merged.filter(function (x) { return !x['锚点']; });
+    ST.refine.pendingLoc = merged;
+    if (unlocated.length) {
+      var hu = [];
+      hu.push('⚠ ' + stepLabel + ' 阶段 B（定位）：内容已经写好（' + gen.units.length + ' 处），但有 ' + unlocated.length + ' 处**没能定位到插入位置**。');
+      hu.push('（这是新流程的正常分支：内容不会因此丢失，定位可以单独重跑。）');
+      hu.push('');
+      unlocated.forEach(function (x, i) {
+        hu.push((i + 1) + '. 意图：' + (x['理由'] || '（无）'));
+        hu.push('   模型说明：' + (x['_note'] || '（无）'));
+        hu.push('   内容预览：' + String(x['新内容']).slice(0, 160).replace(/\n/g, '⏎'));
+      });
+      hu.push('');
+      hu.push('可选操作：');
+      hu.push('  · 「📍 只重跑定位」：内容不动，只让它重新在原文里找位置（便宜，推荐先试）；');
+      hu.push('  · 「⏭ 跳过本步」：这处先不插，留到以后；');
+      hu.push('  · 想手动指定：把内容复制出来，直接在成品框里贴到你要的位置。');
+      if (ao) ao.textContent = hu.join('\n');
+      ST.refine.appliedText = hu.join('\n');
+      refineNote('③ ' + stepLabel + ' 内容已生成 ' + gen.units.length + ' 处，' + unlocated.length + ' 处待定位');
+      toast('内容已生成，但有 ' + unlocated.length + ' 处没定位到位置——可点「📍 只重跑定位」', 'warning');
+      refineSyncButtons();
+      var fi0 = getEl('opf-rf-fidelity'); if (fi0 && !ST.refine.fidelityText) fi0.style.display = 'none';
+      return;
+    }
+    var usable = merged.map(function (x) { return { '类型': x['类型'], '锚点': x['锚点'], '新内容': x['新内容'], '理由': x['理由'] }; });
+    var parsed = { changes: usable, format: '两阶段（生成→定位）', tail: gen.tail || '' };
+    var resp = genResp;                                       // 供后续诊断引用
+    var locNote = merged.filter(function (x) { return /兜底/.test(x._how); }).length;
+    // 材料隔离核对（在落刀之前）：新内容里若整段搬了"只在世界参考里才有"的内容 → 先拦下问用户
+    var pool = refineTaintPool(ST.refine.working, refineRefText());
+    var names = refineNamePool(ST.refine.working, refineRefText());
+    var taint = refinePatchTaint(usable, pool, names);
+    if (taint.length) {
+      var askT = (typeof window !== 'undefined' && window.confirm) ? window.confirm : function () { return false; };
+      if (!askT('材料隔离核对发现问题：本次补丁的"新内容"里有 ' + taint.length + ' 段内容**只存在于②页的世界设定参考里**，说明模型把世界规则搬进了这个二创核心（典型串台）：\n\n'
+        + taint.map(function (s, i) { return (i + 1) + '. ' + s.slice(0, 110); }).join('\n\n')
+        + '\n\n· 点「取消」＝放弃本轮（推荐：世界规则不该进核心，可点「↻ 重新生成这一步」并说明"只改核心本身"）\n'
+        + '· 点「确定」＝我知道风险，仍然落地（落地后请重点看差异预览）')) {
+        if (ao) ao.textContent = '因材料隔离核对未通过而放弃本轮，工作稿未改动。\n\n涉及片段：\n' + taint.map(function (s, i) { return (i + 1) + '. ' + s.slice(0, 160); }).join('\n');
+        refineNote('③ ' + stepLabel + ' 因"疑似把世界参考搬进核心"而放弃');
+        toast('已拦下：补丁里疑似混入了世界参考内容，工作稿未改动', 'warning');
+        return;
+      }
+      ST.refine.taintWarn = taint;
+    } else ST.refine.taintWarn = null;
     var res = refineApplyPatch(ST.refine.working, usable);
     var lines = [];
     if (!res.ok) {
@@ -5023,6 +5363,8 @@ async function refineApply(){
       lines.push('     新内容：' + a.next.slice(0, 200).replace(/\n/g, '⏎') + (a.next.length > 200 ? ' …' : ''));
     });
     if (res.degraded) lines.push('\n⚠ 有 ' + res.degraded + ' 处是**近似定位**（锚点与原文有空白差异，或退化为按行定位）——请重点看下面的差异预览确认位置对不对。');
+    if (ST.refine.taintWarn && ST.refine.taintWarn.length) lines.push('\n⚠ 材料隔离：本次有 ' + ST.refine.taintWarn.length + ' 段新内容疑似来自世界设定参考（你选择了仍然落地）——请核对它们是否本该属于这个核心。');
+    else if (pool.length) lines.push('\n✓ 材料隔离核对通过：新内容里没有出现"只在世界参考里才有"的内容（参考池 ' + pool.length + ' 段）。');
     if (parsed.tail) lines.push('\n模型附注：' + parsed.tail);
     var remain = steps.length - ST.refine.stepIndex;
     if (steps.length) {
@@ -5062,6 +5404,8 @@ function refineSyncButtons(){
   var r = getEl('opf-rf-retrystep');
   // 只要已经有改法/分步计划，就始终给出「重新生成这一步」——失败时用户第一眼就要能找到它
   if (r) r.style.display = (ST.refine.plan || (ST.refine.steps && ST.refine.steps.length)) ? '' : 'none';
+  var rl = getEl('opf-rf-relocate');
+  if (rl) rl.style.display = (ST.refine.pendingGen && ST.refine.pendingGen.length) ? '' : 'none';
 }
 function refineCacheSave(){
   if (refineCacheSave._t) clearTimeout(refineCacheSave._t);
