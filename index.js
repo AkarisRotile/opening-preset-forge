@@ -2495,27 +2495,35 @@ var DEST_EJS_SEG_PROMPTS = {
     + 'B. 配置驱动人格（读者核心式）：把人格做成 JSON 存局部变量（systemName/definition/coreMechanism/coreConcept/personality/role/hobbies/wish/constraints/appearance/opening/letterStyle/toneMode/tonePrompt/corpus/corpusMode/fpDefinition/newsStyle/ascensionAdvantage/skillAdvantage/revival/conditionalMechanisms），用统一的 `_custom_text(key, fallback)` 取值器渲染，十槽也由配置生成。\n'
     + 'C. 静默与兜底：`let _silent = getLocalVar(\'<核心>_silent\') === \'on\';`，唤醒条件用 `matchChatMessages([关键词…],{start:-1,role:\'user\'})` 或地点判定；命中则输出完整核心，否则只输出一句"存在但静默"的极简块——两条分支的包裹标签都必须闭合。\n'    + '只输出本段。'
 };
-// v1.13.0：本段已按上游文档逐条核实（ST-Prompt-Template docs/reference_cn.md + docs/features_cn.md
-// + mde/ejs Tags 表 + JS-Slash-Runner @types），核实于 2026-09-16；人类可读版见《命定核心EJS规范.md》。
+// ⚠️ 本常量会被**注入模型提示词**，因此只写规则本身：不出现文件名、路径、"来源/上游文档"之类
+// 模型无从核对的字样（出处信息放在 DEST_EJS_SOURCES，仅供人类查看）。
 var DEST_EJS_STANDARD = [
-  '【EJS 重型核心·规范（依据上游文档核实，非记忆）】',
-  '来源：ST-Prompt-Template 的 docs/reference_cn.md 与 docs/features_cn.md（提供 EJS 引擎、内置函数与常量、装饰器、世界书标记）；mde/ejs README 的 Tags 表（标签语义）；JS-Slash-Runner @types（酒馆助手函数签名）。',
-  '■ 引擎与时机：EJS 由 ST-Prompt-Template 扩展提供（不是酒馆内建、不是酒馆助手）。runType 四值：preparation（准备，酒馆会多次计算世界书）→ generate（发给 LLM 前）→ render（渲染楼层）→ render_permanent（渲染并永久改写消息）。渲染期不触发世界书计算；生成期的 EJS 结果会真的发给 LLM。',
-  '■ 何时才上 EJS：静态散文 + 十槽已能覆盖大部分核心。只有"按存档状态改变输出/多形态切换/渲染时写变量/人格可配置/条件触发规则"才值得上。代价：直连主 API 的模式不执行世界书 EJS、变量重名会让整段编译失败、体积膨胀 4~15 倍。',
-  '■ 标签（10 个，语义已核实）：`<%` 代码不输出；`<%_` 代码且吞掉前面所有空白；`<%=` 输出（转义，渲染期还走宏/正则/Markdown 格式化）；`<%-` 输出（不转义，渲染期直接当 HTML）；`<%#` 注释；`<%%`/`%%>` 输出字面量；`%>` 普通结束；`-%>` 吞掉后面的换行；`_%>` 吞掉后面所有空白。重型核心默认用 `<%_ … _%>`（不吞空白会让正文塞满空行）。',
-  '■ 硬规则：混用 EJS 与 JS 的 if/for 必须写花括号（上游原话：省略花括号的行为 undefined）；标签内可换行，但一条语句不能拆到多个标签；`<%-`/`<%=` 里不能调用 print()；要一段内容完全不被模板处理用 `<#escape-ejs>…<#/escape-ejs>`。',
-  '■ 变量五作用域：global（酒馆全局）/ local（聊天）/ message（楼层，chat[msg_id].variables[swipe_id]）/ cache（临时，即 variables.xxx，不保存）/ initial（[InitialVariables] 提供）。',
-  '■ 读写函数与默认值陷阱：`getvar(key, {scope, defaults, noCache, clone})` 默认 scope 是 **cache**（消息+聊天+全局的合并结果）；`setvar(key, value, {scope, flags, results, merge, dryRun, noCache})` 默认 scope 是 **message**；特化别名 getMessageVar/setMessageVar/getLocalVar/setLocalVar/getGlobalVar/setGlobalVar、incvar/decvar、delvar、insvar、patchVariables。flags：nx 不存在才设 / xx 存在才设 / n 强制设 / nxs·xxs 以对应 scope 为准。',
-  '■ 三个必须记住的陷阱：① 读默认 cache、写默认 message，语义不一致——要明确就显式写 scope；② 写完立刻读要 `noCache: true`（上游：缓存只在开始时加载，中途不更新）；③ `variables` 的合并顺序是高覆盖低：消息变量 → 聊天变量 → 全局变量，且处理楼层消息时不含当前及之后楼层。',
-  '■ 生成期可用常量：variables / SillyTavern / _ (lodash) / $ / faker / toastr / runType / userName / charName / chatId / lastUserMessage / lastCharMessage / lastMessageId / lastUserMessageId / charLoreBook / userLoreBook / chatLoreBook / model / generateType。',
-  '■ 渲染期专属（只在 runType === \'render\' 存在）：message_id / swipe_id / name / is_last / is_user / is_system。渲染期 `<%=` 与 `<%-` 才有区别；`&lt;%`→`<%`、`%&gt;`→`%>`；只改显示不改原始消息（所以要用正则把楼层里的 `<% %>` 隐藏，否则下次会重复执行）；代码高亮与渲染期 EJS 冲突。',
-  '■ 读消息与楼层：`getChatMessage(idx, role?)` 单楼层字符串；`getChatMessages(count|start,end[,role])` 返回数组（EJS 面是重载，不是 options 对象）；`matchChatMessages(pattern, {start, end, role, and})` 支持字符串/正则/数组，**数组时由 `and` 决定全部还是任意匹配**，默认 start=-2；`await getwi(世界书名, 条目名)` / `await activewi(...)` 读/激活世界书条目；`define(name, value)` 定义全局（函数内要用 this.getvar）；`print(...)` 输出；`execute(cmd)` / `parseJSON` / `jsonPatch` / `patchVariables` / `setVariableSchema`（扩展侧）。',
-  '■ 酒馆助手面（不同技术面，签名不要混）：`TavernHelper.getLastMessageId()`、`TavernHelper.getVariables({type:\'message\'|...})`、`TavernHelper.insertOrAssignVariables(vars, {type:\'message\'})`、`await TavernHelper.triggerSlash(\'/pass {{user}}\')`。注意 EJS 的 getChatMessage（单数、同步、返回内容字符串）与助手的 getChatMessages（复数、返回对象数组、options 里有 role/hide_state/include_swipes）**参数与返回值都不同**。',
-  '■ 世界书条目的标记与装饰器：标题前缀 `[GENERATE:BEFORE/AFTER]`、`[RENDER:BEFORE/AFTER]`、`[GENERATE:{idx}:BEFORE/AFTER]`（idx 从 0 起）、`[GENERATE:REGEX:pattern]`、`[InitialVariables]`、`[Preprocessing]`、`@INJECT pos=/target=/regex=`；正文第一行的 @@ 装饰器：activate / dont_activate / message_formatting / generate_before / generate_after / render_before / render_after / dont_preload / preload / only_preload / initial_variables / always_enabled / private / if / iframe / preprocessing。**装饰器必须从第一行开始、每个独占一行、中间不许空行；无法识别的 @@ 行会被上游直接丢弃**；`@@private` 会给条目包上 `<% { %>`/`<% } %>` 防重名；`@@if` 只支持单行表达式。',
-  '■ 六层架构（层序即执行序）：0 块作用域 `<%_ { _%>` → 1 身份守卫 `<%_ if (getvar(\'系统核心\') === \'<系统核心>\') { _%>` → 2 数据读取 → 3 防错归一 → 4 派生与写回 → 5 渲染（`<{{getvar::系统名}}>` 或 `<%- getvar(\'系统名\') %>` 包裹）→ 收尾两层 `} _%>`。',
-  '■ 防错归一（必做）：枚举白名单兜底、`Number.isFinite` 数值守卫、对象类型守卫、玩家可配置文本净化 `.replace(/[\\r\\n<>]/g,\' \').replace(/\\s+/g,\' \').trim().slice(0,80)`；存档状态优先于玩家配置（`fromMessageVar || fromConfig`）。',
-  '■ 写入纪律：派生幂等（`Math.max` / 已应用轮次 / lastMessageId 比对，防同层重算重复累加）；准备阶段不要写变量（dryRun 默认关闭是对的）；写消息变量显式带 scope/type；改完按需 `saveVariables()`；路径白名单（`事件|世界|任务列表|主角|命运点数|关系列表|新闻` 开头，拒绝 `__proto__/prototype/constructor`）；先 capture 旧值再写，失败整体 restore；历史状态设上限（事务 30 / 状态 50）。',
-  '■ 反模式（会直接坏掉）：if/for 不写花括号、装饰器名拼错（整行静默消失）、装饰器与正文间留空行、getvar 读刚 setvar 的值不加 noCache、以为 getvar 默认读本层（实际是 cache）、顶层 const/let 重名（用 `<%_ { _%>` 或 @@private 解决）、EJS 与助手的同名函数混用、漏写 await、生成期用渲染期字段、在 `<%-` 里调 print、EJS 里做网络/存储/DOM 操作、配置文本未净化就 `<%- %>`、正则无 try/catch、派生用 +1 不幂等、状态表无上限。'
+  '【EJS 编写规范（写命定核心时必须遵守）】',
+  '■ 执行时机：EJS 在「准备提示词」时执行一次，在「渲染楼层消息」时再执行一次。准备阶段酒馆会重复计算世界书，所以**不要在准备阶段写变量**（会写多次）。渲染阶段不重新计算世界书，且渲染只改显示、不改原始消息内容——**不要指望渲染期写变量能影响本轮生成**。',
+  '■ 十个标签：`<%` 代码不输出；`<%_` 代码且吞掉它前面所有空白；`<%=` 输出（转义，渲染期还会走宏/正则/Markdown 格式化）；`<%-` 输出（不转义，渲染期直接当 HTML）；`<%#` 注释；`<%%` 与 `%%>` 输出字面量；`%>` 普通结束；`-%>` 吞掉后面的换行（只对代码标签与注释有效，对输出标签无效）；`_%>` 吞掉后面所有空白。重型核心默认用 `<%_ … _%>`——不吞空白会让正文里塞满空行。',
+  '■ 硬规则：① 混用 EJS 与 JS 的 if/for/else **必须写花括号**（省略花括号的行为是未定义的，不要图省事）；② 一条语句不能拆到多个标签里，但一个标签内部可以换行；③ 不能在 `<%-` / `<%=` 里调用输出函数；④ 需要一段内容完全不被当模板处理时用转义块包起来。',
+  '■ 变量五个作用域：global（全局）/ local（聊天）/ message（楼层，按楼层与消息页分开存）/ cache（临时，即 variables.xxx，不保存）/ initial（初始变量）。',
+  '■ 读写默认值不一样，这是最容易写错的地方：读变量（getvar）**默认读 cache**，也就是"消息变量+聊天变量+全局变量"按优先级合并后的结果；写变量（setvar）**默认写 message**（本层消息变量）。想明确就显式写 scope。',
+  '■ 三个必记陷阱：① 读完即写、写完即读时，缓存不会中途更新，**写完立刻读要加 `noCache: true`**；② 合并顺序是高覆盖低（消息变量 → 聊天变量 → 全局变量），处理楼层消息时不含当前及之后楼层；③ 同一层楼可能被重算，**写变量必须幂等**（用取最大值、或记录"已应用到的楼层"来防重复累加）。',
+  '■ 生成期可用：常量 variables（合并后的变量树）、runType（当前阶段）、userName / charName / chatId / lastUserMessage / lastCharMessage / lastMessageId / lastUserMessageId / model / generateType、charLoreBook / userLoreBook / chatLoreBook；工具库 `_`（lodash）、`$`、`faker`、`toastr`。可用函数：getvar/setvar 及其各作用域别名、incvar/decvar、delvar、insvar、patchVariables、setVariableSchema、getChatMessage/getChatMessages、matchChatMessages、getwi/activewi、define、print、execute、parseJSON、jsonPatch、injectPrompt/getPromptsInjected、activateRegex。',
+  '■ 阶段常量 runType 有四个取值：preparation（准备）/ generate（发给模型之前）/ render（渲染楼层消息）/ render_permanent（渲染并永久改写消息）。不要在 preparation 阶段写变量（酒馆会重复计算）。',
+  '■ 渲染期专属字段（只在 render 阶段存在，其它阶段读到的是 undefined）：message_id / swipe_id / name / is_last / is_user / is_system。要用它们必须先判断 runType === \'render\'。渲染期还有两条差异：`<%=` 与 `<%-` 此时才真正不同（前者转义、后者直接当 HTML）；楼层里的 `<% %>` 下次生成会被再执行一次，所以常用一条只对提示词生效的正则把它隐藏。',
+  '■ 世界书条目的注入标记写在**条目名**里，原样使用这些写法：`[GENERATE:BEFORE]` / `[GENERATE:AFTER]` / `[RENDER:BEFORE]` / `[RENDER:AFTER]` / `[GENERATE:序号:BEFORE]` / `[GENERATE:序号:AFTER]`（序号从 0 起）/ `[GENERATE:REGEX:模式]` / `[InitialVariables]` / `[Preprocessing]`。正文**第一行**可写装饰器：`@@activate`、`@@dont_activate`、`@@preload`、`@@only_preload`、`@@dont_preload`、`@@always_enabled`、`@@private`、`@@if`、`@@iframe`、`@@message_formatting`、`@@generate_before`、`@@generate_after`、`@@render_before`、`@@render_after`、`@@initial_variables`、`@@preprocessing`。',
+  '■ 有两套"名字很像但完全不同"的函数，**不要混用**：EJS 侧的 `getChatMessage(楼层, 角色)` 是单数、同步、返回一段内容字符串；酒馆助手侧的 `getChatMessages(范围, { role, hide_state, include_swipes })` 是复数、返回对象数组。同理助手侧的变量函数（getVariables / insertOrAssignVariables / replaceVariables 等）与 EJS 侧的 getvar/setvar 是两套东西，助手侧调用必须显式给 `{ type: \'message\' | \'chat\' | \'global\' | \'character\' | ... }`，否则写进错误作用域。',
+  '■ 读消息与楼层：`getChatMessage(楼层, 角色)` 取单条内容（返回字符串）；`getChatMessages(起, 止, 角色)` 取多条（返回字符串数组）；`matchChatMessages(模式, { start, end, role, and })` 做关键词/正则匹配——模式可为字符串、正则或数组，**数组时用 `and` 决定"必须全部命中"还是"任意命中"**，且 `start` 默认只看最近两条消息，要扫全对话必须手动传；读世界书条目 `await getwi(世界书名, 条目名)`；激活条目 `await activewi(...)`；定义全局变量或函数 `define(名字, 值)`（函数内部要用 this 取变量）；执行酒馆命令 `await execute(命令)`。',
+  '■ 装饰器的书写规则（写错就静默失效）：装饰器必须从条目内容的**第一行**开始、**每个独占一行**、彼此之间**不允许有空行**；装饰器可以带参数（用第一个空格分隔）；**认不出来的装饰器行会被直接丢弃**——既不起作用，也不会留在内容里，所以拼写必须精确；想输出字面量的装饰器写法，要在前面多写一个 @ 转义；条件排除类装饰器只支持**单行**表达式；`@@private` 的作用是给条目内容包上一层块作用域，专门用来避免与其它核心的变量重名导致整段编译失败。',
+  '■ 顺序与结构要求：模块顺序 = ① 块作用域（把变量关进一对花括号里，避免与其它核心的变量重名导致整段编译失败）→ ② 身份守卫（判断当前启用的是不是本核心，不是就直接不输出）→ ③ 读取数据 → ④ 防错归一（枚举白名单兜底、数值用 isFinite 守卫、对象做类型判定、玩家可配置文本净化后截断）→ ⑤ 派生与写回 → ⑥ 渲染（包裹标签跟随系统名，不要写死）→ ⑦ 收尾闭合。**静默/兜底分支里的包裹标签也必须完整闭合。**',
+  '■ 写入纪律：写入前先归一；写消息变量要显式指定作用域；写完按需保存；派生幂等；路径白名单（只允许改你自己核心的状态路径，拒绝原型污染类路径）；先记旧值再写、失败整体回滚；历史记录表设上限。',
+  '■ 会直接写坏的做法（一条都别犯）：if/for 不写花括号；装饰器名拼错或与正文之间留空行；读完即写不加 noCache；以为读变量默认读的是"本层变量"；顶层用 const/let 却与别的核心重名（用块作用域解决）；把两套同名函数混用；异步函数漏写 await；生成期使用渲染期字段；在输出标签里调用输出函数；在 EJS 里做网络/存储/DOM 操作；玩家可配置文本未净化就原样插入；正则用具名捕获却不加 try/catch；派生用 +1 导致重复累加；状态表不设上限。'
+].join('\n');
+// 仅供人类查看的出处（不进提示词）
+var DEST_EJS_SOURCES = [
+  '【出处与核实记录】（此段只给人看，不会注入提示词）',
+  '· 引擎、内置函数与常量、装饰器、世界书注入标记、渲染期规则：ST-Prompt-Template 的 docs/reference_cn.md 与 docs/features_cn.md（main 分支，核实于 2026-09-16）',
+  '· 十个标签的语义：mde/ejs 仓库 README 的 Tags 表 + EJS Syntax Reference（v2.5.1 标签）',
+  '· 扩展侧函数签名（变量表/插值/命令行/消息读写）：JS-Slash-Runner @types/function/*.d.ts（v4.9.5）',
+  '· MVU 的 stat_data 结构与生命周期不在本次核实范围，需另行核对',
+  '· 完整版（含来源表、反模式表、可照抄骨架、自检清单、仍未核实项）见仓库文档《命定核心EJS规范.md》'
 ].join('\n');
 function destSegs(){ return (ST.dest && ST.dest.ejs) ? DEST_SEGS.concat(DEST_EJS_SEGS) : DEST_SEGS; }
 function destSegPrompt(id){ return DEST_SEG_PROMPTS[id] || DEST_EJS_SEG_PROMPTS[id] || ''; }
@@ -2757,7 +2765,7 @@ function toggleDestEjs(on){
 function toggleDestEjsStandard(){
   var box = getEl('opf-dest-ejsstandard'); if (!box) return;
   var open = box.style.display !== 'none';
-  box.textContent = open ? '尚未展开' : DEST_EJS_STANDARD;
+  box.textContent = open ? '尚未展开' : (DEST_EJS_STANDARD + '\n\n' + DEST_EJS_SOURCES + '\n\n—— 完整版（来源与置信度表、反模式表、可照抄骨架、自检清单、未核实项）见仓库文档《命定核心EJS规范.md》');
   box.style.display = open ? 'none' : 'block';
 }
 function destSystemContent(){
@@ -3774,22 +3782,43 @@ var REFINE_PLAN_SPEC = [
   '  "锚点预告": ["预计要动的原文片段（逐字引用，供用户核对）"],',
   '  "冲突": ["无法在‘不动其它内容’前提下实现的部分，及最小侵入替代方案"],',
   '  "保真承诺": "改完后哪些东西保证一个字符都不变（逐项列出）",',
-  '  "确认提示": "给用户看的一句话：确认后我会这样改"',
+  '  "改动量": "小|中|大",',
+  '  "执行步骤": [{"步骤":1,"标题":"这一步做什么（≤20字）","做什么":"具体改动内容与位置","预计新内容字符数":300}],',
+  '  "确认提示": "给用户看的一句话：确认后我会分 N 步这样改"',
   '}',
+  '【分步要求·重要】',
+  'A. 先判断这个改法需要几步，再写「执行步骤」。判断标准是**单次输出的正文量**：每步的新内容必须控制在 ' + '1200' + ' 字符以内（含 EJS 代码），预计超过就必须继续拆——例如"插入一段大段 EJS"应拆成：插骨架与守卫 → 往骨架里插数据读取 → 插分支与收尾。',
+  'B. 每步只做一件事，且每步都要能独立成立：做完第 N 步后，原文仍是一个能跑的核心（不能留下半截代码或未闭合的标签）。',
+  'C. 若某一步无论如何都无法在 1200 字符内完成（例如必须一次性替换一大段现有内容），就在「做什么」里注明"本步输出较大"，并把它拆成"先替换前半、再替换后半"两步，锚点分别取原文里不同的唯一片段。',
+  'D. 步骤数一般 1~5 步：小改动 1 步，中等改动 2~3 步，大改动 4~6 步。不要为了少写而硬塞。',
+  'E. 如果改动量其实很小（一句话、一个数值），就老老实实给 1 步，不要硬拆。',
   '要求：宁可少改也不要动到无关内容；若用户意见与既有设计冲突（例如要削弱已有约束、要改口令词），必须显式指出并给出影响面。'
 ].join('\n');
 var REFINE_PATCH_SPEC = [
-  '【置入任务】用户已确认改法。现在输出**补丁**（不是全文，不是新版本文件）。',
-  '输出一个 json 代码块：',
-  '{ "变更": [ { "类型": "替换|后插|前插", "锚点": "原文里逐字存在且唯一的片段", "新内容": "替换/插入的内容", "理由": "一句话" } ], "冲突": ["未能实现的部分及原因"] }',
+  '【置入任务】用户已确认改法。现在**只做当前这一步**，输出**补丁**（不是全文，不是新版本文件）。',
+  '输出格式（优先用这个分块格式，它对"输出被截断"最友好；不要用 json 包裹整份补丁）：',
+  '###变更1',
+  '类型: 替换|后插|前插',
+  '锚点:',
+  '<<<',
+  '（原文里逐字存在且唯一的片段，原样抄写，不要改一个字）',
+  '>>>',
+  '新内容:',
+  '<<<',
+  '（要替换/插入的内容；可以是纯文本，也可以是 EJS 代码）',
+  '>>>',
+  '理由: 一句话',
+  '',
+  '###变更2 …（需要多处改动就重复这个块）',
+  '',
   '类型语义：替换=用新内容替换锚点整段；后插=在锚点之后另起一行插入新内容；前插=在锚点之前另起一行插入新内容。',
-  '自检（输出前逐条核对）：① 每个锚点都能在原文里用 Ctrl+F 精确找到且只有一处；'
-    + '② 新内容里没有误抄进来的周边原文；③ 除变更清单外没有别的差异；④ 没有动到 setvar 槽位、EJS 标签、变量路径与既有口令。',
-  '若某条改动实在无法用唯一锚点表达，就不要放进「变更」，写进「冲突」并说明。'
+  '【本步的输出上限】新内容合计**不要超过 1200 字符**。如果这一步的内容更多，就只输出前半部分，把剩下的写进「后续」一行（例如 `后续: 还需插入 else 分支与收尾`），下一轮会继续做。宁可多分几轮，也不要一口气输出到被截断。',
+  '【自检（输出前逐条核对）】① 每个锚点都能在原文里精确找到且只有一处；② 新内容里没有误抄进来的周边原文；③ 除变更清单外没有别的差异；④ 没有动到 setvar 槽位、EJS 标签、变量路径与既有口令；⑤ 每处改动单独看都是完整的（不留半截代码、不留未闭合标签）。',
+  '若某条改动实在无法用唯一锚点表达，就不要放进变更块，写进末尾的「冲突:」一行并说明。'
 ].join('\n');
 
 function refineInit(){
-  ST.refine = ST.refine || { src: '', name: '', scan: '', analysis: '', analysisObj: null, request: '', plan: '', planObj: null, result: '', diff: '', fidelity: null, applied: [], status: 'idle', _inited: false };
+  ST.refine = ST.refine || { src: '', name: '', scan: '', analysis: '', analysisObj: null, request: '', plan: '', planObj: null, result: '', diff: '', fidelity: null, applied: [], status: 'idle', _inited: false, working: '', steps: [], stepIndex: 0, sizeCap: 1200, ejsNote: '' };
 }
 // ---------- 本地结构体检（零 AI）：先让脚本把事实摆出来 ----------
 function refineScan(src){
@@ -3834,11 +3863,13 @@ function refineLoad(text, name){
   ST.refine.name = name || ST.refine.name || '未命名核心';
   ST.refine.analysis = ''; ST.refine.analysisObj = null; ST.refine.plan = ''; ST.refine.planObj = null;
   ST.refine.result = ''; ST.refine.diff = ''; ST.refine.fidelity = null; ST.refine.applied = [];
+  ST.refine.working = t; ST.refine.steps = []; ST.refine.stepIndex = 0; ST.refine.sizeCap = 1200;
   var sc = refineScan(t);
   ST.refine.scan = sc.text;
   var ta = getEl('opf-rf-src'); if (ta) ta.value = t;
   refineEjsCheck(false);                                  // 载入即做一次 EJS 体检（零 AI）
   refineRender();
+  refineSyncButtons();
   return sc;
 }
 // ⑦ 的 EJS 体检：直接复用 ④ 页的 destEjsLint（两层检查：通用 + 上游核实项）
@@ -4421,6 +4452,73 @@ function rxSyncTransportUi() {
         : (why ? '⚠ ' + why : '配置完整，可生成；适用于有 CORS 头的自建/本地接口'));
   }
 }
+// ---------- 补丁解析：优先解析分块格式（对截断友好），兼容旧 JSON 格式 ----------
+// 分块格式：
+//   ###变更1 / 类型: 后插 / 锚点: <<< … >>> / 新内容: <<< … >>> / 理由: …
+// 好处：被截断时**完整的块仍然可用**，且能精确告知"第 N 块被截断"，而不是整份报废。
+function refineParseBlocks(raw){
+  var t = String(raw || '');
+  var F = fence();
+  t = t.replace(new RegExp(F + '[a-zA-Z]*\\s*\\n', 'g'), '').replace(new RegExp('\\n?' + F, 'g'), '');
+  var marks = t.split(/^[ \t]*#{2,4}[ \t]*变更[ \t]*\d*[ \t]*$/m);
+  if (marks.length < 2) return { ok: false, why: '没有找到 `###变更` 分块', changes: [], truncated: 0, tail: '' };
+  var changes = [], truncated = 0, tail = '';
+  for (var i = 1; i < marks.length; i++) {
+    var body = marks[i];
+    var type = (body.match(/^[ \t]*类型[ \t]*[:：][ \t]*(.+)$/m) || [])[1] || '替换';
+    var why = (body.match(/^[ \t]*理由[ \t]*[:：][ \t]*(.+)$/m) || [])[1] || '';
+    var anchor = '', next = '';
+    var a1 = body.indexOf('<<<', body.search(/^[ \t]*锚点[ \t]*[:：]/m));
+    if (a1 >= 0) { var a2 = body.indexOf('>>>', a1 + 3); if (a2 >= 0) anchor = body.slice(a1 + 3, a2).replace(/^\n/, '').replace(/\n$/, ''); else { truncated++; continue; } }
+    var nKey = body.search(/^[ \t]*新内容[ \t]*[:：]/m);
+    if (nKey >= 0) {
+      var n1 = body.indexOf('<<<', nKey);
+      var n2 = n1 >= 0 ? body.indexOf('>>>', n1 + 3) : -1;
+      if (n1 >= 0 && n2 >= 0) next = body.slice(n1 + 3, n2).replace(/^\n/, '').replace(/\n$/, '');
+      else if (n1 >= 0) { truncated++; continue; }
+    }
+    if (!anchor.trim() && !next.trim()) continue;
+    if (!anchor.trim() || !next.trim()) { truncated++; continue; }   // 只有半边 → 视为被截断，绝不当成可用变更
+    changes.push({ '类型': String(type).trim(), '锚点': anchor, '新内容': next, '理由': String(why).trim() });
+  }
+  // 末尾的「后续 / 冲突」行
+  var tailM = t.match(/^[ \t]*(后续|冲突)[ \t]*[:：][ \t]*(.+)$/gm);
+  if (tailM) tail = tailM.join('\n');
+  var incompleteTail = /<<<[\s\S]*$/.test(marks[marks.length - 1]) && marks[marks.length - 1].indexOf('>>>', marks[marks.length - 1].lastIndexOf('<<<')) < 0;
+  if (incompleteTail && truncated === 0) truncated = 1;
+  return { ok: changes.length > 0, why: changes.length ? '' : '分块里没有解析出可用的锚点/新内容', changes: changes, truncated: truncated, tail: tail };
+}
+// 统一入口：先试分块，再试 JSON（兼容旧格式与模型自由发挥）
+function refineParsePatch(raw){
+  var t = String(raw || '');
+  var blocks = refineParseBlocks(t);
+  if (blocks.ok) return { changes: blocks.changes, truncated: blocks.truncated, tail: blocks.tail, format: '分块' };
+  var j = rxExtractJson(t);
+  var arr = j && Array.isArray(j['变更']) ? j['变更'] : (Array.isArray(j) ? j : null);
+  if (arr && arr.length) {
+    var tail2 = (j && Array.isArray(j['冲突']) && j['冲突'].length) ? ('冲突: ' + j['冲突'].join('；')) : '';
+    var incomplete = !/\}\s*$/.test(t.trim());
+    return { changes: arr, truncated: incomplete ? 1 : 0, tail: tail2, format: 'JSON' };
+  }
+  // 完全解析不出来时，也要区分"模型没按格式写"与"输出被截断"（后者该走截断对策）
+  var openB = (t.match(/\{/g) || []).length, closeB = (t.match(/\}/g) || []).length;
+  var looksTrunc = (openB > closeB) || (/<<</.test(t) && (t.match(/<<</g) || []).length % 2 === 1) || (t.indexOf('变更') >= 0 && !/\}\s*$/.test(t.trim()) && openB > 0);
+  return { changes: [], truncated: looksTrunc ? 1 : 0, tail: '', format: '无法解析', why: blocks.why };
+}
+// 截断诊断：把"模型回复被切断"与"模型没按格式写"区分开
+function refineTruncDiag(raw){
+  var t = String(raw || '');
+  var open = (t.match(/\{/g) || []).length, close = (t.match(/\}/g) || []).length;
+  var blocks = (t.match(/###[ \t]*变更/g) || []).length;
+  var openM = (t.match(/<<</g) || []).length, closeM = (t.match(/>>>/g) || []).length;
+  var lines = ['返回长度 ' + t.length + ' 字符'];
+  if (blocks) lines.push('变更块 ' + blocks + ' 个');
+  if (openM || closeM) lines.push('内容标记 <<< ' + openM + ' 个 / >>> ' + closeM + ' 个' + (openM !== closeM ? '（不相等＝最后一块被截断）' : '（成对）'));
+  if (open !== close) lines.push('花括号 { ' + open + ' / } ' + close + '（不相等＝很可能被截断）');
+  lines.push('结尾 40 字符：' + JSON.stringify(t.slice(-40)));
+  return lines.join('　｜　');
+}
+
 // ---------- ⑦ 命定核心精修：界面 ----------
 var REFINE_HTML = '<div class="opf-char-wrap">'
   + '<div class="opf-sec-label">✦ 命定核心精修 · 外科手术式改造（绝对保持原有内容/功能/人设）</div>'
@@ -4448,7 +4546,9 @@ var REFINE_HTML = '<div class="opf-char-wrap">'
   + '<pre id="opf-rf-planout" class="opf-box opf-char-report">（还没分析意见）</pre>'
   + '<div class="opf-sec"><div class="opf-sec-label">③ 确认后置入（模型只出补丁，插件落刀）</div></div>'
   + '<div class="opf-char-tools"><button type="button" class="opf-btn primary" id="opf-rf-apply">✓ 确认无误，置入</button>'
-  + '<button type="button" class="opf-btn ghost" id="opf-rf-retry">↻ 换个说法重来</button>'
+  + '<button type="button" class="opf-btn ghost" id="opf-rf-retrystep" style="display:none">↻ 重新生成这一步</button>'
+  + '<button type="button" class="opf-btn ghost" id="opf-rf-splitstep">✂ 拆细本步（更小上限）</button>'
+  + '<button type="button" class="opf-btn ghost" id="opf-rf-skipstep">⏭ 跳过本步</button>'
   + '<button type="button" class="opf-btn ghost" id="opf-rf-rollback">↩ 回退到原文</button></div>'
   + '<pre id="opf-rf-applyout" class="opf-box opf-char-report">（还没置入）</pre>'
   + '<pre id="opf-rf-fidelity" class="opf-box opf-char-report" style="display:none">尚未校验</pre>'
@@ -4504,21 +4604,49 @@ function bindRefinePage(){
   getEl('opf-rf-ejsstd').addEventListener('click', function () {
     var box = getEl('opf-rf-ejsstdbox'); if (!box) return;
     var open = box.style.display !== 'none';
-    box.textContent = open ? '尚未展开' : (DEST_EJS_STANDARD + '\n\n—— 完整版（含来源与置信度、反模式表、骨架模板、未核实清单）见工作区《命定核心EJS规范.md》');
+    box.textContent = open ? '尚未展开' : (DEST_EJS_STANDARD + '\n\n' + DEST_EJS_SOURCES);
     box.style.display = open ? 'none' : 'block';
   });
   getEl('opf-rf-copyanalysis').addEventListener('click', function () { destCopyText(String(ST.refine && ST.refine.analysis || ''), '还没有分析结果'); });
   getEl('opf-rf-plan').addEventListener('click', function () { refinePlan(); });
   getEl('opf-rf-suggest').addEventListener('click', function () { refineSuggest(); });
   getEl('opf-rf-apply').addEventListener('click', function () { refineApply(); });
-  getEl('opf-rf-retry').addEventListener('click', function () { ST.refine.plan = ''; ST.refine.planObj = null; var p = getEl('opf-rf-planout'); if (p) p.textContent = '（已清空上一次分析，可改一改意见后重新点「② 分析这条意见」）'; refineNote('已清空上一次改法分析'); });
+  getEl('opf-rf-retrystep').addEventListener('click', function () { refineApply(); });
+  getEl('opf-rf-splitstep').addEventListener('click', function () {
+    refineInit();
+    var cur = ST.refine.sizeCap || 1200;
+    ST.refine.sizeCap = Math.max(400, Math.round(cur / 2));
+    var steps = ST.refine.steps || [];
+    var si = ST.refine.stepIndex || 0;
+    if (steps[si] && !steps[si].split) {
+      steps[si].split = true;
+      steps.splice(si + 1, 0, { i: si + 1, title: (steps[si].title || '本步') + '（后半）', detail: '接续上一步未完成的部分：' + (steps[si].detail || ''), est: 0, done: false });
+    }
+    refineNote('本步输出上限已降到 ' + ST.refine.sizeCap + ' 字符' + (steps[si] && steps[si].split ? '，并已把该步拆成两步' : ''));
+    toast('已把本步拆细：新内容上限降到 ' + ST.refine.sizeCap + ' 字符' + (steps.length > 1 ? '，步骤数变为 ' + steps.length : '') + '；再点一次「✓」重试本步', 'success');
+    refineSyncButtons(); refineCacheSave();
+  });
+  getEl('opf-rf-skipstep').addEventListener('click', function () {
+    refineInit();
+    var steps = ST.refine.steps || [];
+    var si = ST.refine.stepIndex || 0;
+    if (!steps.length) { toast('当前没有分步计划', 'warning'); return; }
+    if (si >= steps.length) { toast('已经到最后一步了', 'warning'); return; }
+    steps[si].skipped = true; steps[si].done = false;
+    ST.refine.stepIndex = si + 1;
+    refineSyncButtons(); refineCacheSave();
+    toast('已跳过第 ' + (si + 1) + ' 步（' + (steps[si].title || '') + '），当前进度 ' + ST.refine.stepIndex + '/' + steps.length, 'warning');
+    refineNote('已跳过第 ' + (si + 1) + ' 步');
+  });
   getEl('opf-rf-rollback').addEventListener('click', function () {
     if (!ST.refine || !ST.refine.src) { toast('没有可回退的原文', 'warning'); return; }
     ST.refine.result = ''; ST.refine.diff = ''; ST.refine.fidelity = null; ST.refine.applied = [];
+    ST.refine.working = ST.refine.src; ST.refine.stepIndex = 0;
+    (ST.refine.steps || []).forEach(function (s) { s.done = false; s.skipped = false; });
     var ta = getEl('opf-rf-result'); if (ta) ta.value = '';
     ['opf-rf-fidelity', 'opf-rf-diff'].forEach(function (id) { var e = getEl(id); if (e) e.style.display = 'none'; });
-    var ao = getEl('opf-rf-applyout'); if (ao) ao.textContent = '已回退到原文（原文一直没被改动过，补丁只是生成了一份新文本）';
-    refineNote('已回退');
+    var ao = getEl('opf-rf-applyout'); if (ao) ao.textContent = '已回退：工作稿重置为原文，分步进度归零（原文一直没被改动过，补丁只是生成一份新文本）';
+    refineNote('已回退到原文'); refineSyncButtons(); refineCacheSave();
   });
   getEl('opf-rf-copy').addEventListener('click', function () { destCopyText(String(ST.refine && ST.refine.result || ''), '还没有成品'); });
   getEl('opf-rf-download').addEventListener('click', function () {
@@ -4568,7 +4696,8 @@ function refineRender(){
   var fi = getEl('opf-rf-fidelity'), df = getEl('opf-rf-diff');
   if (fi) { fi.style.display = s.fidelityText ? 'block' : 'none'; if (s.fidelityText) fi.textContent = s.fidelityText; }
   if (df) { df.style.display = s.diffText ? 'block' : 'none'; if (s.diffText) df.textContent = s.diffText; }
-  refineNote(s.src ? ('已载入 ' + (s.name || '未命名') + '：' + s.src.length + ' 字符｜' + (s.analysisObj ? '已分析' : '未分析') + (s.plan ? '｜已出改法' : '') + (s.result ? '｜已置入' : '')) : '还没载入核心');
+  refineNote(s.src ? ('已载入 ' + (s.name || '未命名') + '：' + s.src.length + ' 字符｜' + (s.analysisObj ? '已分析' : '未分析') + (s.plan ? '｜已出改法' : '') + (s.steps && s.steps.length ? '｜分步 ' + (s.stepIndex || 0) + '/' + s.steps.length : '') + (s.result ? '｜已落地' : '')) : '还没载入核心');
+  try { refineSyncButtons(); } catch (e) {}
 }
 async function refineAnalyze(){
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
@@ -4634,8 +4763,21 @@ async function refinePlan(){
     var j = rxExtractJson(resp);
     ST.refine.planObj = j || null;
     ST.refine.plan = j ? refineFormatPlan(j) : ('（没能解析成 JSON，原文如下）\n\n' + String(resp || '').slice(0, 6000));
-    refineRender(); refineCacheSave();
-    toast(j ? '② 已给出改法与影响评估——确认无误后可点「✓ 确认无误，置入」' : '② 模型返回的不是 JSON，已原样显示', j ? 'success' : 'warning');
+    // 分步计划：模型给出的执行步骤（单步输出量受控，避免一次输出太大被截断）
+    var st = (j && Array.isArray(j['执行步骤'])) ? j['执行步骤'] : [];
+    ST.refine.steps = st.map(function (x, i) {
+      return { i: i, title: String(x['标题'] || ('第 ' + (i + 1) + ' 步')), detail: String(x['做什么'] || ''), est: Number(x['预计新内容字符数']) || 0, done: false };
+    });
+    if (!ST.refine.steps.length && j) {
+      ST.refine.steps = [{ i: 0, title: '一次完成', detail: String(j['确认提示'] || '按已确认的改法一次落地'), est: 0, done: false }];
+    }
+    ST.refine.working = String((getEl('opf-rf-src') || {}).value || ST.refine.src || '');
+    ST.refine.stepIndex = 0;
+    ST.refine.applied = []; ST.refine.result = ''; ST.refine.diff = ''; ST.refine.fidelity = null;
+    ST.refine.fidelityText = ''; ST.refine.diffText = ''; ST.refine.appliedText = '';
+    ['opf-rf-fidelity', 'opf-rf-diff'].forEach(function (id) { var e = getEl(id); if (e) e.style.display = 'none'; });
+    refineRender(); refineCacheSave(); refineSyncButtons();
+    toast(j ? ('② 已给出改法与影响评估——确认无误后可点「' + (getEl('opf-rf-apply') || {}).textContent + '」' + (ST.refine.steps.length > 1 ? '（本次拆成 ' + ST.refine.steps.length + ' 步，逐步落地，避免一次输出太大被截断）' : '')) : '② 模型返回的不是 JSON，已原样显示', j ? 'success' : 'warning');
   } catch (e) { toast('分析意见出错：' + (e && e.message ? e.message : e), 'error'); refineNote('分析意见失败'); }
   finally { ST.running = false; renderRunButtons(); }
 }
@@ -4657,8 +4799,16 @@ function refineFormatPlan(j){
     L.push('\n预计要动的原文片段：');
     j['锚点预告'].forEach(function (x) { L.push('  ▸ ' + String(x).slice(0, 160)); });
   }
-  if (Array.isArray(j['冲突']) && j['冲突'].length) { L.push('\n冲突/无法实现的部分：'); j['冲突'].forEach(function (x) { L.push('  ⚠ ' + x); }); }
+  if (j['冲突'] && j['冲突'].length) { L.push('\n冲突/无法实现的部分：'); j['冲突'].forEach(function (x) { L.push('  ⚠ ' + x); }); }
   if (j['保真承诺']) L.push('\n保真承诺：' + j['保真承诺']);
+  if (j['改动量']) L.push('\n改动量评估：' + j['改动量']);
+  if (Array.isArray(j['执行步骤']) && j['执行步骤'].length) {
+    L.push('\n分步执行计划（每步单独落地，防止一次输出太大被截断）：');
+    j['执行步骤'].forEach(function (x, i) {
+      L.push('  ' + (x['步骤'] || (i + 1)) + '. ' + (x['标题'] || '') + '　' + (x['做什么'] || '') + (x['预计新内容字符数'] ? '　（预计 ' + x['预计新内容字符数'] + ' 字符）' : ''));
+    });
+    if (j['执行步骤'].length > 1) L.push('  → 点「✓」每次只执行一步；每步做完都会刷新差异预览与保真校验，你可以逐步检查。');
+  }
   if (j['确认提示']) L.push('\n确认提示：' + j['确认提示']);
   return L.join('\n');
 }
@@ -4689,65 +4839,126 @@ async function refineApply(){
   var req = String((getEl('opf-rf-req') || {}).value || ST.refine.request || '').trim();
   if (!src.trim()) { toast('先载入核心文本', 'warning'); return; }
   if (!ST.refine.plan) { toast('请先点「② 分析这条意见」并确认改法', 'warning'); return; }
-  ST.running = true; renderRunButtons(); refineNote('③ 正在生成补丁（锚点 + 新内容）…');
+  // 多步执行：每一步都在"当前工作稿"上落刀，原始文本（src）永不改动
+  if (!ST.refine.working) ST.refine.working = src;
+  var steps = ST.refine.steps || [];
+  var si = ST.refine.stepIndex || 0;
+  var cur = steps[si] || null;
+  var sizeCap = ST.refine.sizeCap || 1200;
+  var stepLabel = steps.length ? ('第 ' + (si + 1) + '/' + steps.length + ' 步' + (cur && cur.title ? '（' + cur.title + '）' : '')) : '一步到位';
+  ST.running = true; renderRunButtons(); refineNote('③ ' + stepLabel + '：正在生成补丁（锚点 + 新内容）…');
   try {
-    var msg = '[核心全文]\n' + src.slice(0, 60000)
+    var doneList = steps.slice(0, si).map(function (s, i) { return (i + 1) + '. [' + (s.done ? '已完成' : '未完成') + '] ' + (s.title || '') + '——' + (s.detail || ''); });
+    var msg = '[当前工作稿（已包含此前各步的改动；锚点请在这个版本里找）]\n' + ST.refine.working.slice(0, 60000)
       + '\n\n[用户意见]\n' + req
       + '\n\n[已确认的改法分析]\n' + ST.refine.plan
+      + (doneList.length ? '\n\n[本次要执行的分步计划 / 已完成情况]\n' + steps.map(function (s, i) { return (i + 1) + '. ' + (s.title || '') + '：' + (s.detail || '') + (i < si ? '（已完成，不要重复做）' : (i === si ? '　← 现在只做这一步' : '（待做，本轮不要碰）')); }).join('\n') : '')
+      + (cur ? ('\n\n[本次只做这一步]\n第 ' + (si + 1) + ' 步：' + (cur.title || '') + '\n' + (cur.detail || '') + '\n请只完成这一步，不要顺手做后面的步骤。') : '')
+      + '\n\n[本步输出上限]新内容合计不超过 ' + sizeCap + ' 字符；超了就只做前半部分，并在末尾写 `后续: 还需要……`。'
       + '\n\n' + REFINE_PATCH_SPEC;
     var resp = await callModel([{ role: 'system', content: refineSystem() }, { role: 'user', content: macroFill(msg) }]);
-    var j = rxExtractJson(resp);
-    var changes = j && Array.isArray(j['变更']) ? j['变更'] : null;
-    if (!changes || !changes.length) {
-      var ao0 = getEl('opf-rf-applyout');
-      if (ao0) ao0.textContent = '模型没有给出可用的「变更」清单（未对原文做任何改动）。原文回复：\n\n' + String(resp || '').slice(0, 4000);
-      toast('没有拿到补丁，原文未被改动（可看下方原文回复）', 'warning');
-      refineNote('③ 未产出补丁'); return;
-    }
-    var res = refineApplyPatch(src, changes);
+    var parsed = refineParsePatch(resp);
     var ao = getEl('opf-rf-applyout');
+    if (!parsed.changes.length) {
+      var diag = refineTruncDiag(resp);
+      var hLines = [];
+      hLines.push('❌ ' + stepLabel + '：没能解析出可用的变更（原文一个字符都没动）。');
+      hLines.push('【诊断】' + diag);
+      hLines.push('【解析说明】' + (parsed.why || '未按 `###变更N` 分块格式输出'));
+      hLines.push('');
+      hLines.push('两种常见原因与对策：');
+      hLines.push('  · 输出被截断 → 点「↻ 拆细本步（更小上限）」重试，或回 ② 页把执行步骤拆得更细；');
+      hLines.push('  · 模型没按格式写 → 点「↻ 重新生成这一步」；连续两次失败就换个说法描述本步。');
+      hLines.push('');
+      hLines.push('【模型原始回复（前 4000 字符）】\n' + String(resp || '').slice(0, 4000));
+      if (ao) ao.textContent = hLines.join('\n');
+      ST.refine.appliedText = hLines.join('\n');
+      toast('本步没拿到补丁，原文未被改动（诊断见下方）', 'warning');
+      refineNote('③ ' + stepLabel + ' 未产出补丁'); return;
+    }
+    // 截断处理：完整的块可用，但要不要先落地由用户决定
+    var usable = parsed.changes;
+    if (parsed.truncated) {
+      var ask2 = (typeof window !== 'undefined' && window.confirm) ? window.confirm : function () { return false; };
+      if (!ask2('模型这次的输出疑似被截断（检测到 ' + parsed.truncated + ' 个不完整的变更块）。\n\n'
+        + '· 点「确定」＝先落地已完整的 ' + usable.length + ' 个变更，剩下的下次再做（推荐）\n'
+        + '· 点「取消」＝这一轮整体放弃，原文不动\n\n（无论哪种，原始文本都不会被破坏，随时可「↩ 回退」）')) {
+        if (ao) ao.textContent = '本轮因截断放弃，未做任何改动。\n\n' + refineTruncDiag(resp) + '\n\n【模型原始回复（前 3000 字符）】\n' + String(resp || '').slice(0, 3000);
+        refineNote('③ ' + stepLabel + ' 因截断放弃');
+        return;
+      }
+    }
+    var res = refineApplyPatch(ST.refine.working, usable);
     var lines = [];
     if (!res.ok) {
       // all-or-nothing：任何一处锚点不唯一/找不到，就整份放弃，绝不留半份改动
-      lines.push('❌ 补丁未通过校验，已整体放弃（原文一个字符都没动）：');
-      res.failed.forEach(function (f) { lines.push('  · 第 ' + (f.i + 1) + ' 处：' + f.why + '\n    锚点：' + String(f.ch && (f.ch['锚点'] || '')).slice(0, 120)); });
-      lines.push('\n可以点「② 分析这条意见」让它给更长的锚点，或把意见写得再具体一点后重试。');
+      lines.push('❌ ' + stepLabel + ' 的补丁未通过校验，已整体放弃（工作稿未被改动）：');
+      res.failed.forEach(function (f) { lines.push('  · 第 ' + (f.i + 1) + ' 处：' + f.why + '\n    锚点：' + String(f.ch && (f.ch['锚点'] || '')).slice(0, 160)); });
+      lines.push('\n对策：');
+      lines.push('  · 锚点找不到 → 常因模型凭记忆改写了锚点。点「↻ 重新生成这一步」；');
+      lines.push('  · 锚点出现多次 → 需要更长的锚点（可回 ② 页把这一步的范围写得更具体）；');
+      lines.push('  · 若本步内容确实太大 → 点「↻ 拆细本步（更小上限）」。');
       if (ao) ao.textContent = lines.join('\n');
-      toast('补丁锚点校验失败，已整体放弃（原文未动）', 'error');
-      refineNote('③ 锚点校验失败，原文未改动');
-      return;
+      ST.refine.appliedText = lines.join('\n');
+      toast('本步补丁锚点校验失败，已整体放弃', 'error');
+      refineNote('③ ' + stepLabel + ' 锚点校验失败'); return;
     }
-    var fid = refineFidelity(src, res.text, req);
-    var diffText = refineRenderDiff(src, res.text, fid.diff);
+    // 落地到工作稿
+    ST.refine.working = res.text;
+    if (cur) { cur.done = true; ST.refine.stepIndex = Math.min(si + 1, steps.length); }
+    var fid = refineFidelity(src, ST.refine.working, req);
+    var diffText = refineRenderDiff(src, ST.refine.working, fid.diff);
     var fLines = [];
-    fLines.push('保真校验（脚本逐项核对，' + fid.checks.length + ' 项）');
+    fLines.push('保真校验（脚本逐项核对，' + fid.checks.length + ' 项）　—— 对比的是「原始文本」与「当前工作稿（含全部已完成步骤）」');
     fid.checks.forEach(function (c) { fLines.push('  ' + (c.ok ? '✓' : '⚠') + ' ' + c.k + '：' + c.v); });
     fLines.push('');
-    fLines.push('行级统计：未变动 ' + fid.stats.same + ' 行 ｜ 新增 ' + fid.stats.add + ' 行 ｜ 删除 ' + fid.stats.del + ' 行'
-      + '（越接近"只动你要求的那几行"越好）');
+    fLines.push('行级统计：未变动 ' + fid.stats.same + ' 行 ｜ 新增 ' + fid.stats.add + ' 行 ｜ 删除 ' + fid.stats.del + ' 行');
     var srcLines = src.split(/\r?\n/).length;
     fLines.push('保真度：' + (srcLines ? Math.round(fid.stats.same / srcLines * 1000) / 10 : 0) + '% 的原有行原样保留');
-    lines.push('✓ 补丁已应用：' + res.applied.length + ' 处变更');
+    lines.push('✓ ' + stepLabel + ' 已落地：' + res.applied.length + ' 处变更（格式：' + parsed.format + '）');
     res.applied.forEach(function (a, i) {
       lines.push('  ' + (i + 1) + '. [' + a.type + '] ' + (a.why || ''));
       lines.push('     锚点：' + a.anchor.slice(0, 100).replace(/\n/g, '⏎'));
-      lines.push('     新内容：' + a.next.slice(0, 160).replace(/\n/g, '⏎') + (a.next.length > 160 ? ' …' : ''));
+      lines.push('     新内容：' + a.next.slice(0, 200).replace(/\n/g, '⏎') + (a.next.length > 200 ? ' …' : ''));
     });
-    if (j['冲突'] && j['冲突'].length) { lines.push('\n模型报告的冲突：'); j['冲突'].forEach(function (x) { lines.push('  ⚠ ' + x); }); }
-    lines.push('\n（原文仍是原文，这里只是生成了一份新文本；不满意点「↩ 回退到原文」即可）');
+    if (parsed.tail) lines.push('\n模型附注：' + parsed.tail);
+    var remain = steps.length - ST.refine.stepIndex;
+    if (steps.length) {
+      lines.push('');
+      lines.push('进度：' + ST.refine.stepIndex + '/' + steps.length + ' 步已完成'
+        + (remain > 0 ? '。**先看一眼下面的差异预览与保真校验**，确认无误后点「✓ 继续第 ' + (ST.refine.stepIndex + 1) + ' 步」。' : '。全部步骤已完成，可以复制/下载成品了。'));
+      steps.forEach(function (s, i) { lines.push('   ' + (s.done ? '✓' : (i === ST.refine.stepIndex ? '▶' : '·')) + ' ' + (i + 1) + '. ' + (s.title || '') + (s.detail ? '——' + s.detail : '')); });
+    }
+    lines.push('\n（原始文本一直是原文，这里只是生成了一份工作稿；不满意点「↩ 回退到原文」即可）');
     if (ao) ao.textContent = lines.join('\n');
     var fi = getEl('opf-rf-fidelity'); if (fi) { fi.textContent = fLines.join('\n'); fi.style.display = 'block'; }
-    var df = getEl('opf-rf-diff'); if (df) { df.textContent = '差异预览（- 原文 / + 新文本）\n\n' + diffText; df.style.display = 'block'; }
-    ST.refine.result = res.text; ST.refine.applied = res.applied; ST.refine.diff = diffText;
+    var df = getEl('opf-rf-diff'); if (df) { df.textContent = '差异预览（- 原文 / + 当前工作稿）\n\n' + diffText; df.style.display = 'block'; }
+    ST.refine.result = ST.refine.working; ST.refine.applied = res.applied; ST.refine.diff = diffText;
     ST.refine.fidelity = fid; ST.refine.fidelityText = fLines.join('\n'); ST.refine.diffText = diffText; ST.refine.appliedText = lines.join('\n');
-    var ta = getEl('opf-rf-result'); if (ta) ta.value = res.text;
-    refineRender(); refineCacheSave();
+    ST.refine.sizeCap = sizeCap;
+    var ta = getEl('opf-rf-result'); if (ta) ta.value = ST.refine.working;
+    refineRender(); refineCacheSave(); refineSyncButtons();
     var warn = fid.checks.filter(function (c) { return !c.ok; }).length;
-    toast(warn ? ('已置入 ' + res.applied.length + ' 处，但保真校验有 ' + warn + ' 项需要你看一眼（见校验区）')
-      : ('已置入 ' + res.applied.length + ' 处变更，保真校验全部通过'), warn ? 'warning' : 'success');
-    refineNote('③ 已置入 ' + res.applied.length + " 处变更" + (warn ? '（' + warn + ' 项待核对）' : '（保真校验通过）'));
+    toast(warn ? (stepLabel + ' 已落地 ' + res.applied.length + ' 处，但保真校验有 ' + warn + ' 项需你看一眼')
+      : (stepLabel + ' 已落地 ' + res.applied.length + ' 处变更，保真校验通过'), warn ? 'warning' : 'success');
+    refineNote('③ ' + stepLabel + ' 完成' + (remain > 0 ? '（还剩 ' + remain + ' 步）' : '（全部完成）') + (warn ? '（' + warn + ' 项待核对）' : ''));
   } catch (e) { toast('置入出错：' + (e && e.message ? e.message : e), 'error'); refineNote('置入失败'); }
   finally { ST.running = false; renderRunButtons(); }
+}
+// 按当前状态刷新 ③ 区按钮文案（分步时显示"第 N 步"）
+function refineSyncButtons(){
+  refineInit();
+  var steps = ST.refine.steps || [];
+  var si = ST.refine.stepIndex || 0;
+  var b = getEl('opf-rf-apply');
+  if (b) {
+    b.textContent = steps.length
+      ? (si >= steps.length ? '✓ 全部步骤已完成' : '✓ 确认无误，执行第 ' + (si + 1) + '/' + steps.length + ' 步')
+      : '✓ 确认无误，置入';
+    b.disabled = steps.length > 0 && si >= steps.length;
+  }
+  var r = getEl('opf-rf-retrystep');
+  if (r) r.style.display = ST.refine.appliedText ? '' : 'none';
 }
 function refineCacheSave(){
   if (refineCacheSave._t) clearTimeout(refineCacheSave._t);
