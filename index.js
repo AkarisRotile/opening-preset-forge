@@ -3818,7 +3818,7 @@ var REFINE_PATCH_SPEC = [
 ].join('\n');
 
 function refineInit(){
-  ST.refine = ST.refine || { src: '', name: '', scan: '', analysis: '', analysisObj: null, request: '', plan: '', planObj: null, result: '', diff: '', fidelity: null, applied: [], status: 'idle', _inited: false, working: '', steps: [], stepIndex: 0, sizeCap: 1200, ejsNote: '' };
+  ST.refine = ST.refine || { src: '', name: '', scan: '', analysis: '', analysisObj: null, request: '', plan: '', planObj: null, result: '', diff: '', fidelity: null, applied: [], status: 'idle', _inited: false, working: '', steps: [], stepIndex: 0, sizeCap: 1200, ejsNote: '', lastFailed: null };
 }
 // ---------- 本地结构体检（零 AI）：先让脚本把事实摆出来 ----------
 function refineScan(src){
@@ -4025,9 +4025,87 @@ function refineRenderDiff(before, after, diff){
   if (hunks >= 20) out.push('…（变更块过多已截断显示）');
   return out.join('\n');
 }
-// ---------- 补丁应用：逐字唯一命中，all-or-nothing ----------
-function refineApplyPatch(src, changes){
+// ---------- 锚点定位：先逐字，再归一化空白，最后（仅插入类）退化为按行定位 ----------
+// 模型写锚点时最常见的问题是"凭记忆抄"：缩进差几格、行尾多了空格、把两行并成一行。
+// 这里做三级匹配，并对"近似定位"如实标注，绝不假装是逐字命中。
+function refineNormIndex(s) {
+  var map = [], buf = '';
+  for (var i = 0; i < s.length; i++) {
+    var c = s.charAt(i);
+    if (/\s/.test(c)) {
+      if (buf && buf.charAt(buf.length - 1) !== ' ') { buf += ' '; map.push(i); }
+    } else { buf += c; map.push(i); }
+  }
+  return { norm: buf, map: map };
+}
+function refineFindAnchor(text, anchor, type) {
+  var a = String(anchor == null ? '' : anchor);
+  if (!a.trim()) return { ok: false, why: '锚点为空' };
+  // ① 逐字
+  var i1 = text.indexOf(a);
+  if (i1 >= 0) {
+    if (text.indexOf(a, i1 + 1) >= 0) return { ok: false, why: '锚点在原文里出现多次（≥2 处），无法唯一定位', dup: true };
+    return { ok: true, start: i1, end: i1 + a.length, how: '逐字' };
+  }
+  // ② 归一化空白（缩进/行尾空格/多空格差异都能对上）
+  var T = refineNormIndex(text);
+  var B = refineNormIndex(a).norm.trim();
+  if (B) {
+    var p2 = T.norm.indexOf(B);
+    if (p2 >= 0) {
+      if (T.norm.indexOf(B, p2 + 1) >= 0) return { ok: false, why: '锚点按空白归一后仍出现多次，无法唯一定位', dup: true };
+      var st2 = T.map[p2], en2 = T.map[p2 + B.length - 1] + 1;
+      return { ok: true, start: st2, end: en2, how: '空白归一（缩进/空格差异）', degraded: true };
+    }
+  }
+  // ③ 仅对"插入类"退化：用锚点里最长的一行去定位（替换类绝不做，避免误删原文）
+  if (/前插|后插|insert/i.test(String(type))) {
+    var lines = a.split(/\r?\n/).map(function (x) { return x.trim(); }).filter(function (x) { return x.length >= 6; });
+    lines.sort(function (x, y) { return y.length - x.length; });
+    for (var k = 0; k < lines.length && k < 3; k++) {
+      var probe = lines[k];
+      var np = refineNormIndex(probe).norm;
+      var p3 = T.norm.indexOf(np);
+      if (p3 >= 0 && T.norm.indexOf(np, p3 + 1) < 0) {
+        var st3 = T.map[p3], en3 = T.map[p3 + np.length - 1] + 1;
+        return { ok: true, start: st3, end: en3, how: '按锚点最长行近似定位', degraded: true };
+      }
+    }
+  }
+  return { ok: false, why: '锚点在原文里找不到（模型多半是凭记忆改写了锚点：缩进/标点/换行与原文不一致）' };
+}
+// "你是不是想找这段" —— 在原文里找出与锚点最接近的片段，用于下一次重试时回灌给模型
+function refineAnchorHint(text, anchor) {
+  var a = String(anchor || '');
+  var first = '';
+  a.split(/\r?\n/).some(function (l) { if (l.trim().length >= 4) { first = l.trim(); return true; } return false; });
+  if (!first) first = a.trim().slice(0, 20);
+  if (!first) return '';
+  var lines = String(text || '').split(/\r?\n/);
+  var bigrams = function (s) {
+    var out = [];
+    for (var i = 0; i < s.length - 1; i++) out.push(s.slice(i, i + 2));
+    return out;
+  };
+  var bg = bigrams(first);
+  if (!bg.length) return '';
+  var best = -1, bestScore = 0;
+  lines.forEach(function (l, i) {
+    var t = l.trim();
+    if (t.length < 4) return;
+    var hit = 0;
+    bg.forEach(function (x) { if (t.indexOf(x) >= 0) hit++; });
+    var score = hit / bg.length;
+    if (t.indexOf(first) >= 0) score += 1;                    // 包含整行 → 直接优先
+    if (score > bestScore) { bestScore = score; best = i; }
+  });
+  if (best < 0 || bestScore < 0.5) return '';
+  return lines.slice(best, best + 3).join('\n');
+}
+// 把补丁落到文本上；三级锚点匹配 + all-or-nothing
+function refineApplyPatch(src, changes, opts){
   var out = String(src), applied = [], failed = [];
+  var o = opts || {};
   (changes || []).forEach(function (ch, i) {
     var type = String(ch['类型'] || ch['type'] || '替换');
     var anchor = String(ch['锚点'] || ch['anchor'] || '');
@@ -4035,17 +4113,20 @@ function refineApplyPatch(src, changes){
     var why = String(ch['理由'] || '');
     if (!anchor) { failed.push({ i: i, why: '锚点为空', ch: ch }); return; }
     if (!next.trim()) { failed.push({ i: i, why: '新内容为空', ch: ch }); return; }
-    var idx = out.indexOf(anchor);
-    if (idx < 0) { failed.push({ i: i, why: '锚点在原文里找不到（模型可能改写了锚点或跨越了已改动区域）', ch: ch }); return; }
-    if (out.indexOf(anchor, idx + 1) >= 0) { failed.push({ i: i, why: '锚点在原文里出现多次，无法唯一定位（需要更长的锚点）', ch: ch }); return; }
+    var hit = refineFindAnchor(out, anchor, type);
+    if (!hit.ok) {
+      failed.push({ i: i, why: hit.why, ch: ch, hint: refineAnchorHint(out, anchor) });
+      return;
+    }
     var rep;
-    if (/前插/.test(type)) rep = next + '\n' + anchor;
-    else if (/后插/.test(type)) rep = anchor + '\n' + next;
+    if (/前插/.test(type)) rep = next + '\n' + out.slice(hit.start, hit.end);
+    else if (/后插/.test(type)) rep = out.slice(hit.start, hit.end) + '\n' + next;
     else rep = next;
-    out = out.slice(0, idx) + rep + out.slice(idx + anchor.length);
-    applied.push({ i: i, type: type, why: why, anchor: anchor, next: next });
+    out = out.slice(0, hit.start) + rep + out.slice(hit.end);
+    applied.push({ i: i, type: type, why: why, anchor: anchor, next: next, how: hit.how, degraded: !!hit.degraded });
   });
-  return { ok: failed.length === 0, text: out, applied: applied, failed: failed };
+  var deg = applied.filter(function (x) { return x.degraded; }).length;
+  return { ok: failed.length === 0, text: out, applied: applied, failed: failed, degraded: deg };
 }
 
 // ============================================================================
@@ -4546,7 +4627,7 @@ var REFINE_HTML = '<div class="opf-char-wrap">'
   + '<pre id="opf-rf-planout" class="opf-box opf-char-report">（还没分析意见）</pre>'
   + '<div class="opf-sec"><div class="opf-sec-label">③ 确认后置入（模型只出补丁，插件落刀）</div></div>'
   + '<div class="opf-char-tools"><button type="button" class="opf-btn primary" id="opf-rf-apply">✓ 确认无误，置入</button>'
-  + '<button type="button" class="opf-btn ghost" id="opf-rf-retrystep" style="display:none">↻ 重新生成这一步</button>'
+  + '<button type="button" class="opf-btn ghost" id="opf-rf-retrystep">↻ 重新生成这一步</button>'
   + '<button type="button" class="opf-btn ghost" id="opf-rf-splitstep">✂ 拆细本步（更小上限）</button>'
   + '<button type="button" class="opf-btn ghost" id="opf-rf-skipstep">⏭ 跳过本步</button>'
   + '<button type="button" class="opf-btn ghost" id="opf-rf-rollback">↩ 回退到原文</button></div>'
@@ -4642,6 +4723,7 @@ function bindRefinePage(){
     if (!ST.refine || !ST.refine.src) { toast('没有可回退的原文', 'warning'); return; }
     ST.refine.result = ''; ST.refine.diff = ''; ST.refine.fidelity = null; ST.refine.applied = [];
     ST.refine.working = ST.refine.src; ST.refine.stepIndex = 0;
+    ST.refine.lastFailed = null;
     (ST.refine.steps || []).forEach(function (s) { s.done = false; s.skipped = false; });
     var ta = getEl('opf-rf-result'); if (ta) ta.value = '';
     ['opf-rf-fidelity', 'opf-rf-diff'].forEach(function (id) { var e = getEl(id); if (e) e.style.display = 'none'; });
@@ -4773,6 +4855,7 @@ async function refinePlan(){
     }
     ST.refine.working = String((getEl('opf-rf-src') || {}).value || ST.refine.src || '');
     ST.refine.stepIndex = 0;
+    ST.refine.lastFailed = null;
     ST.refine.applied = []; ST.refine.result = ''; ST.refine.diff = ''; ST.refine.fidelity = null;
     ST.refine.fidelityText = ''; ST.refine.diffText = ''; ST.refine.appliedText = '';
     ['opf-rf-fidelity', 'opf-rf-diff'].forEach(function (id) { var e = getEl(id); if (e) e.style.display = 'none'; });
@@ -4849,12 +4932,28 @@ async function refineApply(){
   ST.running = true; renderRunButtons(); refineNote('③ ' + stepLabel + '：正在生成补丁（锚点 + 新内容）…');
   try {
     var doneList = steps.slice(0, si).map(function (s, i) { return (i + 1) + '. [' + (s.done ? '已完成' : '未完成') + '] ' + (s.title || '') + '——' + (s.detail || ''); });
-    var msg = '[当前工作稿（已包含此前各步的改动；锚点请在这个版本里找）]\n' + ST.refine.working.slice(0, 60000)
+    // ③ 这一步要把整份工作稿交给模型（锚点必须来自这里，不能凭记忆）
+    var CTX_CAP = 200000;
+    var ctxText = ST.refine.working.slice(0, CTX_CAP);
+    var ctxTrunc = ST.refine.working.length > CTX_CAP;
+    var hintBlock = '';
+    if (ST.refine.lastFailed && ST.refine.lastFailed.length) {
+      hintBlock = '\n\n[上一次的锚点没对上原文——请直接使用下面给出的原文片段作为锚点，逐字复制]\n'
+        + ST.refine.lastFailed.map(function (f, i) {
+          return (i + 1) + '. 你上次写的锚点：\n<<<\n' + String(f.anchor || '').slice(0, 300) + '\n>>>\n'
+            + (f.hint ? ('原文里最接近的一段实际是这样（请用它当锚点）：\n<<<\n' + f.hint + '\n>>>') : '原文里没有找到足够接近的片段，请重新在原文里定位。')
+            + '\n失败原因：' + f.why;
+        }).join('\n\n');
+    }
+    var msg = '[当前工作稿（已包含此前各步的改动；锚点必须逐字来自这份文本）]\n' + ctxText
+      + (ctxTrunc ? '\n\n（注意：工作稿过长已截断显示，超出部分你看不到；请只在上面出现的范围内取锚点）' : '')
       + '\n\n[用户意见]\n' + req
       + '\n\n[已确认的改法分析]\n' + ST.refine.plan
       + (doneList.length ? '\n\n[本次要执行的分步计划 / 已完成情况]\n' + steps.map(function (s, i) { return (i + 1) + '. ' + (s.title || '') + '：' + (s.detail || '') + (i < si ? '（已完成，不要重复做）' : (i === si ? '　← 现在只做这一步' : '（待做，本轮不要碰）')); }).join('\n') : '')
       + (cur ? ('\n\n[本次只做这一步]\n第 ' + (si + 1) + ' 步：' + (cur.title || '') + '\n' + (cur.detail || '') + '\n请只完成这一步，不要顺手做后面的步骤。') : '')
       + '\n\n[本步输出上限]新内容合计不超过 ' + sizeCap + ' 字符；超了就只做前半部分，并在末尾写 `后续: 还需要……`。'
+      + hintBlock
+      + '\n\n[锚点纪律]锚点请从上面的「当前工作稿」里**复制粘贴**，不要凭记忆手打；不确定就先在稿子里找到那一行，再从那一行开始往后多带一两行。'
       + '\n\n' + REFINE_PATCH_SPEC;
     var resp = await callModel([{ role: 'system', content: refineSystem() }, { role: 'user', content: macroFill(msg) }]);
     var parsed = refineParsePatch(resp);
@@ -4892,17 +4991,31 @@ async function refineApply(){
     var lines = [];
     if (!res.ok) {
       // all-or-nothing：任何一处锚点不唯一/找不到，就整份放弃，绝不留半份改动
+      ST.refine.lastFailed = res.failed.map(function (f) { return { anchor: String(f.ch && (f.ch['锚点'] || '')), why: f.why, hint: f.hint || '' }; });
       lines.push('❌ ' + stepLabel + ' 的补丁未通过校验，已整体放弃（工作稿未被改动）：');
-      res.failed.forEach(function (f) { lines.push('  · 第 ' + (f.i + 1) + ' 处：' + f.why + '\n    锚点：' + String(f.ch && (f.ch['锚点'] || '')).slice(0, 160)); });
+      res.failed.forEach(function (f) {
+        lines.push('  · 第 ' + (f.i + 1) + ' 处：' + f.why);
+        lines.push('    锚点：' + String(f.ch && (f.ch['锚点'] || '')).slice(0, 160).replace(/\n/g, '⏎'));
+        if (f.hint) {
+          lines.push('    ↳ 原文里最接近的一段是：');
+          String(f.hint).split('\n').forEach(function (l) { lines.push('        ' + l); });
+          lines.push('    （已记下：点「↻ 重新生成这一步」时会连着这段原文一起交给模型，让它直接用这段当锚点）');
+        } else {
+          lines.push('    ↳ 原文里没找到足够接近的片段——这一步的范围可能写得太笼统，可回 ② 页补一句"改哪一节、改哪几句"再重来。');
+        }
+      });
       lines.push('\n对策：');
-      lines.push('  · 锚点找不到 → 常因模型凭记忆改写了锚点。点「↻ 重新生成这一步」；');
+      lines.push('  · 锚点找不到 → 直接点「↻ 重新生成这一步」（会附上上面那段原文让它照抄）；');
       lines.push('  · 锚点出现多次 → 需要更长的锚点（可回 ② 页把这一步的范围写得更具体）；');
-      lines.push('  · 若本步内容确实太大 → 点「↻ 拆细本步（更小上限）」。');
+      lines.push('  · 若本步内容确实太大 → 点「✂ 拆细本步（更小上限）」。');
       if (ao) ao.textContent = lines.join('\n');
       ST.refine.appliedText = lines.join('\n');
-      toast('本步补丁锚点校验失败，已整体放弃', 'error');
-      refineNote('③ ' + stepLabel + ' 锚点校验失败'); return;
+      toast('本步锚点校验失败，已整体放弃；提示里给出了原文最接近的片段，直接点「↻ 重新生成这一步」即可', 'error');
+      refineNote('③ ' + stepLabel + ' 锚点校验失败（已记下最接近的原文片段）');
+      refineSyncButtons();
+      return;
     }
+    ST.refine.lastFailed = null;
     // 落地到工作稿
     ST.refine.working = res.text;
     if (cur) { cur.done = true; ST.refine.stepIndex = Math.min(si + 1, steps.length); }
@@ -4918,9 +5031,10 @@ async function refineApply(){
     lines.push('✓ ' + stepLabel + ' 已落地：' + res.applied.length + ' 处变更（格式：' + parsed.format + '）');
     res.applied.forEach(function (a, i) {
       lines.push('  ' + (i + 1) + '. [' + a.type + '] ' + (a.why || ''));
-      lines.push('     锚点：' + a.anchor.slice(0, 100).replace(/\n/g, '⏎'));
+      lines.push('     锚点：' + a.anchor.slice(0, 100).replace(/\n/g, '⏎') + '　（定位方式：' + a.how + (a.degraded ? ' ⚠ 近似' : '') + '）');
       lines.push('     新内容：' + a.next.slice(0, 200).replace(/\n/g, '⏎') + (a.next.length > 200 ? ' …' : ''));
     });
+    if (res.degraded) lines.push('\n⚠ 有 ' + res.degraded + ' 处是**近似定位**（锚点与原文有空白差异，或退化为按行定位）——请重点看下面的差异预览确认位置对不对。');
     if (parsed.tail) lines.push('\n模型附注：' + parsed.tail);
     var remain = steps.length - ST.refine.stepIndex;
     if (steps.length) {
@@ -4958,7 +5072,8 @@ function refineSyncButtons(){
     b.disabled = steps.length > 0 && si >= steps.length;
   }
   var r = getEl('opf-rf-retrystep');
-  if (r) r.style.display = ST.refine.appliedText ? '' : 'none';
+  // 只要已经有改法/分步计划，就始终给出「重新生成这一步」——失败时用户第一眼就要能找到它
+  if (r) r.style.display = (ST.refine.plan || (ST.refine.steps && ST.refine.steps.length)) ? '' : 'none';
 }
 function refineCacheSave(){
   if (refineCacheSave._t) clearTimeout(refineCacheSave._t);
