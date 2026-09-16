@@ -1,6 +1,6 @@
 # 始弦的魔法大典 · destiny 开局预设工坊
 
-SillyTavern（酒馆）/ Tavern Helper 浏览器扩展「悬浮窗」· 当前版本 **v1.10.5**
+SillyTavern（酒馆）/ Tavern Helper 浏览器扩展「悬浮窗」· 当前版本 **v1.10.6**
 
 为「始弦的魔法大典 + 命定之诗与黄昏之歌」一类角色卡提供**开局预设一键流水线**：
 
@@ -325,7 +325,14 @@ body: { chat_completion_source:'makersuite', reverse_proxy:'<你的中转>',
 | **经酒馆服务端转发 + 流式** | `/api/backends/chat-completions/generate` + `stream:true` | **反代场景推荐**：无 CORS 问题、密钥与反代地址由服务端处理、Google 协议由 ST 转换、真流式回传 |
 | **浏览器直连 + 流式** | 插件直接 `fetch`（OpenAI 兼容 `/chat/completions`，或 Google 原生 `:streamGenerateContent?alt=sse`） | 有 CORS 头的自建/本地接口 |
 
-**模型名不用手填**：点「🔌 获取模型列表」即可——服务端转发档会调 ST 的 `POST /api/backends/chat-completions/status`
+**模型名不用手填（v1.10.6 改为双通道）**：点「🔌 获取模型列表」会同时走两条路并合并——
+① ST 服务端 `POST /api/backends/chat-completions/status`（走反代，无 CORS）；
+② **直接向反代地址要原始 `/v1beta/models`**（可能被 CORS 拦，拦了就跳过）。
+之所以要第二条：**ST 会用 `supportedGenerationMethods?.includes('generateContent')` 过滤，而新版 Gemini 模型不再返回该字段，会被整类丢掉**——
+症状就是"列表里只有 2.5-pro 时代的老模型"。第二条通道不过滤，把新模型全部保留。
+另外：**手填过的模型名会被记住**（写进本机配置，下次直接从下拉里选），所以即使两条通道都取不到，你手打一次就永久可用。
+状态行会报告三个数字：原始列表 N / ST 过滤后 M / 自定义 K，以及哪条通道失败、为什么。
+：点「🔌 获取模型列表」即可——服务端转发档会调 ST 的 `POST /api/backends/chat-completions/status`
 （依据 ST 1.18.0：该端点的 MAKERSUITE 分支由服务端去拉 `{reverse_proxy}/v1beta/models?key=…`，
 并按 `supportedGenerationMethods.includes('generateContent')` 过滤，只返回能聊天的模型，回包形状 `{ data: [ { id } ] }`），
 **走的是同一条反代通道，所以没有 CORS 问题**；直连档则按协议打 `/v1beta/models` 或 `/models`。
@@ -364,6 +371,7 @@ body: { chat_completion_source:'makersuite', reverse_proxy:'<你的中转>',
 ## 九、版本历史（简）
 | 版本 | 内容 |
 | --- | --- |
+| v1.10.6 | 模型列表改双通道合并：ST `/status`（会被 `supportedGenerationMethods` 过滤掉新版 Gemini 模型）+ **直接向反代要原始 `/v1beta/models`**（不过滤，CORS 被拦则跳过）；手填模型名自动记住并进入下拉；状态行报告「原始 N / ST 过滤后 M / 自定义 K」与失败通道原因 |
 | v1.10.5 | 提速：流式传输下「设计基调 + 并发 3 路生成样式块 + 实时预览」；流停顿止损（20 秒无新字节即判停并保留已收内容、4 分钟绝对上限、maxChars/maxTokens 按段预算硬顶）；状态行 5 秒心跳；非流式路径保持原顺序小段策略 |
 | v1.10.4 | 模型名自动获取：服务端转发档调 `POST /api/backends/chat-completions/status`（ST 服务端经同一反代拉 `/v1beta/models` 并按 `generateContent` 过滤），直连档按协议打 `/v1beta/models` 或 `/models`；模型名输入框改为「可下拉可手填」，拉取后自动选中 `gemini-2.5-pro/flash`；换传输/反代/密码时若模型名为空自动拉取 |
 | v1.10.3 | 正则工坊新增「经酒馆服务端转发 + 流式」传输（`POST /api/backends/chat-completions/generate` + `stream:true` + `reverse_proxy`/`proxy_password`/`use_sysprompt`），直击类反向代理场景下的 Cloudflare 524：无 CORS 问题、协议转换与密钥由酒馆服务端处理、真流式回传；「生成传输」改为三档下拉（酒馆主 API / 服务端转发+流式 / 浏览器直连+流式），直连支持 OpenAI 兼容与 Google 原生双协议；SSE 解析器同时兼容 OpenAI 与 Google 两种分片形状 |
