@@ -3842,8 +3842,8 @@ function rxRenderItems() {
     // 生成后修改：提要求 → AI 只改被要求的部分（可只改样式，或连带匹配式）
     body.appendChild(rxLabel('修改（对这条生成结果提要求，AI 只改你点到的部分；其它条目不受影响）'));
     var rrow = document.createElement('div'); rrow.className = 'opf-step-ref-row';
-    var rscope = document.createElement('select'); rscope.className = 'opf-ref-input'; rscope.style.flex = '0 0 96px';
-    [['css', '只改样式'], ['find', '样式+匹配式']].forEach(function (p) { var o = document.createElement('option'); o.value = p[0]; o.textContent = p[1]; rscope.appendChild(o); });
+    var rscope = document.createElement('select'); rscope.className = 'opf-ref-input'; rscope.style.flex = '0 0 132px';
+    [['patch', '补丁：只改样式'], ['css', '整段：只改样式'], ['find', '整段：样式+匹配式']].forEach(function (p) { var o = document.createElement('option'); o.value = p[0]; o.textContent = p[1]; rscope.appendChild(o); });
     var rin = document.createElement('input'); rin.type = 'text'; rin.className = 'opf-ref-input';
     rin.placeholder = '例：边框改成暗金色、字号大一点、去掉动效；或：台词外的括号改成灰色小字';
     var rdo = document.createElement('button'); rdo.type = 'button'; rdo.className = 'opf-step-act'; rdo.textContent = '✨ 修改';
@@ -3947,6 +3947,76 @@ function rxItemFormat(item) {
 function rxSetItemCss(item, css) {
   item.css = String(css || '');
   item.replaceHtml = rxAssemble(item, rxItemFormat(item), item.css);
+}
+// ---------- CSS 解析与补丁合并：只让模型输出「要改的规则」，合并由插件做 ----------
+// 按花括号配对切出顶层规则（跳过字符串与注释），@ 块整体算一条
+function rxCssRules(css) {
+  var s = String(css || ''), out = [], i = 0, n = s.length;
+  var skipWsAndComments = function (p) {
+    for (;;) {
+      while (p < n && /\s/.test(s.charAt(p))) p++;
+      if (s.slice(p, p + 2) === '/*') { var e = s.indexOf('*/', p + 2); p = e < 0 ? n : e + 2; continue; }
+      return p;
+    }
+  };
+  while (i < n) {
+    var j = skipWsAndComments(i);
+    if (j >= n) break;
+    var k = j;
+    while (k < n && s.charAt(k) !== '{' && s.charAt(k) !== ';') {
+      if (s.slice(k, k + 2) === '/*') { var e1 = s.indexOf('*/', k + 2); k = e1 < 0 ? n : e1 + 2; continue; }
+      var q = s.charAt(k);
+      if (q === '"' || q === "'") { k++; while (k < n && s.charAt(k) !== q) { if (s.charAt(k) === '\\') k++; k++; } }
+      k++;
+    }
+    if (k >= n) break;
+    if (s.charAt(k) === ';') { i = k + 1; continue; }              // @import / @charset 之类
+    var d = 0, m = k;
+    for (; m < n; m++) {
+      var c = s.charAt(m);
+      if (s.slice(m, m + 2) === '/*') { var e2 = s.indexOf('*/', m + 2); m = e2 < 0 ? n : e2 + 1; continue; }
+      if (c === '"' || c === "'") { m++; while (m < n && s.charAt(m) !== c) { if (s.charAt(m) === '\\') m++; m++; } continue; }
+      if (c === '{') d++;
+      else if (c === '}') { d--; if (d === 0) break; }
+    }
+    var pre = s.slice(j, k).trim();
+    out.push({ prelude: pre, at: pre.charAt(0) === '@', raw: s.slice(i, m + 1), start: i, end: m + 1 });
+    i = m + 1;
+  }
+  return out;
+}
+function rxCssNormSel(p) {
+  return String(p || '').replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+// 把补丁里同选择器的规则覆盖进原 CSS，新选择器追加到末尾；未提到的部分逐字不动
+function rxCssMerge(orig, patch) {
+  var base = String(orig || '');
+  var rules = rxCssRules(base), adds = rxCssRules(patch);
+  var replaced = [], added = [], skipped = [], append = [];
+  adds.forEach(function (r) {
+    if (r.at) { skipped.push(r.prelude); return; }
+    if (!r.prelude) return;
+    var key = rxCssNormSel(r.prelude);
+    var hit = null;
+    for (var t = 0; t < rules.length; t++) { if (!rules[t].at && rxCssNormSel(rules[t].prelude) === key) { hit = rules[t]; break; } }
+    if (hit) { hit.newRaw = r.raw; replaced.push(r.prelude); }
+    else { added.push(r.prelude); append.push(r.raw); }
+  });
+  var out = '', cursor = 0;
+  rules.forEach(function (x) {
+    out += base.slice(cursor, x.start);
+    out += (x.newRaw != null) ? x.newRaw : x.raw;
+    cursor = x.end;
+  });
+  out += base.slice(cursor);
+  if (append.length) out = out.replace(/\s*$/, '') + '\n\n/* 修改追加 */\n' + append.join('\n') + '\n';
+  return { css: out, replaced: replaced, added: added, skipped: skipped };
+}
+// 模型没听劝、整段回了一套 CSS 时：按整段处理（走缩水保护），别再当补丁合并
+function rxLooksLikeFullCss(patchCss, curCss) {
+  var a = rxCssRules(patchCss).filter(function (r) { return !r.at; }).length;
+  var b = rxCssRules(curCss).filter(function (r) { return !r.at; }).length;
+  return a > 0 && b > 0 && a >= Math.max(4, Math.ceil(b * 0.6));
 }
 // ---------- 自动修复：先本地（纯字符串、立即），剩下交给 AI ----------
 var RX_AI_FIXABLE = ['ref', 'moodbranch', 'external', 'fixedwidth', 'nomatch', 'toosmall', 'toobig', 'exmatch', 'empty'];
@@ -4130,6 +4200,61 @@ async function rxAutoFixAll() {
   } finally { ST.running = false; renderRunButtons(); }
 }
 // ---------- 生成后修改：用户提要求，AI 只改被要求的部分 ----------
+// 补丁模式（默认）：仍然把完整 CSS 作为输入发给模型，但**只要求它输出要改的规则**，
+// 合并按选择器由插件完成 —— 输出从 1.5 万字符降到几百字符，截断/偷懒/思考吃预算全部失效。
+var RX_REFINE_RULES_PATCH = [
+  '【修改规则】',
+  '1. 只改用户要求点到的部分，未提到的规则一个字都不要动（也不用抄）。',
+  '2. 颜色优先使用现有 CSS 变量；确实需要新颜色可以在规则里写死，或用 :root 之外的自定义属性。',
+  '3. 禁止：<script>、外部字体/图片资源、写死像素宽度、依赖 :hover 才显示文字、@import。',
+  '4. 必须保留现有的 class 名与骨架结构，不得重命名选择器。'
+].join('\n');
+function rxPatchPrompt(item, f, dir) {
+  var cur = rxItemCss(item);
+  var L = [];
+  L.push('[任务] 修改一条「对话美化正则」的样式层。**你只输出需要新增或替换的 CSS 规则**——未改动的规则一律不要重复输出：插件会把你的规则按选择器合并进现有 CSS，没提到的部分逐字保留。');
+  L.push('[用户要求]\n' + String(dir));
+  L.push('[当前完整 CSS（共 ' + cur.length + ' 字符）——只供你确认选择器、变量与既有写法，不要原样重抄]\n' + cur);
+  L.push('[骨架（HTML 结构由插件生成并锁定，绝不能改动）]\n' + rxSkeleton(item, f));
+  if (f.params && f.params.length) f.params.forEach(function (p) { if (p.values && p.values.length) L.push('[参数 ' + p.name + ' 的枚举值] ' + p.values.join('、')); });
+  L.push('[合并规则]\n1. 改已有规则：输出**同选择器**的完整规则块（选择器写法与现有一致，大小写与空白会被规范化后匹配）；\n2. 新增规则：用新选择器，插件会追加到末尾；\n3. 一条规则必须整体写出（选择器 + 完整花括号内容），不要只写半截声明；\n4. 不要输出 @media / @keyframes / @font-face / @import 等 @ 块——需要改这类整块时提示改用「整段重写」档；\n5. 一次最多输出 12 条规则，只覆盖用户要求涉及的部分。');
+  L.push(RX_REFINE_RULES_PATCH);
+  L.push('[输出] 一个 ' + fence() + 'css 代码块，里面**只有要合并的规则**；不要 JSON、不要解释、不要重抄整份 CSS。');
+  return macroFill(L.join('\n\n'));
+}
+async function rxRefinePatch(item, dir) {
+  var f = rxItemFormat(item);
+  var cur = rxItemCss(item);
+  var out = { changed: [], before: cur.length, after: cur.length, blocked: false, note: '', replaced: 0, added: 0, skipped: 0 };
+  if (!cur) { out.note = '这条还没有样式可补丁，请用「整段重写」档或先生成替换体'; return out; }
+  var raw = await rxCallRepair(rxPatchPrompt(item, f, dir), '修改·补丁');
+  var patchCss = rxExtractCss(raw);
+  if (!patchCss) { out.note = '模型没有返回可用的规则' + (ST.rx.lastStalled ? '（传输中途停顿，疑似被截断，可直接重试）' : '') + '（工具栏「📄 上次返回」可看原文）'; return out; }
+  // 兜底 1：模型整段回了一套 CSS → 按整段重写处理，走缩水保护
+  if (rxLooksLikeFullCss(patchCss, cur)) {
+    if (rxIsShrinkSuspect(cur.length, patchCss.length, dir)) {
+      out.blocked = true;
+      out.note = '模型没有按补丁输出，而是整段回了一套 CSS，且只有 ' + patchCss.length + ' / 原 ' + cur.length + ' 字符（疑似截断），已保留原样';
+      return out;
+    }
+    rxSnapshot(item); rxSetItemCss(item, patchCss); item.issues = rxLint(item, ST.rx.parsed);
+    out.changed = ['样式（整段）']; out.after = patchCss.length; out.note = '模型整段返回，已按整段替换处理';
+    return out;
+  }
+  var mg = rxCssMerge(cur, patchCss);
+  if (!mg.replaced.length && !mg.added.length) {
+    out.note = '没能从返回里解析出可合并的规则' + (mg.skipped.length ? '（只收到 @ 块：' + mg.skipped.join('、') + '，请改用「整段重写」档）' : '');
+    return out;
+  }
+  rxSnapshot(item);
+  rxSetItemCss(item, mg.css);
+  item.issues = rxLint(item, ST.rx.parsed);
+  out.replaced = mg.replaced.length; out.added = mg.added.length; out.skipped = mg.skipped.length;
+  out.after = mg.css.length;
+  out.changed = ['样式补丁'];
+  out.note = '替换 ' + mg.replaced.length + ' 条 / 新增 ' + mg.added.length + ' 条规则' + (mg.skipped.length ? '（跳过 ' + mg.skipped.length + ' 个 @ 块）' : '');
+  return out;
+}
 async function rxRefineItem(item, dir, scope) {
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
   var text = String(dir || '').trim();
@@ -4139,18 +4264,23 @@ async function rxRefineItem(item, dir, scope) {
   var st = getEl('opf-rx-statusline');
   if (st) st.textContent = '按你的要求修改中…';
   try {
-    var r = await rxAiRewrite(item, f, null, text, scope, '修改');
+    var r;
+    if (scope === 'patch' && rxIsSkeletonItem(item)) r = await rxRefinePatch(item, text);
+    else {
+      if (scope === 'patch') toast('这条是手写替换体（不是骨架 + CSS 结构），补丁模式不适用，已按「整段重写」处理', 'warning');
+      r = await rxAiRewrite(item, f, null, text, 'css', '修改');
+    }
     rxRenderItems(); rxCacheSave();
     if (r.changed.length) {
       var msg = r.changed.join('、') + '：' + r.before + ' → ' + r.after + ' 字符';
       if (st) st.textContent = '已修改（' + msg + '）' + (r.note ? ' ｜ ' + r.note : '');
-      toast('已修改（' + msg + '）' + (r.blocked ? '（结果偏短，是你确认保留的）' : ''), r.blocked ? 'warning' : 'success');
+      toast('已修改（' + msg + '）' + (r.note ? '　' + r.note : ''), r.blocked ? 'warning' : 'success');
     } else if (r.blocked) {
       if (st) st.textContent = '已中止：' + r.note;
       toast('已保留原样（' + r.note + '）', 'warning');
     } else {
       var n = r.note || '模型没有返回可用的修改结果';
-      if (st) st.textContent = n + '（工具栏「📄 上次返回」可看原文）';
+      if (st) st.textContent = n;
       toast(n + '，可换个说法再试', 'warning');
     }
   } catch (e) {
@@ -4175,7 +4305,7 @@ async function rxSuggestItem(item, idx) {
     list.slice(0, 3).forEach(function (t) {
       var b = document.createElement('button'); b.type = 'button'; b.className = 'opf-dir-chip';
       b.textContent = '▶ ' + t;
-      b.addEventListener('click', function () { rxRefineItem(item, t, 'css'); });
+      b.addEventListener('click', function () { rxRefineItem(item, t, 'patch'); });
       box.appendChild(b);
     });
   } catch (e) { toast('生成建议失败：' + rxDiagError(e), 'error'); }
