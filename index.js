@@ -1853,9 +1853,10 @@ var PAGE_DEFS = [
   { id: "destiny",label: "④ 命定系统" },
   { id: "regex",  label: "⑤ 正则工坊" },
   { id: "shixian",label: "⑥ 与始弦聊天" },
-  { id: "p4",     label: "⑦ DLC剧情", ph: true },
-  { id: "p5",     label: "⑧ DLC物品", ph: true },
-  { id: "p6",     label: "⑨ 更多功能", ph: true }
+  { id: "refine", label: "⑦ 核心精修" },
+  { id: "p4",     label: "⑧ DLC剧情", ph: true },
+  { id: "p5",     label: "⑨ DLC物品", ph: true },
+  { id: "p6",     label: "⑩ 更多功能", ph: true }
 ];
 
 var SHELL_CSS = "#opf-shell{position:fixed;inset:0;height:100vh;height:100dvh;z-index:2147480002;display:flex;flex-direction:column;color:#fdeef0;font-family:'Noto Sans SC','Microsoft YaHei',sans-serif;letter-spacing:.3px;background:linear-gradient(180deg,#18040b 0%,#0d0206 55%,#0a0105 100%);border:none;transition:opacity .16s ease,transform .16s ease}#opf-shell.opf-shell-hidden{opacity:0;pointer-events:none;transform:translateY(12px)}#opf-shell *{box-sizing:border-box}#opf-shell-head{position:relative;display:flex;align-items:center;gap:10px;padding:8px 12px;flex:none;background:rgba(46,6,14,.6);border-bottom:1px solid rgba(255,122,138,.28)}#opf-shell-head::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#ff4d5e 18%,#ffd9a8 50%,#c8102e 82%,transparent);box-shadow:0 0 12px rgba(255,90,100,.8)}#opf-shell-title{font-size:15px;font-weight:600;color:#ffd9de;text-shadow:0 0 10px rgba(255,77,94,.35);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#opf-shell-close{margin-left:auto;flex:none;border:1px solid rgba(255,122,138,.35);background:rgba(255,77,94,.14);color:#ff8a95;width:40px;height:40px;min-width:40px;border-radius:10px;font-size:16px;cursor:pointer}#opf-shell-close:hover{background:rgba(255,77,94,.3);color:#fff}#opf-nav{display:flex;gap:5px;padding:8px 10px 0;overflow-x:auto;overflow-y:hidden;flex:none;scrollbar-width:thin;scrollbar-color:rgba(255,122,138,.4) transparent}.opf-tab{flex:none;border:1px solid rgba(255,122,138,.26);background:rgba(255,235,238,.05);color:#ffc9cf;border-radius:10px 10px 0 0;padding:9px 13px;font-size:12.5px;line-height:1.2;cursor:pointer;white-space:nowrap;min-height:40px}.opf-tab.active{background:linear-gradient(180deg,rgba(255,77,94,.26),rgba(255,77,94,.07));color:#fff;border-color:rgba(255,150,165,.65);box-shadow:inset 0 2px 0 #ff4d5e}.opf-tab.placeholder{opacity:.6;border-style:dashed}#opf-pages{flex:1;min-height:0;position:relative}.opf-page{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;padding:10px 12px 14px;display:none;scrollbar-width:thin}.opf-page.active{display:block}.opf-page-ph{padding:32px 16px;text-align:center;color:rgba(255,200,208,.55);font-size:13.5px;line-height:2.2;white-space:pre-line}#opf-shell #opf-root{position:static;width:100%;max-width:100%;height:auto;min-height:100%;max-height:none;margin:0;border:none;border-radius:0;box-shadow:none;background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none}#opf-shell #opf-root.opf-hidden{opacity:1;pointer-events:auto;transform:none}#opf-shell #opf-root::before{display:none}#opf-shell #opf-lside{position:static;transform:none;width:100%;max-width:none;height:100%;top:auto;bottom:auto;left:auto;border:none;border-radius:0;box-shadow:none;background:transparent}#opf-shell #opf-lside.open{transform:none}.opf-char-wrap{display:flex;flex-direction:column;gap:8px;max-width:860px;margin:0 auto}.opf-char-input{width:100%;border-radius:8px;padding:8px 10px;font-size:12.5px;color:#ffeef1;background:rgba(10,2,5,.55);border:1px solid rgba(255,122,138,.25);outline:none;resize:vertical}.opf-char-input:focus{border-color:rgba(255,110,125,.6);box-shadow:0 0 6px rgba(255,77,94,.25)}#opf-char-demand{min-height:56px}#opf-char-ref{min-height:48px;font-size:12px}.opf-char-tools{display:flex;gap:6px;flex-wrap:wrap}.opf-char-tools .opf-btn{flex:1 1 130px;min-height:44px;font-size:13px}.opf-box{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;margin:6px 0 0;padding:10px 12px;border:1px solid rgba(255,122,138,.32);border-radius:10px;background:rgba(10,2,5,.62);box-shadow:inset 0 0 14px rgba(255,60,80,.05);color:#ffeef1;font-size:12px;line-height:1.55;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;overflow:auto}.opf-char-report{max-height:300px;min-height:64px}#opf-char-out{max-height:56vh;min-height:140px;font-size:12.5px;scrollbar-width:thin}.opf-char-copyrow{margin-top:6px}#opf-dest-demand{min-height:56px}#opf-dest-ref{min-height:48px;font-size:12px}#opf-dest-out{max-height:56vh;min-height:140px;font-size:12.5px;scrollbar-width:thin}#opf-dest-ejswrap{display:flex;align-items:flex-start;gap:7px;font-size:11.5px;line-height:1.5;color:#ffc9cf;background:rgba(60,140,200,.10);border:1px dashed rgba(120,190,255,.35);border-radius:8px;padding:7px 9px;cursor:pointer}#opf-dest-ejswrap input{width:16px;height:16px;margin:1px 0 0;flex:none;accent-color:#3c8cc8}.opf-rx-preview{max-width:100%;overflow:auto;border:1px dashed rgba(255,122,138,.3);border-radius:8px;padding:6px;margin:4px 0;background:rgba(10,2,5,.5);font-size:12px}#opf-rx-items select.opf-ref-input{flex:0 0 auto;min-width:120px}#opf-rx-core{min-height:90px}.opf-shx-cfg{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:4px 0}.opf-shx-cfg .opf-opt{display:flex;align-items:center;gap:5px;font-size:11.5px;color:#ffc9cf}.opf-shx-cfg .opf-ref-input{min-width:130px}.opf-shx-log{max-height:46vh;min-height:160px;overflow:auto;border:1px solid rgba(255,122,138,.28);border-radius:10px;background:rgba(10,2,5,.55);padding:8px 10px;display:flex;flex-direction:column;gap:8px}.opf-shx-msg{padding:7px 9px;border-radius:9px;font-size:12.5px;line-height:1.7}.opf-shx-msg.me{background:rgba(255,77,94,.10);border:1px solid rgba(255,122,138,.22);align-self:flex-end;max-width:86%}.opf-shx-msg.her{background:rgba(120,190,255,.08);border:1px solid rgba(120,190,255,.25);align-self:flex-start;max-width:92%}.opf-shx-who{font-size:10px;letter-spacing:1px;opacity:.65;margin-bottom:3px}.opf-shx-text{white-space:pre-wrap;word-break:break-word}#opf-shx-input{min-height:56px}.opf-shx-wblist{max-height:220px;overflow:auto;border:1px solid rgba(255,122,138,.2);border-radius:8px;padding:5px 7px;margin-top:5px}@media (max-width:760px){#opf-shell-head{padding:6px 8px}#opf-shell-title{font-size:13px}#opf-shell-close{width:40px;height:40px}.opf-tab{padding:8px 10px;font-size:11.5px;min-height:40px}.opf-page{padding:8px 8px 12px}#opf-shell #opf-root{font-size:13px}.opf-page .opf-btn{min-height:44px}.opf-char-tools .opf-btn{min-height:46px}.opf-wi-row{min-height:40px}.opf-wi-row input{width:18px;height:18px}#opf-lside-tools{gap:6px}#opf-lside-tools .opf-step-act{min-height:40px;font-size:12px}}";
@@ -1891,6 +1892,8 @@ function buildShell(){
       d.innerHTML = RX_HTML;
     } else if (p.id === "shixian") {
       d.innerHTML = SHX_HTML;
+    } else if (p.id === "refine") {
+      d.innerHTML = REFINE_HTML;
     } else if (p.id === "world") {
       /* 世界书侧栏由 buildWorldSide 挂载到本页 */
     } else {
@@ -1913,6 +1916,7 @@ function buildShell(){
   try { bindDestinyPage(); } catch (e) { opfErr("destiny page", e); }
   try { bindRxPage(); } catch (e) { opfErr("regex page", e); }
   try { bindShxPage(); } catch (e) { opfErr("shixian page", e); }
+  try { bindRefinePage(); } catch (e) { opfErr("refine page", e); }
   try { buildWorldSide(); } catch (e) { opfErr("buildWorldSide", e); }
   if (getSettings().visible) showPanel();
 }
@@ -3614,6 +3618,259 @@ function destDraftRestore(){
 }
 
 // ============================================================================
+// v1.12.0 ⑦ 命定核心精修：改动既有核心（外科手术式）
+// 四步闸门：① 整体分析 → ② 用户提意见 → ③ 模型分析并给出改法 → ④ 确认后置入
+// 绝对保持的铁律靠**机制**而不是靠模型自觉：
+//   · 模型不许重写全文，只许给出「锚点 + 新内容」的补丁；
+//   · 补丁由插件按"逐字唯一命中"应用到原文，任何一处锚点不唯一/找不到 → 整体放弃；
+//   · 应用后跑脚本保真校验（行级 diff、包裹标签、十槽、人设字段、EJS 配对、
+//     既有口令短语与变量路径是否消失），未变动部分逐字不动是"物理事实"而非承诺。
+// ============================================================================
+var REFINE_RULES = [
+  '【绝对保持·铁律】',
+  '1. 除「变更」清单明确列出的部分外，原文必须逐字不变：字符、空格、缩进、标点、换行、注释、变量路径、EJS 标签、口令词，一个都不许动。',
+  '2. 禁止输出整份文件、禁止重排、禁止顺手润色、禁止统一格式。你只输出锚点与新内容。',
+  '3. 锚点必须是原文里**逐字存在且唯一**的片段：长度 20~80 字符，带足够上下文以保证唯一；'
+    + '不要用行号、不要用省略号、不要凭记忆改写锚点、不要跨越你打算修改的范围。',
+  '4. 新内容只包含"替换掉锚点的那一段"或"要插入的那一段"，不要把周边原文抄进新内容里。',
+  '5. 不得改变既有功能、数值、触发条件、口令、人设、语气、变量名，除非本次意见明确要求改它。',
+  '6. 若某条意见无法在"不动其它内容"的前提下实现，就把它从「变更」里去掉，并在「冲突」里说明原因与最小侵入的替代方案。',
+  '7. 保持原有的缩进风格与行尾形态（YAML 正文以 2 空格为一层）。'
+].join('\n');
+var REFINE_ANALYZE_SPEC = [
+  '【分析任务】读懂这份命定系统核心，输出结构化认知（只读，不改动任何内容）。',
+  '输出一个 json 代码块，键如下（全部用中文键名）：',
+  '{',
+  '  "条目名": "含 (署名) 的注释名或文件名",',
+  '  "系统名": "包裹标签名", "系统核心名": "灵的自有名", "系统核心": "条目标识",',
+  '  "包裹标签": "<X>",',
+  '  "一级节": ["定义/关键能力/命运点数(FP)/…"],',
+  '  "十槽": {"齐全": true, "缺": ["…"]},',
+  '  "功能清单": ["每条：功能名 = 一句话作用（保留原文口径）"],',
+  '  "机制要点": ["可结算的规则、数值、触发、消耗"],',
+  '  "人设要点": {"形象":"","性格":"","定位":"","说话风格":"","爱好":"","最重要的愿望":""},',
+  '  "语言格式": {"族":"xml|引语|裸引号", "标签":"", "参数":["mood/tag/num…"], "范例条数": 0},',
+  '  "硬约束": ["隐蔽原则/非万能原则/复活约束句/禁令等一旦删除就会坏掉的句子"],',
+  '  "状态与变量": ["用到的 stat_data 路径、setMessageVar/getMessageVar、MVU 写入点、局部变量名"],',
+  '  "口令与关键词": ["触发用的固定词，如‘可要起卦’‘拾枚玉简’"],',
+  '  "EJS结构": {"块数":0, "用途":["身份守卫/数据读取/条件渲染/静默降级…"]},',
+  '  "脆弱点": ["改动时最容易连带弄坏的地方"],',
+  '  "可优化方向": ["3~6 条，只提方向，不要写新内容"]',
+  '}',
+  '要求：只描述"它现在是什么"，不要提改进建议（改进方向写在"可优化方向"里）；不要输出原文片段的长引用，不要输出正文。'
+].join('\n');
+var REFINE_PLAN_SPEC = [
+  '【意见分析任务】用户会对这份核心提出修改意见。你要先分析、后动手，本步**不许输出任何正文改动**。',
+  '输出一个 json 代码块：',
+  '{',
+  '  "可否": "可以|部分可以|不建议",',
+  '  "理解": "用一两句话复述用户到底想要什么",',
+  '  "影响评估": [{"点":"会碰到哪一处","影响":"会连带影响什么（数值/口令/联动/存档兼容）","是否触及既有功能":"否|是"}],',
+  '  "拟定改法": [{"位置":"原文里的哪一节","做法":"最小侵入的实现方式"}],',
+  '  "锚点预告": ["预计要动的原文片段（逐字引用，供用户核对）"],',
+  '  "冲突": ["无法在‘不动其它内容’前提下实现的部分，及最小侵入替代方案"],',
+  '  "保真承诺": "改完后哪些东西保证一个字符都不变（逐项列出）",',
+  '  "确认提示": "给用户看的一句话：确认后我会这样改"',
+  '}',
+  '要求：宁可少改也不要动到无关内容；若用户意见与既有设计冲突（例如要削弱已有约束、要改口令词），必须显式指出并给出影响面。'
+].join('\n');
+var REFINE_PATCH_SPEC = [
+  '【置入任务】用户已确认改法。现在输出**补丁**（不是全文，不是新版本文件）。',
+  '输出一个 json 代码块：',
+  '{ "变更": [ { "类型": "替换|后插|前插", "锚点": "原文里逐字存在且唯一的片段", "新内容": "替换/插入的内容", "理由": "一句话" } ], "冲突": ["未能实现的部分及原因"] }',
+  '类型语义：替换=用新内容替换锚点整段；后插=在锚点之后另起一行插入新内容；前插=在锚点之前另起一行插入新内容。',
+  '自检（输出前逐条核对）：① 每个锚点都能在原文里用 Ctrl+F 精确找到且只有一处；'
+    + '② 新内容里没有误抄进来的周边原文；③ 除变更清单外没有别的差异；④ 没有动到 setvar 槽位、EJS 标签、变量路径与既有口令。',
+  '若某条改动实在无法用唯一锚点表达，就不要放进「变更」，写进「冲突」并说明。'
+].join('\n');
+
+function refineInit(){
+  ST.refine = ST.refine || { src: '', name: '', scan: '', analysis: '', analysisObj: null, request: '', plan: '', planObj: null, result: '', diff: '', fidelity: null, applied: [], status: 'idle', _inited: false };
+}
+// ---------- 本地结构体检（零 AI）：先让脚本把事实摆出来 ----------
+function refineScan(src){
+  var t = String(src || '');
+  var lines = t.split(/\r?\n/);
+  var wrap = (t.match(/^<([^>\s{}]+)>/m) || [])[1] || '';
+  var slots = destExtractSlots(t);
+  var found = DEST_SLOT_ORDER.filter(function (n) { return slots.map[n]; });
+  var top = [], sub = [], ejsDepth = 0;
+  lines.forEach(function (l) {
+    var opens = (l.match(/<%/g) || []).length, closes = (l.match(/%>/g) || []).length;
+    if (ejsDepth > 0 || opens > 0) { ejsDepth += opens - closes; if (ejsDepth < 0) ejsDepth = 0; return; }   // EJS/JS 区里的"键"是代码，不是结构
+    var m = l.match(/^( *)([^ \t#\-][^:：]{0,30})[:：]/);
+    if (!m) return;
+    var k = m[2].trim();
+    if (!k || k.length > 18) return;
+    if (/[\/\\<>\[\]{}"']|^\/\//.test(k)) return;
+    if (/^(?:if|const|let|var|return|function)\b/.test(k)) return;
+    if (m[1].length === 0) { if (top.indexOf(k) < 0) top.push(k); }
+    else if (m[1].length <= 2) { if (sub.indexOf(k) < 0) sub.push(k); }
+  });
+  var ejsOpen = (t.match(/<%/g) || []).length, ejsClose = (t.match(/%>/g) || []).length;
+  var braces = destEjsBraceDelta ? 0 : 0;
+  var marks = [];
+  if (wrap) {
+    var o = (t.match(new RegExp('<' + wrap + '>', 'g')) || []).length;
+    var c = (t.match(new RegExp('</' + wrap + '>', 'g')) || []).length;
+    marks.push('包裹标签 <' + wrap + '> 开 ' + o + ' / 闭 ' + c + (o === c && o > 0 ? ' ✓' : ' ✗ 不配对'));
+  } else marks.push('未找到包裹标签 <X>（这份文本可能不是条目正文）');
+  marks.push('十槽 ' + found.length + '/10' + (found.length < 10 ? '（缺：' + DEST_SLOT_ORDER.filter(function (n) { return found.indexOf(n) < 0; }).join('、') + '）' : ' ✓'));
+  if (ejsOpen > 0) marks.push('顶层键：这是 EJS 核心，正文由条件分支动态拼装（`<%_ if … { _%>` 跨行的块用数标签的办法切不准），脚本不做顶层键切分——交给「① 整体分析」去读');
+  else marks.push('顶层键 ' + top.length + ' 个：' + top.slice(0, 8).join(' / ') + (top.length > 8 ? ' …（还有 ' + (top.length - 8) + ' 个）' : ''));
+  marks.push('一级节 ' + sub.length + ' 个：' + sub.slice(0, 18).join(' / ') + (sub.length > 18 ? ' …（还有 ' + (sub.length - 18) + ' 个：' + sub.slice(18, 30).join(' / ') + '）' : ''));
+  marks.push('EJS 标签 <% ' + ejsOpen + ' / %> ' + ejsClose + (ejsOpen === ejsClose ? ' ✓ 配对' : ' ⚠ 数量不等（可能是多行块，仍需人工确认）'));
+  marks.push('篇幅 ' + t.length + ' 字符 / ' + lines.length + ' 行');
+  return { text: marks.join('\n'), wrap: wrap, slots: found, sections: sub, top: top, chars: t.length, lines: lines.length, ejsOpen: ejsOpen, ejsClose: ejsClose };
+}
+function refineLoad(text, name){
+  refineInit();
+  var t = String(text || '');
+  ST.refine.src = t;
+  ST.refine.name = name || ST.refine.name || '未命名核心';
+  ST.refine.analysis = ''; ST.refine.analysisObj = null; ST.refine.plan = ''; ST.refine.planObj = null;
+  ST.refine.result = ''; ST.refine.diff = ''; ST.refine.fidelity = null; ST.refine.applied = [];
+  var sc = refineScan(t);
+  ST.refine.scan = sc.text;
+  var ta = getEl('opf-rf-src'); if (ta) ta.value = t;
+  refineRender();
+  return sc;
+}
+function refineNote(s){ var el = getEl('opf-rf-status'); if (el) el.textContent = s; }
+// ---------- 行级 diff（LCS，纯脚本）----------
+function refineLineDiff(a, b){
+  var A = String(a).split(/\r?\n/), B = String(b).split(/\r?\n/);
+  var n = A.length, m = B.length;
+  if (n * m > 6000000) return null;
+  var dp = new Int32Array((n + 1) * (m + 1));
+  var W = m + 1;
+  for (var i = n - 1; i >= 0; i--) {
+    for (var j = m - 1; j >= 0; j--) {
+      dp[i * W + j] = (A[i] === B[j]) ? dp[(i + 1) * W + (j + 1)] + 1 : Math.max(dp[(i + 1) * W + j], dp[i * W + (j + 1)]);
+    }
+  }
+  var ops = [], x = 0, y = 0;
+  while (x < n && y < m) {
+    if (A[x] === B[y]) { ops.push({ t: 'same', a: x, b: y }); x++; y++; }
+    else if (dp[(x + 1) * W + y] >= dp[x * W + (y + 1)]) { ops.push({ t: 'del', a: x }); x++; }
+    else { ops.push({ t: 'add', b: y }); y++; }
+  }
+  while (x < n) { ops.push({ t: 'del', a: x }); x++; }
+  while (y < m) { ops.push({ t: 'add', b: y }); y++; }
+  return ops;
+}
+// ---------- 保真校验：把"绝对保持"变成可核对的事实 ----------
+// 抽出「口令类」短语：位于含"口令/必须包含/触发/关键词/四字/禁止"的行里，
+// 这些短语消失 = 既有功能被悄悄改坏的最高信号，要单独点名
+function refinePhrases(t){
+  var all = {}, pass = {};
+  var re = /「([^」\n]{2,40})」|【([^】\n]{2,40})】|\u201c([^\u201d\n]{2,40})\u201d|"([^"\n]{2,40})"/g;
+  String(t).split(/\r?\n/).forEach(function (line) {
+    var isPass = /口令|必须包含|触发|关键词|四字|禁止|专用/.test(line);
+    var m;
+    re.lastIndex = 0;
+    while ((m = re.exec(line)) !== null) {
+      var v = (m[1] || m[2] || m[3] || m[4] || '').trim();
+      if (!v) continue;
+      all[v] = (all[v] || 0) + 1;
+      if (isPass) pass[v] = (pass[v] || 0) + 1;
+    }
+  });
+  return { all: all, pass: pass };
+}
+function refinePaths(t){
+  var out = {}, re = /(?:stat_data\.[\w\u4e00-\u9fa5.\[\]]+|\/(?:主角|世界|事件|任务列表|关系列表|新闻)[\w\u4e00-\u9fa5\/.]*)/g, m;
+  while ((m = re.exec(String(t))) !== null) { out[m[0]] = (out[m[0]] || 0) + 1; }
+  return out;
+}
+function refineFidelity(before, after, wanted){
+  var checks = [], diff = refineLineDiff(before, after), stats = { same: 0, add: 0, del: 0 };
+  if (diff) diff.forEach(function (o) { stats[o.t === 'same' ? 'same' : (o.t === 'add' ? 'add' : 'del')]++; });
+  var B = String(before), A = String(after);
+  var want = String(wanted || '');
+  var list = [];
+  var bWrap = (B.match(/^<([^>\s{}]+)>/m) || [])[1] || '', aWrap = (A.match(/^<([^>\s{}]+)>/m) || [])[1] || '';
+  var wOk = bWrap === aWrap && bWrap;
+  list.push({ ok: !!wOk, k: '包裹标签', v: wOk ? ('<' + bWrap + '> 未变') : ('变了或丢失：' + bWrap + ' → ' + aWrap) });
+  var bS = destExtractSlots(B), aS = destExtractSlots(A);
+  var missSlot = DEST_SLOT_ORDER.filter(function (n) { return bS.map[n] && !aS.map[n]; });
+  var chgSlot = DEST_SLOT_ORDER.filter(function (n) { return bS.map[n] && aS.map[n] && bS.map[n] !== aS.map[n]; });
+  list.push({ ok: missSlot.length === 0, k: '十槽存在性', v: missSlot.length ? ('丢了：' + missSlot.join('、')) : '10 槽一个没少' });
+  list.push({ ok: chgSlot.length === 0 || /槽|setvar|变量/.test(want), k: '槽位内容', v: chgSlot.length ? ('有变化的槽：' + chgSlot.join('、') + (/槽|setvar|变量/.test(want) ? '（本次意见涉及变量，视为预期）' : '（本次未要求改变量，请核对）')) : '全部原样' });
+  var pB = refinePhrases(B), pA = refinePhrases(A);
+  var lostPhrase = Object.keys(pB.all).filter(function (k) { return !pA.all[k]; });
+  var lostPass = lostPhrase.filter(function (k) { return pB.pass[k]; });
+  list.push({
+    ok: lostPhrase.length === 0, k: '既有短语/口令',
+    v: lostPhrase.length
+      ? ('消失了 ' + lostPhrase.length + ' 个'
+        + (lostPass.length ? '，其中**口令类 ' + lostPass.length + ' 个**：' + lostPass.slice(0, 6).map(function (x) { return '「' + x + '」'; }).join('、') : '')
+        + '；其余：' + lostPhrase.filter(function (k) { return lostPass.indexOf(k) < 0; }).slice(0, 8).map(function (x) { return '「' + x + '」'; }).join('、')
+        + (lostPhrase.length > 8 + lostPass.length ? ' …' : ''))
+      : '一个没少（含口令类 ' + Object.keys(pB.pass).length + ' 个）'
+  });
+  var qB = refinePaths(B), qA = refinePaths(A);
+  var lostPath = Object.keys(qB).filter(function (k) { return !qA[k]; });
+  list.push({ ok: lostPath.length === 0, k: '变量/状态路径', v: lostPath.length ? ('消失了：' + lostPath.slice(0, 6).join('、')) : '一个没少' });
+  var eB = (B.match(/<%/g) || []).length, eA = (A.match(/%>/g) || []).length;
+  var zB = (B.match(/%>/g) || []).length, zA = (A.match(/<%/g) || []).length;
+  list.push({ ok: (eB - zB) === (zA - zA), k: 'EJS 标签配对', v: '改动前 <% ' + eB + '/%> ' + zB + '（差 ' + (eB - zB) + '）→ 改动后 <% ' + zA + '/%> ' + eA + '（差 ' + (zA - eA) + '）' + ((eB - zB) === (zA - eA) ? ' ✓' : ' ⚠') });
+  var fB = (B.match(/^\s{6}([\u4e00-\u9fa5]{2,8})[:：]/gm) || []).length, fA = (A.match(/^\s{6}([\u4e00-\u9fa5]{2,8})[:：]/gm) || []).length;
+  list.push({ ok: fA >= fB - (/(人设|性格|形象|愿望)/.test(want) ? 6 : 0), k: '人设字段数', v: '改动前 ' + fB + ' 个字段名 → 改动后 ' + fA + (/人设|性格|形象|愿望/.test(want) ? '（本次意见涉及人设，允许变化）' : '（未要求改人设，不应减少）') });
+  var funcsB = (B.match(/【[^】\n]{2,20}】\s*[:：]/g) || []).length, funcsA = (A.match(/【[^】\n]{2,20}】\s*[:：]/g) || []).length;
+  list.push({ ok: funcsA >= funcsB, k: '功能条目数', v: '【…】条目 ' + funcsB + ' → ' + funcsA + (funcsA < funcsB ? ' ⚠ 少了 ' + (funcsB - funcsA) + ' 条' : '') });
+  return { checks: list, stats: stats, diff: diff, changedLines: stats.add + stats.del };
+}
+function refineRenderDiff(before, after, diff){
+  if (!diff) return '（文本过大，跳过行级 diff）';
+  var A = String(before).split(/\r?\n/), B = String(after).split(/\r?\n/);
+  var out = [], i = 0, hunks = 0;
+  while (i < diff.length && hunks < 20) {
+    if (diff[i].t === 'same') { i++; continue; }
+    var start = i, end = i;
+    // 合并相邻的变更块
+    while (end + 1 < diff.length && diff[end + 1].t !== 'same') end++;
+    var sameRun = 0, k = end + 1;
+    while (k < diff.length && diff[k].t === 'same' && sameRun < 4) { sameRun++; k++; }
+    var pre = [], j = start - 1, cnt = 0;
+    while (j >= 0 && diff[j].t === 'same' && cnt < 3) { pre.unshift(A[diff[j].a]); j--; cnt++; }
+    hunks++;
+    out.push('── 变更 ' + hunks + ' ──');
+    pre.forEach(function (l) { out.push('   ' + l); });
+    for (var q = start; q <= end; q++) {
+      if (diff[q].t === 'del') out.push('-  ' + A[diff[q].a]);
+      else out.push('+  ' + B[diff[q].b]);
+    }
+    i = end + 1;
+  }
+  if (!hunks) return '（没有差异）';
+  if (hunks >= 20) out.push('…（变更块过多已截断显示）');
+  return out.join('\n');
+}
+// ---------- 补丁应用：逐字唯一命中，all-or-nothing ----------
+function refineApplyPatch(src, changes){
+  var out = String(src), applied = [], failed = [];
+  (changes || []).forEach(function (ch, i) {
+    var type = String(ch['类型'] || ch['type'] || '替换');
+    var anchor = String(ch['锚点'] || ch['anchor'] || '');
+    var next = ch['新内容'] != null ? String(ch['新内容']) : (ch['content'] != null ? String(ch['content']) : '');
+    var why = String(ch['理由'] || '');
+    if (!anchor) { failed.push({ i: i, why: '锚点为空', ch: ch }); return; }
+    if (!next.trim()) { failed.push({ i: i, why: '新内容为空', ch: ch }); return; }
+    var idx = out.indexOf(anchor);
+    if (idx < 0) { failed.push({ i: i, why: '锚点在原文里找不到（模型可能改写了锚点或跨越了已改动区域）', ch: ch }); return; }
+    if (out.indexOf(anchor, idx + 1) >= 0) { failed.push({ i: i, why: '锚点在原文里出现多次，无法唯一定位（需要更长的锚点）', ch: ch }); return; }
+    var rep;
+    if (/前插/.test(type)) rep = next + '\n' + anchor;
+    else if (/后插/.test(type)) rep = anchor + '\n' + next;
+    else rep = next;
+    out = out.slice(0, idx) + rep + out.slice(idx + anchor.length);
+    applied.push({ i: i, type: type, why: why, anchor: anchor, next: next });
+  });
+  return { ok: failed.length === 0, text: out, applied: applied, failed: failed };
+}
+
+// ============================================================================
 // v1.9.0 正则工坊：命定系统对话美化正则
 // 匹配式由插件确定生成（依据核心「语言格式」节解析结果），替换体由模型产出
 // 依据：现有 4 条生产正则（命定核心-艾莉亚-车票技能美化 / 月蚀对话美化 / 飨宴 / 去思维链）
@@ -4017,8 +4274,340 @@ function rxSyncTransportUi() {
         : (why ? '⚠ ' + why : '配置完整，可生成；适用于有 CORS 头的自建/本地接口'));
   }
 }
-function bindRxPage() {
-  rxInit();
+// ---------- ⑦ 命定核心精修：界面 ----------
+var REFINE_HTML = '<div class="opf-char-wrap">'
+  + '<div class="opf-sec-label">✦ 命定核心精修 · 外科手术式改造（绝对保持原有内容/功能/人设）</div>'
+  + '<div class="opf-dim">四步闸门：<b>① 整体分析</b>（模型只读一遍，输出结构化概况）→ <b>② 你提修改意见</b> → <b>③ 模型分析并给出改法</b>（评估影响面，仍不动正文）→ <b>④ 你确认无误</b> → 模型只产出「锚点 + 新内容」的补丁，<b>由插件按逐字唯一命中落刀</b>，随后跑脚本保真校验（行级 diff / 包裹标签 / 十槽 / 人设字段 / EJS 配对 / 既有口令与变量路径是否消失）。未改动部分逐字不动是物理事实，不靠模型自觉。</div>'
+  + '<textarea id="opf-rf-src" class="opf-char-input" style="min-height:120px" placeholder="把要修改的命定核心整份文本粘进来（YAML 正文 / 条目正文 / 从酒馆世界书复制出来的内容都行），或点下方「📂 打开文件」"></textarea>'
+  + '<div class="opf-char-tools">'
+  + '<label class="opf-btn ghost" style="margin:0">📂 打开文件<input type="file" id="opf-rf-file" accept=".yaml,.yml,.txt,.json,.md" style="display:none"></label>'
+  + '<button type="button" class="opf-btn ghost" id="opf-rf-fromdest">⬅ 从 ④ 页带入成品</button>'
+  + '<button type="button" class="opf-btn ghost" id="opf-rf-fromworld">📚 从世界书命定系统条目挑一份</button>'
+  + '<button type="button" class="opf-btn ghost" id="opf-rf-clear">🗑 清空</button>'
+  + '</div>'
+  + '<div class="opf-dim" id="opf-rf-status">还没载入核心</div>'
+  + '<div class="opf-sec"><div class="opf-sec-label">结构体检（脚本，零 AI）</div><pre id="opf-rf-scan" class="opf-box opf-char-report">尚未载入</pre></div>'
+  + '<div class="opf-char-tools"><button type="button" class="opf-btn primary" id="opf-rf-analyze">① 整体分析</button>'
+  + '<button type="button" class="opf-btn ghost" id="opf-rf-copyanalysis">⧉ 复制分析</button></div>'
+  + '<pre id="opf-rf-analysis" class="opf-box opf-char-report">（还没分析）</pre>'
+  + '<div class="opf-sec"><div class="opf-sec-label">② 你的修改意见（改什么、为什么、期望效果）</div></div>'
+  + '<textarea id="opf-rf-req" class="opf-char-input" style="min-height:80px" placeholder="例：给「食运加持」加一条约束——同一道菜在同一地点重复品尝不再触发增益；再给『天机推演』的卦象卡片增加一个字段 Rumor（一句市井传闻，20字内）"></textarea>'
+  + '<div class="opf-char-tools"><button type="button" class="opf-btn primary" id="opf-rf-plan">② 分析这条意见</button>'
+  + '<button type="button" class="opf-btn ghost" id="opf-rf-suggest">💡 给我几条可优化方向</button></div>'
+  + '<pre id="opf-rf-planout" class="opf-box opf-char-report">（还没分析意见）</pre>'
+  + '<div class="opf-sec"><div class="opf-sec-label">③ 确认后置入（模型只出补丁，插件落刀）</div></div>'
+  + '<div class="opf-char-tools"><button type="button" class="opf-btn primary" id="opf-rf-apply">✓ 确认无误，置入</button>'
+  + '<button type="button" class="opf-btn ghost" id="opf-rf-retry">↻ 换个说法重来</button>'
+  + '<button type="button" class="opf-btn ghost" id="opf-rf-rollback">↩ 回退到原文</button></div>'
+  + '<pre id="opf-rf-applyout" class="opf-box opf-char-report">（还没置入）</pre>'
+  + '<pre id="opf-rf-fidelity" class="opf-box opf-char-report" style="display:none">尚未校验</pre>'
+  + '<pre id="opf-rf-diff" class="opf-box opf-char-report" style="display:none">尚无差异</pre>'
+  + '<div class="opf-sec"><div class="opf-sec-label">成品（可继续手改；改完可再回来分析新一轮）</div></div>'
+  + '<textarea id="opf-rf-result" class="opf-char-input" style="min-height:160px" placeholder="置入后这里会是改好的完整文本；未置入时为空"></textarea>'
+  + '<div class="opf-char-tools"><button type="button" class="opf-btn ghost" id="opf-rf-copy">⧉ 复制成品</button>'
+  + '<button type="button" class="opf-btn ghost" id="opf-rf-download">💾 下载 .yaml</button>'
+  + '<button type="button" class="opf-btn ghost" id="opf-rf-reload">⟳ 用成品替换原文，开新一轮</button></div>'
+  + '</div>';
+function bindRefinePage(){
+  var f = getEl('opf-rf-file');
+  if (!f) return;
+  f.addEventListener('change', function () {
+    var file = this.files && this.files[0]; if (!file) return;
+    var fr = new FileReader();
+    fr.onload = function () {
+      var txt = String(fr.result || '');
+      if (/^\s*[\[{]/.test(txt)) { try { var j = JSON.parse(txt); txt = j.content || j.正文 || (j.entries ? Object.keys(j.entries).map(function (k) { return j.entries[k].content; }).join('\n\n') : txt); } catch (e) {} }
+      var sc = refineLoad(txt, file.name);
+      toast('已载入 ' + file.name + '（' + sc.chars + ' 字符 / ' + sc.lines + ' 行）', 'success');
+    };
+    fr.readAsText(file, 'utf-8');
+    this.value = '';
+  });
+  getEl('opf-rf-src').addEventListener('input', function () { refineInit(); ST.refine.src = this.value; ST.refine.scan = refineScan(this.value).text; var s = getEl('opf-rf-scan'); if (s) s.textContent = ST.refine.scan; refineCacheSave(); });
+  getEl('opf-rf-fromdest').addEventListener('click', function () {
+    var body = ST.dest && ST.dest.body;
+    if (!body) { toast('④ 页还没有成品：先去 ④ 页「🎁 脚本封装」，或直接把核心粘进来', 'warning'); return; }
+    refineLoad(body, '④页成品-' + (ST.dest.asmInfo && ST.dest.asmInfo.wrapper || '核心'));
+    toast('已从 ④ 页带入成品（' + body.length + ' 字符）');
+  });
+  getEl('opf-rf-fromworld').addEventListener('click', function () {
+    var list = refineCoreList();
+    if (!list.length) { toast('还没有可选的命定系统条目：请先在 ② 世界书页导入世界书（勾选影响的是发给 AI 的上下文，这里只用来挑文本）', 'warning'); return; }
+    var names = list.slice(0, 40).map(function (x, i) { return (i + 1) + '. ' + x.name; }).join('\n');
+    var pick = window.prompt('选择要修改的命定系统条目（输入序号）：\n' + names, '1');
+    var i2 = parseInt(pick, 10);
+    if (!i2 || !list[i2 - 1]) return;
+    refineLoad(list[i2 - 1].content, list[i2 - 1].name);
+    toast('已带入「' + list[i2 - 1].name + '」');
+  });
+  getEl('opf-rf-clear').addEventListener('click', function () {
+    if (!window.confirm('清空本页的载入内容、分析与成品？（不影响其它页面）')) return;
+    ST.refine = null; refineInit();
+    ['opf-rf-src', 'opf-rf-req', 'opf-rf-result'].forEach(function (id) { var e = getEl(id); if (e) e.value = ''; });
+    ['opf-rf-scan', 'opf-rf-analysis', 'opf-rf-planout', 'opf-rf-applyout'].forEach(function (id) { var e = getEl(id); if (e) e.textContent = id === 'opf-rf-scan' ? '尚未载入' : '（空的）'; });
+    ['opf-rf-fidelity', 'opf-rf-diff'].forEach(function (id) { var e = getEl(id); if (e) e.style.display = 'none'; });
+    refineNote('已清空'); refineCacheSave();
+  });
+  getEl('opf-rf-analyze').addEventListener('click', function () { refineAnalyze(); });
+  getEl('opf-rf-copyanalysis').addEventListener('click', function () { destCopyText(String(ST.refine && ST.refine.analysis || ''), '还没有分析结果'); });
+  getEl('opf-rf-plan').addEventListener('click', function () { refinePlan(); });
+  getEl('opf-rf-suggest').addEventListener('click', function () { refineSuggest(); });
+  getEl('opf-rf-apply').addEventListener('click', function () { refineApply(); });
+  getEl('opf-rf-retry').addEventListener('click', function () { ST.refine.plan = ''; ST.refine.planObj = null; var p = getEl('opf-rf-planout'); if (p) p.textContent = '（已清空上一次分析，可改一改意见后重新点「② 分析这条意见」）'; refineNote('已清空上一次改法分析'); });
+  getEl('opf-rf-rollback').addEventListener('click', function () {
+    if (!ST.refine || !ST.refine.src) { toast('没有可回退的原文', 'warning'); return; }
+    ST.refine.result = ''; ST.refine.diff = ''; ST.refine.fidelity = null; ST.refine.applied = [];
+    var ta = getEl('opf-rf-result'); if (ta) ta.value = '';
+    ['opf-rf-fidelity', 'opf-rf-diff'].forEach(function (id) { var e = getEl(id); if (e) e.style.display = 'none'; });
+    var ao = getEl('opf-rf-applyout'); if (ao) ao.textContent = '已回退到原文（原文一直没被改动过，补丁只是生成了一份新文本）';
+    refineNote('已回退');
+  });
+  getEl('opf-rf-copy').addEventListener('click', function () { destCopyText(String(ST.refine && ST.refine.result || ''), '还没有成品'); });
+  getEl('opf-rf-download').addEventListener('click', function () {
+    var txt = String(ST.refine && ST.refine.result || '');
+    if (!txt) { toast('还没有成品', 'warning'); return; }
+    try {
+      var blob = new Blob([txt], { type: 'text/yaml;charset=utf-8' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = (String(ST.refine.name || 'core').replace(/\.(ya?ml|json|txt|md)$/i, '')) + '-修改版.yaml';
+      document.body.appendChild(a); a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    } catch (e) { toast('下载失败：' + (e && e.message ? e.message : e), 'error'); }
+  });
+  getEl('opf-rf-reload').addEventListener('click', function () {
+    var txt = String((getEl('opf-rf-result') || {}).value || '');
+    if (!txt.trim()) { toast('还没有成品可替换', 'warning'); return; }
+    refineLoad(txt, ST.refine.name);
+    var rq = getEl('opf-rf-req'); if (rq) rq.value = '';
+    toast('已用成品作为新一轮的原文（结构体检已重跑）', 'success');
+  });
+  refineRender();
+}
+function refineCoreList(){
+  var out = [];
+  try {
+    var wb = ST.world;
+    var entries = wb && wb.entries ? wb.entries : (wb && wb.data && wb.data.entries ? wb.data.entries : null);
+    if (entries) {
+      Object.keys(entries).forEach(function (k) {
+        var e = entries[k];
+        if (e && e.content && /命定系统/.test(String(e.comment || ''))) out.push({ name: String(e.comment || k).replace('[本体][命定系统]', ''), content: String(e.content) });
+      });
+    }
+  } catch (e) {}
+  out.sort(function (a, b) { return a.name < b.name ? -1 : 1; });
+  return out;
+}
+function refineRender(){
+  refineInit();
+  var s = ST.refine;
+  var set = function (id, v) { var e = getEl(id); if (e) e.textContent = v; };
+  set('opf-rf-scan', s.scan || '尚未载入');
+  set('opf-rf-analysis', s.analysis || '（还没分析）');
+  set('opf-rf-planout', s.plan || '（还没分析意见）');
+  var ao = getEl('opf-rf-applyout'); if (ao && s.appliedText) ao.textContent = s.appliedText;
+  var fi = getEl('opf-rf-fidelity'), df = getEl('opf-rf-diff');
+  if (fi) { fi.style.display = s.fidelityText ? 'block' : 'none'; if (s.fidelityText) fi.textContent = s.fidelityText; }
+  if (df) { df.style.display = s.diffText ? 'block' : 'none'; if (s.diffText) df.textContent = s.diffText; }
+  refineNote(s.src ? ('已载入 ' + (s.name || '未命名') + '：' + s.src.length + ' 字符｜' + (s.analysisObj ? '已分析' : '未分析') + (s.plan ? '｜已出改法' : '') + (s.result ? '｜已置入' : '')) : '还没载入核心');
+}
+async function refineAnalyze(){
+  if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
+  var src = String((getEl('opf-rf-src') || {}).value || ST.refine.src || '');
+  if (!src.trim()) { toast('先把核心文本粘进来（或打开文件）', 'warning'); return; }
+  refineInit(); ST.refine.src = src;
+  if (!ST.refine.scan) ST.refine.scan = refineScan(src).text;
+  ST.running = true; renderRunButtons(); refineNote('① 整体分析中…（只读，不会改动任何内容）');
+  try {
+    var msg = '[分析对象]\n' + src.slice(0, 60000) + '\n\n' + REFINE_ANALYZE_SPEC;
+    var resp = await callModel([{ role: 'system', content: refineSystem() }, { role: 'user', content: macroFill(msg) }]);
+    var j = rxExtractJson(resp);
+    ST.refine.analysisObj = j || null;
+    ST.refine.analysis = j ? refineFormatAnalysis(j) : ('（没能解析成 JSON，原文如下）\n\n' + String(resp || '').slice(0, 6000));
+    refineRender(); refineCacheSave();
+    toast(j ? '① 分析完成（概况已列在下方）' : '① 模型返回的不是 JSON，已原样显示', j ? 'success' : 'warning');
+  } catch (e) { toast('分析出错：' + (e && e.message ? e.message : e), 'error'); refineNote('分析失败'); }
+  finally { ST.running = false; renderRunButtons(); }
+}
+function refineFormatAnalysis(j){
+  var L = [];
+  var line = function (k, v) { if (v == null || v === '' || (Array.isArray(v) && !v.length)) return; L.push('· ' + k + '：' + (Array.isArray(v) ? v.join('；') : String(v))); };
+  line('条目名', j['条目名']); line('系统名（包裹标签）', j['系统名']); line('系统核心名（灵）', j['系统核心名']); line('系统核心（条目）', j['系统核心']);
+  line('一级节', j['一级节']);
+  if (j['十槽']) line('十槽', (j['十槽']['齐全'] ? '齐全' : '缺 ' + ((j['十槽']['缺'] || []).join('、') || '?')));
+  line('功能清单', j['功能清单']);
+  line('机制要点', j['机制要点']);
+  if (j['人设要点'] && typeof j['人设要点'] === 'object') {
+    L.push('· 人设要点：');
+    Object.keys(j['人设要点']).forEach(function (k) { if (j['人设要点'][k]) L.push('    - ' + k + '：' + String(j['人设要点'][k]).slice(0, 120)); });
+  }
+  if (j['语言格式']) line('语言格式', [j['语言格式']['族'], j['语言格式']['标签'], (j['语言格式']['参数'] || []).join('/'), (j['语言格式']['范例条数'] != null ? '范例 ' + j['语言格式']['范例条数'] + ' 条' : '')].filter(Boolean).join('｜'));
+  line('硬约束（不可丢）', j['硬约束']);
+  line('状态与变量', j['状态与变量']);
+  line('口令与关键词', j['口令与关键词']);
+  if (j['EJS结构']) line('EJS 结构', ['块数 ' + (j['EJS结构']['块数'] || 0)].concat(j['EJS结构']['用途'] || []).join('｜'));
+  line('脆弱点', j['脆弱点']);
+  line('可优化方向', j['可优化方向']);
+  return L.join('\n') || '（分析结果为空）';
+}
+function refineSystem(){
+  return macroFill('你是「始弦的魔法大典」的司书，正在帮{{user}}修改一份**已经存在的**命定系统核心。'
+    + '你的第一职责是「不弄坏它」：这份核心正在被使用，任何未要求的变化都会破坏玩家的存档与叙事。'
+    + REFINE_RULES + '\n\n' + (ST.worldInfo ? '[世界书参考]\n' + ST.worldInfo : ''));
+}
+async function refinePlan(){
+  if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
+  var src = String((getEl('opf-rf-src') || {}).value || ST.refine.src || '');
+  var req = String((getEl('opf-rf-req') || {}).value || '').trim();
+  if (!src.trim()) { toast('先载入核心文本', 'warning'); return; }
+  if (!req) { toast('先写下你的修改意见', 'warning'); return; }
+  ST.refine.src = src; ST.refine.request = req;
+  ST.running = true; renderRunButtons(); refineNote('② 分析你的意见中…（仍然不会改动正文）');
+  try {
+    var msg = '[核心全文]\n' + src.slice(0, 60000)
+      + '\n\n[已完成的整体分析]\n' + (ST.refine.analysis || '（无，可先点①）')
+      + '\n\n[用户的修改意见]\n' + req + '\n\n' + REFINE_PLAN_SPEC;
+    var resp = await callModel([{ role: 'system', content: refineSystem() }, { role: 'user', content: macroFill(msg) }]);
+    var j = rxExtractJson(resp);
+    ST.refine.planObj = j || null;
+    ST.refine.plan = j ? refineFormatPlan(j) : ('（没能解析成 JSON，原文如下）\n\n' + String(resp || '').slice(0, 6000));
+    refineRender(); refineCacheSave();
+    toast(j ? '② 已给出改法与影响评估——确认无误后可点「✓ 确认无误，置入」' : '② 模型返回的不是 JSON，已原样显示', j ? 'success' : 'warning');
+  } catch (e) { toast('分析意见出错：' + (e && e.message ? e.message : e), 'error'); refineNote('分析意见失败'); }
+  finally { ST.running = false; renderRunButtons(); }
+}
+function refineFormatPlan(j){
+  var L = [];
+  L.push('能否修改：' + (j['可否'] || '?'));
+  if (j['理解']) L.push('理解：' + j['理解']);
+  if (Array.isArray(j['影响评估']) && j['影响评估'].length) {
+    L.push('\n影响评估：');
+    j['影响评估'].forEach(function (x) {
+      L.push('  · ' + (x['点'] || '') + '　→　' + (x['影响'] || '') + '　【是否触及既有功能：' + (x['是否触及既有功能'] || '?') + '】');
+    });
+  }
+  if (Array.isArray(j['拟定改法']) && j['拟定改法'].length) {
+    L.push('\n拟定改法（最小侵入）：');
+    j['拟定改法'].forEach(function (x, i) { L.push('  ' + (i + 1) + '. [' + (x['位置'] || '') + '] ' + (x['做法'] || '')); });
+  }
+  if (Array.isArray(j['锚点预告']) && j['锚点预告'].length) {
+    L.push('\n预计要动的原文片段：');
+    j['锚点预告'].forEach(function (x) { L.push('  ▸ ' + String(x).slice(0, 160)); });
+  }
+  if (Array.isArray(j['冲突']) && j['冲突'].length) { L.push('\n冲突/无法实现的部分：'); j['冲突'].forEach(function (x) { L.push('  ⚠ ' + x); }); }
+  if (j['保真承诺']) L.push('\n保真承诺：' + j['保真承诺']);
+  if (j['确认提示']) L.push('\n确认提示：' + j['确认提示']);
+  return L.join('\n');
+}
+async function refineSuggest(){
+  if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
+  var src = String((getEl('opf-rf-src') || {}).value || ST.refine.src || '');
+  if (!src.trim()) { toast('先载入核心文本', 'warning'); return; }
+  ST.running = true; renderRunButtons();
+  try {
+    var msg = '[核心全文]\n' + src.slice(0, 60000)
+      + '\n\n请给出 3~5 条**不破坏现有设计**的优化方向（每条一行、≤40字、具体可执行），例如补齐缺口、让某条规则更自洽、增加与既有功能的联动。不要输出正文，不要提"重写/重构"。';
+    var resp = await callModel([{ role: 'system', content: refineSystem() }, { role: 'user', content: macroFill(msg) }]);
+    var list = [];
+    String(resp || '').split(/\r?\n/).forEach(function (ln) {
+      var t = ln.replace(/^\s*(?:[-*•]|\d+[.、)])\s*/, '').trim();
+      if (t && t.length >= 6 && t.length <= 60 && list.indexOf(t) < 0) list.push(t);
+    });
+    if (!list.length) { toast('没拿到可用的方向', 'warning'); return; }
+    var box = getEl('opf-rf-req');
+    if (box) box.value = list.slice(0, 6).join('\n');
+    toast('已把 ' + Math.min(6, list.length) + ' 条方向填进意见框，可挑一条或改写后再点「② 分析这条意见」', 'success');
+  } catch (e) { toast('生成方向失败：' + (e && e.message ? e.message : e), 'error'); }
+  finally { ST.running = false; renderRunButtons(); }
+}
+async function refineApply(){
+  if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
+  var src = String((getEl('opf-rf-src') || {}).value || ST.refine.src || '');
+  var req = String((getEl('opf-rf-req') || {}).value || ST.refine.request || '').trim();
+  if (!src.trim()) { toast('先载入核心文本', 'warning'); return; }
+  if (!ST.refine.plan) { toast('请先点「② 分析这条意见」并确认改法', 'warning'); return; }
+  ST.running = true; renderRunButtons(); refineNote('③ 正在生成补丁（锚点 + 新内容）…');
+  try {
+    var msg = '[核心全文]\n' + src.slice(0, 60000)
+      + '\n\n[用户意见]\n' + req
+      + '\n\n[已确认的改法分析]\n' + ST.refine.plan
+      + '\n\n' + REFINE_PATCH_SPEC;
+    var resp = await callModel([{ role: 'system', content: refineSystem() }, { role: 'user', content: macroFill(msg) }]);
+    var j = rxExtractJson(resp);
+    var changes = j && Array.isArray(j['变更']) ? j['变更'] : null;
+    if (!changes || !changes.length) {
+      var ao0 = getEl('opf-rf-applyout');
+      if (ao0) ao0.textContent = '模型没有给出可用的「变更」清单（未对原文做任何改动）。原文回复：\n\n' + String(resp || '').slice(0, 4000);
+      toast('没有拿到补丁，原文未被改动（可看下方原文回复）', 'warning');
+      refineNote('③ 未产出补丁'); return;
+    }
+    var res = refineApplyPatch(src, changes);
+    var ao = getEl('opf-rf-applyout');
+    var lines = [];
+    if (!res.ok) {
+      // all-or-nothing：任何一处锚点不唯一/找不到，就整份放弃，绝不留半份改动
+      lines.push('❌ 补丁未通过校验，已整体放弃（原文一个字符都没动）：');
+      res.failed.forEach(function (f) { lines.push('  · 第 ' + (f.i + 1) + ' 处：' + f.why + '\n    锚点：' + String(f.ch && (f.ch['锚点'] || '')).slice(0, 120)); });
+      lines.push('\n可以点「② 分析这条意见」让它给更长的锚点，或把意见写得再具体一点后重试。');
+      if (ao) ao.textContent = lines.join('\n');
+      toast('补丁锚点校验失败，已整体放弃（原文未动）', 'error');
+      refineNote('③ 锚点校验失败，原文未改动');
+      return;
+    }
+    var fid = refineFidelity(src, res.text, req);
+    var diffText = refineRenderDiff(src, res.text, fid.diff);
+    var fLines = [];
+    fLines.push('保真校验（脚本逐项核对，' + fid.checks.length + ' 项）');
+    fid.checks.forEach(function (c) { fLines.push('  ' + (c.ok ? '✓' : '⚠') + ' ' + c.k + '：' + c.v); });
+    fLines.push('');
+    fLines.push('行级统计：未变动 ' + fid.stats.same + ' 行 ｜ 新增 ' + fid.stats.add + ' 行 ｜ 删除 ' + fid.stats.del + ' 行'
+      + '（越接近"只动你要求的那几行"越好）');
+    var srcLines = src.split(/\r?\n/).length;
+    fLines.push('保真度：' + (srcLines ? Math.round(fid.stats.same / srcLines * 1000) / 10 : 0) + '% 的原有行原样保留');
+    lines.push('✓ 补丁已应用：' + res.applied.length + ' 处变更');
+    res.applied.forEach(function (a, i) {
+      lines.push('  ' + (i + 1) + '. [' + a.type + '] ' + (a.why || ''));
+      lines.push('     锚点：' + a.anchor.slice(0, 100).replace(/\n/g, '⏎'));
+      lines.push('     新内容：' + a.next.slice(0, 160).replace(/\n/g, '⏎') + (a.next.length > 160 ? ' …' : ''));
+    });
+    if (j['冲突'] && j['冲突'].length) { lines.push('\n模型报告的冲突：'); j['冲突'].forEach(function (x) { lines.push('  ⚠ ' + x); }); }
+    lines.push('\n（原文仍是原文，这里只是生成了一份新文本；不满意点「↩ 回退到原文」即可）');
+    if (ao) ao.textContent = lines.join('\n');
+    var fi = getEl('opf-rf-fidelity'); if (fi) { fi.textContent = fLines.join('\n'); fi.style.display = 'block'; }
+    var df = getEl('opf-rf-diff'); if (df) { df.textContent = '差异预览（- 原文 / + 新文本）\n\n' + diffText; df.style.display = 'block'; }
+    ST.refine.result = res.text; ST.refine.applied = res.applied; ST.refine.diff = diffText;
+    ST.refine.fidelity = fid; ST.refine.fidelityText = fLines.join('\n'); ST.refine.diffText = diffText; ST.refine.appliedText = lines.join('\n');
+    var ta = getEl('opf-rf-result'); if (ta) ta.value = res.text;
+    refineRender(); refineCacheSave();
+    var warn = fid.checks.filter(function (c) { return !c.ok; }).length;
+    toast(warn ? ('已置入 ' + res.applied.length + ' 处，但保真校验有 ' + warn + ' 项需要你看一眼（见校验区）')
+      : ('已置入 ' + res.applied.length + ' 处变更，保真校验全部通过'), warn ? 'warning' : 'success');
+    refineNote('③ 已置入 ' + res.applied.length + " 处变更" + (warn ? '（' + warn + ' 项待核对）' : '（保真校验通过）'));
+  } catch (e) { toast('置入出错：' + (e && e.message ? e.message : e), 'error'); refineNote('置入失败'); }
+  finally { ST.running = false; renderRunButtons(); }
+}
+function refineCacheSave(){
+  if (refineCacheSave._t) clearTimeout(refineCacheSave._t);
+  refineCacheSave._t = setTimeout(function () {
+    if (!ST.refine) return;
+    lsSet(NS + '_refine_v1', { name: ST.refine.name, src: ST.refine.src, scan: ST.refine.scan, analysis: ST.refine.analysis, analysisObj: ST.refine.analysisObj, request: ST.refine.request, plan: ST.refine.plan, planObj: ST.refine.planObj, result: ST.refine.result, applied: ST.refine.applied, fidelityText: ST.refine.fidelityText, diffText: ST.refine.diffText, appliedText: ST.refine.appliedText });
+  }, 600);
+}
+function refineCacheRestore(){
+  refineInit();
+  var c = lsGet(NS + '_refine_v1');
+  if (!c || !c.src) return;
+  ST.refine.name = c.name || ''; ST.refine.src = c.src; ST.refine.scan = c.scan || refineScan(c.src).text;
+  ST.refine.analysis = c.analysis || ''; ST.refine.analysisObj = c.analysisObj || null;
+  ST.refine.request = c.request || ''; ST.refine.plan = c.plan || ''; ST.refine.planObj = c.planObj || null;
+  ST.refine.result = c.result || ''; ST.refine.applied = c.applied || [];
+  ST.refine.fidelityText = c.fidelityText || ''; ST.refine.diffText = c.diffText || ''; ST.refine.appliedText = c.appliedText || '';
+  var set = function (id, v) { var e = getEl(id); if (e && v != null) e.value = v; };
+  set('opf-rf-src', ST.refine.src); set('opf-rf-req', ST.refine.request); set('opf-rf-result', ST.refine.result);
+  refineRender();
+}
+function bindRxPage() {  rxInit();
   var p = getEl('opf-rx-parse'); if (!p || p._b) return; p._b = true;
   getEl('opf-rx-pull').addEventListener('click', function(){ rxPullFromDestiny(); });
   getEl('opf-rx-parse').addEventListener('click', function(){ rxDoParse(); });
