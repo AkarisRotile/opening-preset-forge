@@ -2495,16 +2495,27 @@ var DEST_EJS_SEG_PROMPTS = {
     + 'B. 配置驱动人格（读者核心式）：把人格做成 JSON 存局部变量（systemName/definition/coreMechanism/coreConcept/personality/role/hobbies/wish/constraints/appearance/opening/letterStyle/toneMode/tonePrompt/corpus/corpusMode/fpDefinition/newsStyle/ascensionAdvantage/skillAdvantage/revival/conditionalMechanisms），用统一的 `_custom_text(key, fallback)` 取值器渲染，十槽也由配置生成。\n'
     + 'C. 静默与兜底：`let _silent = getLocalVar(\'<核心>_silent\') === \'on\';`，唤醒条件用 `matchChatMessages([关键词…],{start:-1,role:\'user\'})` 或地点判定；命中则输出完整核心，否则只输出一句"存在但静默"的极简块——两条分支的包裹标签都必须闭合。\n'    + '只输出本段。'
 };
+// v1.13.0：本段已按上游文档逐条核实（ST-Prompt-Template docs/reference_cn.md + docs/features_cn.md
+// + mde/ejs Tags 表 + JS-Slash-Runner @types），核实于 2026-09-16；人类可读版见《命定核心EJS规范.md》。
 var DEST_EJS_STANDARD = [
-  '【EJS 重型核心·规范（依据艾莉亚核心与读者核心逆向）】',
-  '■ 何时才上 EJS：静态散文 + 十槽已能覆盖 18/20 个现有核心。只有"按存档状态改变输出/多形态切换/渲染时写变量/人格可配置/条件触发规则"才值得上。代价：直连主 API 的模式不执行世界书 EJS（生成期看不到渲染结果）、变量重名会让整段编译失败、体积膨胀 4~15 倍。',
-  '■ 四类 EJS 标签：`<%_ … _%>` 执行且吞空白（重型核心默认用这个，不吞空白会让正文塞满空行）；`<% … %>` 执行但保留空白；`<%- 变量 %>` 原样插入；`<%= 变量 %>` 转义插入。',
-  '■ 六层架构（层序即执行序）：0 块作用域 `<%_ { _%>` → 1 身份守卫 `<%_ if (getvar(\'系统核心\') === \'<系统核心>\') { _%>` → 2 数据读取 → 3 防错归一 → 4 派生与写回 → 5 渲染（`<{{getvar::系统名}}>` 包裹）→ 收尾两层 `} _%>`。',
-  '■ 变量 API 语义：`getLocalVar/setLocalVar` 本机持久（玩家配置）；`getMessageVar/setMessageVar` 楼层级存档（写必须带 `{ scope: \'message\' }`，可加 `index: message_id`）；`getvar/setvar` 全局（十槽）；`getChatMessage(-1, \'user\'|\'assistant\')` 读最近消息；`matchChatMessages([…],{start,role})` 关键词/正则匹配；`TavernHelper.getLastMessageId()/getVariables({type:\'message\'})/insertOrAssignVariables(obj,{type:\'message\'})/await triggerSlash(\'/pass {{user}}\')`。',
+  '【EJS 重型核心·规范（依据上游文档核实，非记忆）】',
+  '来源：ST-Prompt-Template 的 docs/reference_cn.md 与 docs/features_cn.md（提供 EJS 引擎、内置函数与常量、装饰器、世界书标记）；mde/ejs README 的 Tags 表（标签语义）；JS-Slash-Runner @types（酒馆助手函数签名）。',
+  '■ 引擎与时机：EJS 由 ST-Prompt-Template 扩展提供（不是酒馆内建、不是酒馆助手）。runType 四值：preparation（准备，酒馆会多次计算世界书）→ generate（发给 LLM 前）→ render（渲染楼层）→ render_permanent（渲染并永久改写消息）。渲染期不触发世界书计算；生成期的 EJS 结果会真的发给 LLM。',
+  '■ 何时才上 EJS：静态散文 + 十槽已能覆盖大部分核心。只有"按存档状态改变输出/多形态切换/渲染时写变量/人格可配置/条件触发规则"才值得上。代价：直连主 API 的模式不执行世界书 EJS、变量重名会让整段编译失败、体积膨胀 4~15 倍。',
+  '■ 标签（10 个，语义已核实）：`<%` 代码不输出；`<%_` 代码且吞掉前面所有空白；`<%=` 输出（转义，渲染期还走宏/正则/Markdown 格式化）；`<%-` 输出（不转义，渲染期直接当 HTML）；`<%#` 注释；`<%%`/`%%>` 输出字面量；`%>` 普通结束；`-%>` 吞掉后面的换行；`_%>` 吞掉后面所有空白。重型核心默认用 `<%_ … _%>`（不吞空白会让正文塞满空行）。',
+  '■ 硬规则：混用 EJS 与 JS 的 if/for 必须写花括号（上游原话：省略花括号的行为 undefined）；标签内可换行，但一条语句不能拆到多个标签；`<%-`/`<%=` 里不能调用 print()；要一段内容完全不被模板处理用 `<#escape-ejs>…<#/escape-ejs>`。',
+  '■ 变量五作用域：global（酒馆全局）/ local（聊天）/ message（楼层，chat[msg_id].variables[swipe_id]）/ cache（临时，即 variables.xxx，不保存）/ initial（[InitialVariables] 提供）。',
+  '■ 读写函数与默认值陷阱：`getvar(key, {scope, defaults, noCache, clone})` 默认 scope 是 **cache**（消息+聊天+全局的合并结果）；`setvar(key, value, {scope, flags, results, merge, dryRun, noCache})` 默认 scope 是 **message**；特化别名 getMessageVar/setMessageVar/getLocalVar/setLocalVar/getGlobalVar/setGlobalVar、incvar/decvar、delvar、insvar、patchVariables。flags：nx 不存在才设 / xx 存在才设 / n 强制设 / nxs·xxs 以对应 scope 为准。',
+  '■ 三个必须记住的陷阱：① 读默认 cache、写默认 message，语义不一致——要明确就显式写 scope；② 写完立刻读要 `noCache: true`（上游：缓存只在开始时加载，中途不更新）；③ `variables` 的合并顺序是高覆盖低：消息变量 → 聊天变量 → 全局变量，且处理楼层消息时不含当前及之后楼层。',
+  '■ 生成期可用常量：variables / SillyTavern / _ (lodash) / $ / faker / toastr / runType / userName / charName / chatId / lastUserMessage / lastCharMessage / lastMessageId / lastUserMessageId / charLoreBook / userLoreBook / chatLoreBook / model / generateType。',
+  '■ 渲染期专属（只在 runType === \'render\' 存在）：message_id / swipe_id / name / is_last / is_user / is_system。渲染期 `<%=` 与 `<%-` 才有区别；`&lt;%`→`<%`、`%&gt;`→`%>`；只改显示不改原始消息（所以要用正则把楼层里的 `<% %>` 隐藏，否则下次会重复执行）；代码高亮与渲染期 EJS 冲突。',
+  '■ 读消息与楼层：`getChatMessage(idx, role?)` 单楼层字符串；`getChatMessages(count|start,end[,role])` 返回数组（EJS 面是重载，不是 options 对象）；`matchChatMessages(pattern, {start, end, role, and})` 支持字符串/正则/数组，**数组时由 `and` 决定全部还是任意匹配**，默认 start=-2；`await getwi(世界书名, 条目名)` / `await activewi(...)` 读/激活世界书条目；`define(name, value)` 定义全局（函数内要用 this.getvar）；`print(...)` 输出；`execute(cmd)` / `parseJSON` / `jsonPatch` / `patchVariables` / `setVariableSchema`（扩展侧）。',
+  '■ 酒馆助手面（不同技术面，签名不要混）：`TavernHelper.getLastMessageId()`、`TavernHelper.getVariables({type:\'message\'|...})`、`TavernHelper.insertOrAssignVariables(vars, {type:\'message\'})`、`await TavernHelper.triggerSlash(\'/pass {{user}}\')`。注意 EJS 的 getChatMessage（单数、同步、返回内容字符串）与助手的 getChatMessages（复数、返回对象数组、options 里有 role/hide_state/include_swipes）**参数与返回值都不同**。',
+  '■ 世界书条目的标记与装饰器：标题前缀 `[GENERATE:BEFORE/AFTER]`、`[RENDER:BEFORE/AFTER]`、`[GENERATE:{idx}:BEFORE/AFTER]`（idx 从 0 起）、`[GENERATE:REGEX:pattern]`、`[InitialVariables]`、`[Preprocessing]`、`@INJECT pos=/target=/regex=`；正文第一行的 @@ 装饰器：activate / dont_activate / message_formatting / generate_before / generate_after / render_before / render_after / dont_preload / preload / only_preload / initial_variables / always_enabled / private / if / iframe / preprocessing。**装饰器必须从第一行开始、每个独占一行、中间不许空行；无法识别的 @@ 行会被上游直接丢弃**；`@@private` 会给条目包上 `<% { %>`/`<% } %>` 防重名；`@@if` 只支持单行表达式。',
+  '■ 六层架构（层序即执行序）：0 块作用域 `<%_ { _%>` → 1 身份守卫 `<%_ if (getvar(\'系统核心\') === \'<系统核心>\') { _%>` → 2 数据读取 → 3 防错归一 → 4 派生与写回 → 5 渲染（`<{{getvar::系统名}}>` 或 `<%- getvar(\'系统名\') %>` 包裹）→ 收尾两层 `} _%>`。',
   '■ 防错归一（必做）：枚举白名单兜底、`Number.isFinite` 数值守卫、对象类型守卫、玩家可配置文本净化 `.replace(/[\\r\\n<>]/g,\' \').replace(/\\s+/g,\' \').trim().slice(0,80)`；存档状态优先于玩家配置（`fromMessageVar || fromConfig`）。',
-  '■ 写入纪律：派生幂等（`Math.max` / `actionsAppliedTurn` 防重复累加）；路径白名单（`事件|世界|任务列表|主角|命运点数|关系列表|新闻` 开头，拒绝 `__proto__/prototype/constructor`）；名称净化 ≤80 字；先 capture 旧值再写，失败整体 restore；历史状态设上限（事务 30 / 状态 50）。',
-  '■ 渲染纪律：包裹标签用 `<{{getvar::系统名}}>`；`<%_ if _%>` 与 `<%_ } _%>` 配对数量必须精确；静默/兜底分支的包裹标签也要闭合；条件分支嵌套不超过两层。',
-  '■ 反模式（会直接坏掉）：顶层 const/let 重名、缺身份守卫、标签写死却改了系统名、兜底分支漏闭合、setMessageVar 不带 scope、配置文本未净化就 `<%- %>`、数值无 isFinite 守卫、正则无 try/catch、派生用 +1 不幂等、状态表无上限、EJS 里做网络/存储/DOM 操作。'
+  '■ 写入纪律：派生幂等（`Math.max` / 已应用轮次 / lastMessageId 比对，防同层重算重复累加）；准备阶段不要写变量（dryRun 默认关闭是对的）；写消息变量显式带 scope/type；改完按需 `saveVariables()`；路径白名单（`事件|世界|任务列表|主角|命运点数|关系列表|新闻` 开头，拒绝 `__proto__/prototype/constructor`）；先 capture 旧值再写，失败整体 restore；历史状态设上限（事务 30 / 状态 50）。',
+  '■ 反模式（会直接坏掉）：if/for 不写花括号、装饰器名拼错（整行静默消失）、装饰器与正文间留空行、getvar 读刚 setvar 的值不加 noCache、以为 getvar 默认读本层（实际是 cache）、顶层 const/let 重名（用 `<%_ { _%>` 或 @@private 解决）、EJS 与助手的同名函数混用、漏写 await、生成期用渲染期字段、在 `<%-` 里调 print、EJS 里做网络/存储/DOM 操作、配置文本未净化就 `<%- %>`、正则无 try/catch、派生用 +1 不幂等、状态表无上限。'
 ].join('\n');
 function destSegs(){ return (ST.dest && ST.dest.ejs) ? DEST_SEGS.concat(DEST_EJS_SEGS) : DEST_SEGS; }
 function destSegPrompt(id){ return DEST_SEG_PROMPTS[id] || DEST_EJS_SEG_PROMPTS[id] || ''; }
@@ -2594,7 +2605,88 @@ function destEjsLint(text){
   } else if (destEjsTags(t).some(function (x) { return !x.out && /^\}\s*else\s*\{/.test(x.inner.trim()); })) {
     warns.push('存在 else 兜底分支，但未识别到包裹标签——两条分支都要完整闭合包裹标签');
   }
-  return warns;
+  return warns.concat(destEjsLintSpec(t, warns.length));
+}
+// ---------- v1.13.0 依据上游文档核实的 EJS 规则检查 ----------
+// 来源：ST-Prompt-Template docs/reference_cn.md 与 docs/features_cn.md（main，核实于 2026-09-16）；
+//       标签语义见 mde/ejs README Tags 表；Tavern Helper 签名见 JS-Slash-Runner @types（4.9.5）。
+//       人类可读规范见工作区《命定核心EJS规范.md》。
+var DEST_EJS_DECORATORS = ['activate', 'dont_activate', 'message_formatting', 'generate_before', 'generate_after', 'render_before', 'render_after', 'dont_preload', 'preload', 'only_preload', 'initial_variables', 'always_enabled', 'private', 'if', 'iframe', 'preprocessing'];
+var DEST_EJS_ASYNC_FNS = ['getwi', 'getWorldInfo', 'activewi', 'activateWorldInfo', 'activateWorldInfoByKeywords', 'getCharData', 'getchar', 'getChara', 'getpreset', 'getPresetPrompt', 'getqr', 'getQuickReply', 'execute', 'evalTemplate', 'getEnabledWorldInfoEntries', 'refreshWorldInfo', 'saveVariables'];
+// 混用 EJS 与 JS 的 if/for/while/else 必须以 `{` 收尾（上游：省略花括号行为 undefined）。
+// 直接取出标签内容判断末尾字符，这样嵌套括号、多行标签都能正确判定。
+function destEjsNoBrace(t){
+  var out = [], re = /<%[=_-]?([\s\S]*?)[_-]?%>/g, m;
+  while ((m = re.exec(String(t || ''))) !== null) {
+    var inner = String(m[1]).trim();
+    if (!/^(?:if|for|while|else)\b|^\}\s*else\b/.test(inner)) continue;
+    if (/\{\s*$/.test(inner)) continue;                       // 正常：以 { 收尾
+    out.push(m[0].replace(/\s+/g, ' ').slice(0, 60));
+  }
+  return out;
+}
+function destEjsLintSpec(t, baseN){
+  var w = [];
+  var F = fence();
+  var code = (t.match(new RegExp(F + '[a-zA-Z]*\\s*\\n([\\s\\S]*?)\\n?' + F, 'g')) || []).join('\n');
+  var scan = t.replace(code, '');                       // 代码块内容不参与装饰器/标签检查（高亮与渲染期冲突，且那里本该是示例）
+  // 1) 装饰器：拼错会被上游静默丢弃，是命定核心最隐蔽的事故
+  var dec = scan.match(/^[ \t]*@@[A-Za-z_][A-Za-z0-9_]*/gm) || [];
+  var unknown = [];
+  dec.forEach(function (l) {
+    var m = l.trim().match(/^@@+([A-Za-z_][A-Za-z0-9_]*)/);
+    if (m && DEST_EJS_DECORATORS.indexOf(m[1]) < 0 && unknown.indexOf(m[1]) < 0) unknown.push(m[1]);
+  });
+  if (unknown.length) w.push('装饰器名无法识别：' + unknown.map(function (x) { return '@@' + x; }).join('、') + '——上游对不认识的 @@ 行会【直接丢弃】（既不生效也不保留），请对照可用清单核对拼写');
+  if (dec.length) {
+    var lines = scan.split(/\r?\n/), first = -1, i;
+    for (i = 0; i < lines.length; i++) { if (lines[i].trim()) { first = i; break; } }
+    if (first >= 0 && lines[first].trim().indexOf('@@') !== 0) w.push('检测到 @@ 装饰器，但它不在条目内容的【第一行】——装饰器必须从第一行开始且彼此不留空行，否则不生效');
+    var run2 = 0;
+    for (i = first; i < lines.length; i++) {
+      var l2 = lines[i].trim();
+      if (!l2) { if (run2 > 0 && i + 1 < lines.length && lines[i + 1].trim().indexOf('@@') === 0) w.push('装饰器之间出现了空行（第 ' + (i + 1) + ' 行）——上游要求装饰器独占一行且中间不允许空行'); break; }
+      if (l2.indexOf('@@') !== 0) break;
+      run2++;
+    }
+  }
+  // 2) 混用 EJS 与 JS 的 if/for 必须带花括号（上游：省略花括号行为未定义）
+  var noBrace = destEjsNoBrace(scan);
+  if (noBrace.length) w.push('有 ' + noBrace.length + ' 处 if/for/else 没写花括号（如 `' + noBrace[0] + '`）——上游明确说明省略花括号的行为 undefined，必须写成 `<%_ if (…) { _%> … <%_ } _%>`');
+  // 3) getvar 默认 scope 是 cache（合并结果），setvar 默认写 message —— 语义不一致是隐藏 bug
+  if (/getvar\(\s*['"][^'"]+['"]\s*\)/.test(scan)) w.push('有 getvar 未显式指定 scope（默认 scope 是 cache＝消息+聊天+全局的合并结果）；要读本层存档请写 getMessageVar，要读全局请写 { scope: \'global\' }');
+  if (/setvar\(/.test(scan) && /getvar\(/.test(scan) && !/noCache\s*:\s*true/.test(scan)) w.push('同时出现 setvar 与 getvar 但未见 `noCache: true`——上游说明变量缓存中途不更新，写完立刻读可能拿到旧值');
+  // 4) 漏 await（按"调用总数 vs 已 await 数"计数，只要有一处漏就报）
+  var missAwait = [];
+  DEST_EJS_ASYNC_FNS.forEach(function (fn) {
+    var body = '(?<![\\w.$])' + fn + '\\s*\\(';
+    var all = scan.match(new RegExp(body, 'g'));
+    if (!all || !all.length) return;
+    var aw = scan.match(new RegExp('await\\s+' + body, 'g'));
+    var n = all.length - (aw ? aw.length : 0);
+    if (n > 0) missAwait.push(fn + '×' + n);
+  });
+  var tsAll = scan.match(/(?<![\w.$])TavernHelper\.triggerSlash\s*\(/g);
+  if (tsAll && tsAll.length) {
+    var tsAw = scan.match(/await\s+TavernHelper\.triggerSlash\s*\(/g);
+    var tn = tsAll.length - (tsAw ? tsAw.length : 0);
+    if (tn > 0) missAwait.push('TavernHelper.triggerSlash×' + tn);
+  }
+  if (missAwait.length) w.push('疑似漏写 await：' + missAwait.join('、') + '（这些上游声明为 Promise，不 await 会拿到 Promise 对象而不是内容）');
+  // 5) 两个技术面混用（参数/返回值完全不同）
+  if (/getChatMessage\s*\(/.test(scan) && /getChatMessages\s*\(\s*[-'"\d]/.test(scan)) w.push('同时出现 EJS 的 getChatMessage(idx, role) 与酒馆助手的 getChatMessages(range, {role, hide_state, include_swipes})——两者参数与返回值完全不同，确认没有混用');
+  if (/matchChatMessages\s*\([^)]*\{[^}]*\b(andAll|allMatch|requireAll)\b/.test(scan)) w.push('matchChatMessages 的选项键上游定义为 `and`（不是 andAll/allMatch），请核对');
+  if (/matchChatMessages\s*\(\s*\[[^\]]*\][^)]*\)/.test(scan) && !/matchChatMessages\s*\([^)]*\{[^}]*\band\b/.test(scan)) w.push('matchChatMessages 传了数组但没写 `{ and: true/false }`——数组时由 and 决定"全部匹配"还是"任意匹配"，默认语义容易写反');
+  // 6) 渲染期专属字段被用在生成期
+  var renderOnly = ['is_user', 'is_system', 'is_last', 'swipe_id', 'message_id'];
+  var usedRender = renderOnly.filter(function (k) { return new RegExp('(?<![\\w.$])' + k + '(?![\\w$])').test(scan); });
+  if (usedRender.length && !/runType\s*===?\s*['"]render/.test(scan)) w.push('用到了渲染期专属字段（' + usedRender.join('、') + '）但没有 `runType === \'render\'` 判断——这些字段只在渲染阶段存在，生成阶段读到的是 undefined');
+  // 7) 写变量纪律
+  if (/setMessageVar\(|insertOrAssignVariables\(/.test(scan) && !/Math\.max|已应用|appliedTurn|lastMessageId/.test(scan)) w.push('有写变量的调用但没看到幂等保护（Math.max / 已应用轮次 / lastMessageId 比对）——同一层楼重算会重复累加');
+  if (/insertOrAssignVariables\s*\(/.test(scan) && !/type\s*:\s*['"]message['"]/.test(scan)) w.push('insertOrAssignVariables 未见 `{ type: \'message\' }`——酒馆助手的变量函数必须显式给 type，否则写进错误作用域');
+  // 8) 上游明令禁止的用法
+  if (/<%-[^%]*\bprint\s*\(/.test(scan) || /<%=[^%]*\bprint\s*\(/.test(scan)) w.push('在 `<%-` / `<%=` 语句块里调用了 print()——上游明确说明不能这样用');
+  return w;
 }
 // 命定系统标准（运行时版；人类可读版见工作区《命定系统标准.md》）
 // 依据：世界书 22 个命定系统条目的逐条结构普查（包裹标签/节标题/人设字段/功能词表/语言格式/数值）
@@ -3635,7 +3727,19 @@ var REFINE_RULES = [
   '4. 新内容只包含"替换掉锚点的那一段"或"要插入的那一段"，不要把周边原文抄进新内容里。',
   '5. 不得改变既有功能、数值、触发条件、口令、人设、语气、变量名，除非本次意见明确要求改它。',
   '6. 若某条意见无法在"不动其它内容"的前提下实现，就把它从「变更」里去掉，并在「冲突」里说明原因与最小侵入的替代方案。',
-  '7. 保持原有的缩进风格与行尾形态（YAML 正文以 2 空格为一层）。'
+  '7. 保持原有的缩进风格与行尾形态（YAML 正文以 2 空格为一层）。',
+  '【EJS 铁律（这类核心几乎都含 EJS；下面的规则来自上游文档核实，不是习惯）】',
+  'E1. 不要改动任何 `<% … %>` / `<%_ … _%>` / `<%- … %>` / `<%= … %>` 代码块内部的代码，除非本次意见明确要求；不要合并、拆分、重排、重新缩进这些块。',
+  'E2. `if/for/while` 必须保留花括号（`<%_ if (…) { _%>` … `<%_ } _%>`）：省略花括号在上游文档里是"行为未定义"。',
+  'E3. 标签必须成对、数量不变：改完 `<%` 与 `%>` 的数量要相等，`<%_ { _%>` 与 `<%_ } _%>` 数量要相等。',
+  'E4. 装饰器（正文第一行的 `@@activate` / `@@if …` / `@@render_after` / `@@private` 等）必须仍在第一行、每个独占一行、中间不留空行；'
+    + '**名字拼错的 @@ 行会被上游直接丢弃**，不确定就不要写、也不要去改它们。',
+  'E5. 变量作用域语义不要想当然：`getvar` 默认读 cache（消息+聊天+全局的合并结果），`setvar` 默认写 message；'
+    + '写了立刻读要 `noCache: true`。要改就显式写 scope/type，不要"顺手规范化"。',
+  'E6. 不要混用两个技术面：EJS 的 `getChatMessage(idx, role)`（单数、返回字符串）与酒馆助手的 '
+    + '`getChatMessages(range, {role, hide_state, include_swipes})`（复数、返回对象数组）参数与返回值都不同。',
+  'E7. `getwi` / `activewi` / `execute` / `TavernHelper.triggerSlash` 等都是异步函数，`await` 一个都不许漏。',
+  'E8. 渲染期专属字段（`message_id` / `swipe_id` / `is_user` / `is_system` / `is_last`）只能在 `runType === \'render\'` 的分支里用，不要搬到生成期。'
 ].join('\n');
 var REFINE_ANALYZE_SPEC = [
   '【分析任务】读懂这份命定系统核心，输出结构化认知（只读，不改动任何内容）。',
@@ -3653,7 +3757,7 @@ var REFINE_ANALYZE_SPEC = [
   '  "硬约束": ["隐蔽原则/非万能原则/复活约束句/禁令等一旦删除就会坏掉的句子"],',
   '  "状态与变量": ["用到的 stat_data 路径、setMessageVar/getMessageVar、MVU 写入点、局部变量名"],',
   '  "口令与关键词": ["触发用的固定词，如‘可要起卦’‘拾枚玉简’"],',
-  '  "EJS结构": {"块数":0, "用途":["身份守卫/数据读取/条件渲染/静默降级…"]},',
+  '  "EJS结构": {"块数":0, "用途":["身份守卫/数据读取/条件渲染/静默降级…"], "装饰器":["@@preload 等（若无可空）"], "依赖的常量":["runType/lastMessageId/variables…"]},',
   '  "脆弱点": ["改动时最容易连带弄坏的地方"],',
   '  "可优化方向": ["3~6 条，只提方向，不要写新内容"]',
   '}',
@@ -3733,8 +3837,33 @@ function refineLoad(text, name){
   var sc = refineScan(t);
   ST.refine.scan = sc.text;
   var ta = getEl('opf-rf-src'); if (ta) ta.value = t;
+  refineEjsCheck(false);                                  // 载入即做一次 EJS 体检（零 AI）
   refineRender();
   return sc;
+}
+// ⑦ 的 EJS 体检：直接复用 ④ 页的 destEjsLint（两层检查：通用 + 上游核实项）
+function refineEjsCheck(showToast){
+  refineInit();
+  var t = String(ST.refine.src || '');
+  var box = getEl('opf-rf-ejsout');
+  if (t.indexOf('<%') < 0) {
+    var msg = '这份文本里没有 EJS 标签（`<% … %>`），无需 EJS 体检。';
+    if (box) box.textContent = msg;
+    if (showToast) toast('文本里没有 EJS 标签', 'warning');
+    ST.refine.ejsNote = '';
+    return [];
+  }
+  var warns = destEjsLint(t);
+  var tagsOpen = (t.match(/<%/g) || []).length, tagsClose = (t.match(/%>/g) || []).length;
+  var decs = (t.match(/^[ \t]*@@[A-Za-z_][A-Za-z0-9_]*/gm) || []).length;
+  var head = 'EJS 体检（' + tagsOpen + ' 个标签／装饰器 ' + decs + ' 行／花括号净差 ' + destEjsBraceDelta(t) + '）';
+  var body = warns.length
+    ? warns.map(function (x, i) { return (i + 1) + '. ' + x; }).join('\n')
+    : '✓ 未发现规范问题（标签配对、花括号、作用域用法、await、装饰器拼写、渲染期字段、幂等保护等检查均通过）';
+  if (box) box.textContent = head + '\n\n' + body;
+  ST.refine.ejsNote = warns.length ? ('EJS 体检 ' + warns.length + ' 条提示') : 'EJS 体检通过';
+  if (showToast) toast(warns.length ? ('EJS 体检发现 ' + warns.length + ' 条（见体检区）') : 'EJS 体检通过', warns.length ? 'warning' : 'success');
+  return warns;
 }
 function refineNote(s){ var el = getEl('opf-rf-status'); if (el) el.textContent = s; }
 // ---------- 行级 diff（LCS，纯脚本）----------
@@ -3819,6 +3948,24 @@ function refineFidelity(before, after, wanted){
   list.push({ ok: fA >= fB - (/(人设|性格|形象|愿望)/.test(want) ? 6 : 0), k: '人设字段数', v: '改动前 ' + fB + ' 个字段名 → 改动后 ' + fA + (/人设|性格|形象|愿望/.test(want) ? '（本次意见涉及人设，允许变化）' : '（未要求改人设，不应减少）') });
   var funcsB = (B.match(/【[^】\n]{2,20}】\s*[:：]/g) || []).length, funcsA = (A.match(/【[^】\n]{2,20}】\s*[:：]/g) || []).length;
   list.push({ ok: funcsA >= funcsB, k: '功能条目数', v: '【…】条目 ' + funcsB + ' → ' + funcsA + (funcsA < funcsB ? ' ⚠ 少了 ' + (funcsB - funcsA) + ' 条' : '') });
+  // EJS 完整性（这类核心几乎都含 EJS，且 EJS 坏了是"整段失效"级别）
+  if (B.indexOf('<%') >= 0) {
+    var decB = (B.match(/^[ \t]*@@[A-Za-z_][A-Za-z0-9_]*/gm) || []).map(function (x) { return x.trim(); });
+    var decA = (A.match(/^[ \t]*@@[A-Za-z_][A-Za-z0-9_]*/gm) || []).map(function (x) { return x.trim(); });
+    var lostDec = decB.filter(function (x) { return decA.indexOf(x) < 0; });
+    list.push({ ok: lostDec.length === 0, k: 'EJS 装饰器行', v: decB.length ? (lostDec.length ? ('消失/改名 ' + lostDec.length + ' 行：' + lostDec.join('、') + '（上游对拼错的 @@ 行会直接丢弃，务必核对）') : decB.length + ' 行原样保留') : '本条没有 @@ 装饰器' });
+    var noBraceB = destEjsNoBrace(B).length, noBraceA = destEjsNoBrace(A).length;
+    list.push({ ok: noBraceA <= noBraceB, k: 'EJS 花括号写法', v: '无花括号的 if/for：' + noBraceB + ' → ' + noBraceA + (noBraceA > noBraceB ? ' ⚠ 新增了' + (noBraceA - noBraceB) + ' 处（上游：行为未定义）' : '') });
+    var braceB = destEjsBraceDelta(B), braceA = destEjsBraceDelta(A);
+    list.push({ ok: braceB === braceA, k: 'EJS 代码花括号净差', v: braceB + ' → ' + braceA + (braceB === braceA ? ' ✓ 未变' : ' ⚠ 变了（可能是块没配平）') });
+    var awB = (B.match(/(?<!await\s)(?<![\w.$])(?:getwi|activewi|execute|evalTemplate)\s*\(/g) || []).length;
+    var awA = (A.match(/(?<!await\s)(?<![\w.$])(?:getwi|activewi|execute|evalTemplate)\s*\(/g) || []).length;
+    if (awA !== awB) list.push({ ok: false, k: 'EJS 漏 await', v: '疑似漏 await 的异步调用：' + awB + ' → ' + awA + '（新增的记得补 await）' });
+    // 空白控制标签漂移：<%_ / _%> 改成 <% / %> 会改变输出空白（正文塞满空行），属行为变化
+    var wsB = (B.match(/<%_|_%>/g) || []).length, wsA = (A.match(/<%_|_%>/g) || []).length;
+    if (wsB !== wsA) list.push({ ok: false, k: 'EJS 空白控制标签', v: '<%_ / _%> 数量 ' + wsB + ' → ' + wsA + '（改名会改变输出里的空白，正文可能突然多出大量空行）' });
+    else list.push({ ok: true, k: 'EJS 空白控制标签', v: wsB + ' 个 <%_ / _%> 未变' });
+  }
   return { checks: list, stats: stats, diff: diff, changedLines: stats.add + stats.del };
 }
 function refineRenderDiff(before, after, diff){
@@ -4288,7 +4435,11 @@ var REFINE_HTML = '<div class="opf-char-wrap">'
   + '<div class="opf-dim" id="opf-rf-status">还没载入核心</div>'
   + '<div class="opf-sec"><div class="opf-sec-label">结构体检（脚本，零 AI）</div><pre id="opf-rf-scan" class="opf-box opf-char-report">尚未载入</pre></div>'
   + '<div class="opf-char-tools"><button type="button" class="opf-btn primary" id="opf-rf-analyze">① 整体分析</button>'
-  + '<button type="button" class="opf-btn ghost" id="opf-rf-copyanalysis">⧉ 复制分析</button></div>'
+  + '<button type="button" class="opf-btn ghost" id="opf-rf-copyanalysis">⧉ 复制分析</button>'
+  + '<button type="button" class="opf-btn ghost" id="opf-rf-ejslint">🧬 EJS 体检</button>'
+  + '<button type="button" class="opf-btn ghost" id="opf-rf-ejsstd">🧬 EJS 规范速查</button></div>'
+  + '<pre id="opf-rf-ejsout" class="opf-box opf-char-report">（还没做 EJS 体检）</pre>'
+  + '<pre id="opf-rf-ejsstdbox" class="opf-box opf-char-report" style="display:none">尚未展开</pre>'
   + '<pre id="opf-rf-analysis" class="opf-box opf-char-report">（还没分析）</pre>'
   + '<div class="opf-sec"><div class="opf-sec-label">② 你的修改意见（改什么、为什么、期望效果）</div></div>'
   + '<textarea id="opf-rf-req" class="opf-char-input" style="min-height:80px" placeholder="例：给「食运加持」加一条约束——同一道菜在同一地点重复品尝不再触发增益；再给『天机推演』的卦象卡片增加一个字段 Rumor（一句市井传闻，20字内）"></textarea>'
@@ -4349,6 +4500,13 @@ function bindRefinePage(){
     refineNote('已清空'); refineCacheSave();
   });
   getEl('opf-rf-analyze').addEventListener('click', function () { refineAnalyze(); });
+  getEl('opf-rf-ejslint').addEventListener('click', function () { refineEjsCheck(true); });
+  getEl('opf-rf-ejsstd').addEventListener('click', function () {
+    var box = getEl('opf-rf-ejsstdbox'); if (!box) return;
+    var open = box.style.display !== 'none';
+    box.textContent = open ? '尚未展开' : (DEST_EJS_STANDARD + '\n\n—— 完整版（含来源与置信度、反模式表、骨架模板、未核实清单）见工作区《命定核心EJS规范.md》');
+    box.style.display = open ? 'none' : 'block';
+  });
   getEl('opf-rf-copyanalysis').addEventListener('click', function () { destCopyText(String(ST.refine && ST.refine.analysis || ''), '还没有分析结果'); });
   getEl('opf-rf-plan').addEventListener('click', function () { refinePlan(); });
   getEl('opf-rf-suggest').addEventListener('click', function () { refineSuggest(); });
@@ -4446,15 +4604,19 @@ function refineFormatAnalysis(j){
   line('硬约束（不可丢）', j['硬约束']);
   line('状态与变量', j['状态与变量']);
   line('口令与关键词', j['口令与关键词']);
-  if (j['EJS结构']) line('EJS 结构', ['块数 ' + (j['EJS结构']['块数'] || 0)].concat(j['EJS结构']['用途'] || []).join('｜'));
+  if (j['EJS结构']) line('EJS 结构', ['块数 ' + (j['EJS结构']['块数'] || 0)].concat(j['EJS结构']['用途'] || []).concat(j['EJS结构']['装饰器'] ? ['装饰器 ' + (j['EJS结构']['装饰器'] || []).join('、')] : []).concat(j['EJS结构']['依赖的常量'] ? ['依赖 ' + (j['EJS结构']['依赖的常量'] || []).join('、')] : []).join('｜'));
   line('脆弱点', j['脆弱点']);
   line('可优化方向', j['可优化方向']);
   return L.join('\n') || '（分析结果为空）';
 }
 function refineSystem(){
+  var src = String((ST.refine && ST.refine.src) || '');
+  var hasEjs = src.indexOf('<%') >= 0;
   return macroFill('你是「始弦的魔法大典」的司书，正在帮{{user}}修改一份**已经存在的**命定系统核心。'
     + '你的第一职责是「不弄坏它」：这份核心正在被使用，任何未要求的变化都会破坏玩家的存档与叙事。'
-    + REFINE_RULES + '\n\n' + (ST.worldInfo ? '[世界书参考]\n' + ST.worldInfo : ''));
+    + REFINE_RULES
+    + (hasEjs ? '\n\n[这份核心含 EJS：以下是经上游文档核实的规范，你的改动必须遵守]\n' + DEST_EJS_STANDARD : '')
+    + '\n\n' + (ST.worldInfo ? '[世界书参考]\n' + ST.worldInfo : ''));
 }
 async function refinePlan(){
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
