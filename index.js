@@ -321,12 +321,14 @@ function systemCtxBudgetOk(msgs) {
   return total < 90000;
 }
 
-async function callModel(msgs) {
+async function callModel(msgs, extraOpts) {
   var c = getCtx();
   if (!c || typeof c.generateRaw !== 'function') {
     throw new Error('generateRaw 不可用（SillyTavern 版本过旧或未就绪）。请升级到支持 getContext().generateRaw 的版本。');
   }
-  var out = await c.generateRaw({ prompt: msgs });
+  var opts = { prompt: msgs };
+  if (extraOpts && typeof extraOpts === 'object') { for (var k in extraOpts) { if (extraOpts[k] !== undefined && extraOpts[k] !== null) opts[k] = extraOpts[k]; } }
+  var out = await c.generateRaw(opts);
   if (out === null || out === undefined) throw new Error('主 API 返回为空（可能被中断或未连接）。');
   return String(out);
 }
@@ -3615,11 +3617,25 @@ function rxExtractHtml(text) {
   return (end > start ? t.slice(start + 1, end) : t.slice(start + 1)).replace(/^\n+/, '').replace(/\s+$/, '');
 }
 // ---------- 页面 ----------
-var RX_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">✦ 正则工坊 · 命定系统对话美化</div><div class="opf-dim">流程：粘贴核心全文（或从 ④ 页带入）→ 解析语言格式 → 勾选要美化的格式 → 选用途与预算档位 → 匹配式由插件确定生成、替换体由模型产出 → 实时预览 → 自检 → 导出 JSON。字段名与你现有 4 条正则一致，可直接粘进预设的 regex_scripts。</div><textarea id="opf-rx-core" class="opf-char-input" placeholder="把命定系统核心条目全文粘在这里（必须含「语言格式」节）"></textarea><div class="opf-char-tools"><button type="button" class="opf-btn ghost" id="opf-rx-pull">⬅ 从 ④ 页带入</button><button type="button" class="opf-btn primary" id="opf-rx-parse">🔍 解析语言格式（AI）</button><button type="button" class="opf-btn ghost" id="opf-rx-parse2">⚙ 脚本解析（离线）</button><button type="button" class="opf-btn ghost" id="opf-rx-gen">🎨 生成替换体</button><button type="button" class="opf-btn ghost" id="opf-rx-check">🔎 自检</button><button type="button" class="opf-btn ghost" id="opf-rx-copy1">⧉ 复制单条 JSON</button><button type="button" class="opf-btn ghost" id="opf-rx-copyall">⧉ 复制 JSON 数组</button><button type="button" class="opf-btn ghost" id="opf-rx-new">🗑 清空</button><button type="button" class="opf-btn ghost" id="opf-rx-ping">🩺 连通性自检</button></div><div class="opf-shx-cfg"><label class="opf-opt">生成传输<select id="opf-rx-transport" class="opf-ref-input"><option value="st">酒馆主 API（generateRaw，非流式）</option><option value="server">经酒馆服务端转发 + 流式（反代推荐）</option><option value="direct">浏览器直连 + 流式</option></select></label><label class="opf-opt">协议源<select id="opf-rx-source" class="opf-ref-input"><option value="makersuite">Google AI Studio (makersuite)</option><option value="vertexai">Vertex AI (vertexai)</option></select></label><label class="opf-opt">中转/反代地址<input id="opf-rx-reverse" class="opf-ref-input" placeholder="https://gcli.ggchan.dev"></label><label class="opf-opt">代理密码/密钥<input id="opf-rx-proxypass" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">模型名<input id="opf-rx-model" class="opf-ref-input" list="opf-rx-modellist" placeholder="点右侧按钮自动获取；也可直接手填，填过的会记住"><datalist id="opf-rx-modellist"></datalist></label><button type="button" class="opf-btn ghost" id="opf-rx-models">🔌 获取模型列表</button></div><div class="opf-shx-cfg"><label class="opf-opt">直连协议<select id="opf-rx-proto" class="opf-ref-input"><option value="openai">OpenAI 兼容 (/chat/completions)</option><option value="gemini">Google 原生 (:streamGenerateContent)</option></select></label><label class="opf-opt">直连地址<input id="opf-rx-base" class="opf-ref-input" placeholder="https://api.example.com/v1"></label><label class="opf-opt">直连密钥<input id="opf-rx-key" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">直连模型<input id="opf-rx-chatmodel" class="opf-ref-input" placeholder="直连时用；留空则用上面的模型名"></label></div><div class="opf-dim" id="opf-rx-statusline">就绪</div><div class="opf-sec"><div class="opf-sec-label">语言格式解析结果（只读核对）</div><pre id="opf-rx-parsed" class="opf-box opf-char-report">尚未解析</pre></div><div id="opf-rx-items"></div><div class="opf-sec"><div class="opf-sec-label">自检</div><pre id="opf-rx-issues" class="opf-box opf-char-report">尚未自检</pre></div></div>';
+var RX_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">✦ 正则工坊 · 命定系统对话美化</div><div class="opf-dim">流程：粘贴核心全文（或从 ④ 页带入）→ 解析语言格式 → 勾选要美化的格式 → 选用途与预算档位 → 匹配式由插件确定生成、替换体由模型产出 → 实时预览 → 自检 → 导出 JSON。字段名与你现有 4 条正则一致，可直接粘进预设的 regex_scripts。</div><textarea id="opf-rx-core" class="opf-char-input" placeholder="把命定系统核心条目全文粘在这里（必须含「语言格式」节）"></textarea><div class="opf-char-tools"><button type="button" class="opf-btn ghost" id="opf-rx-pull">⬅ 从 ④ 页带入</button><button type="button" class="opf-btn primary" id="opf-rx-parse">🔍 解析语言格式（AI）</button><button type="button" class="opf-btn ghost" id="opf-rx-parse2">⚙ 脚本解析（离线）</button><button type="button" class="opf-btn ghost" id="opf-rx-gen">🎨 生成替换体</button><button type="button" class="opf-btn ghost" id="opf-rx-check">🔎 自检</button><button type="button" class="opf-btn ghost" id="opf-rx-copy1">⧉ 复制单条 JSON</button><button type="button" class="opf-btn ghost" id="opf-rx-copyall">⧉ 复制 JSON 数组</button><button type="button" class="opf-btn ghost" id="opf-rx-new">🗑 清空</button><button type="button" class="opf-btn ghost" id="opf-rx-ping">🩺 连通性自检</button></div><div class="opf-shx-cfg"><label class="opf-opt">生成传输<select id="opf-rx-transport" class="opf-ref-input"><option value="st">酒馆主 API（零配置·推荐）</option><option value="server">经酒馆服务端转发 + 流式（需自填反代）</option><option value="direct">浏览器直连 + 流式（需自填接口）</option></select></label><span class="opf-dim" id="opf-rx-txnote"></span></div><div class="opf-shx-cfg" id="opf-rx-cfg-server" style="display:none"><label class="opf-opt">协议源<select id="opf-rx-source" class="opf-ref-input"><option value="makersuite">Google AI Studio (makersuite)</option><option value="vertexai">Vertex AI (vertexai)</option></select></label><label class="opf-opt">中转/反代地址<input id="opf-rx-reverse" class="opf-ref-input" placeholder="https://你的中转域名"></label><label class="opf-opt">代理密码/密钥<input id="opf-rx-proxypass" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">模型名<input id="opf-rx-model" class="opf-ref-input" list="opf-rx-modellist" placeholder="点右侧按钮获取；也可直接手填，填过会记住"><datalist id="opf-rx-modellist"></datalist></label><button type="button" class="opf-btn ghost" id="opf-rx-models">🔌 获取模型列表</button></div><div class="opf-shx-cfg" id="opf-rx-cfg-direct" style="display:none"><label class="opf-opt">直连协议<select id="opf-rx-proto" class="opf-ref-input"><option value="openai">OpenAI 兼容 (/chat/completions)</option><option value="gemini">Google 原生 (:streamGenerateContent)</option></select></label><label class="opf-opt">直连地址<input id="opf-rx-base" class="opf-ref-input" placeholder="https://api.example.com/v1"></label><label class="opf-opt">直连密钥<input id="opf-rx-key" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">直连模型<input id="opf-rx-chatmodel" class="opf-ref-input" placeholder="留空则用上面的模型名"></label></div><div class="opf-dim" id="opf-rx-statusline">就绪</div><div class="opf-sec"><div class="opf-sec-label">语言格式解析结果（只读核对）</div><pre id="opf-rx-parsed" class="opf-box opf-char-report">尚未解析</pre></div><div id="opf-rx-items"></div><div class="opf-sec"><div class="opf-sec-label">自检</div><pre id="opf-rx-issues" class="opf-box opf-char-report">尚未自检</pre></div></div>';
 
 function rxInit() {
   ST.rx = ST.rx || { core: '', coreName: '', parsed: null, items: [], _inited: false };
   ST.rx.items = ST.rx.items || [];
+}
+function rxSyncTransportUi() {
+  var t = rxCfg().transport || 'st';
+  var s = getEl('opf-rx-cfg-server'), d = getEl('opf-rx-cfg-direct'), n = getEl('opf-rx-txnote');
+  if (s) s.style.display = (t === 'server') ? '' : 'none';
+  if (d) d.style.display = (t === 'direct') ? '' : 'none';
+  if (n) {
+    var why = rxTransportWhy(rxCfg());
+    n.textContent = t === 'st'
+      ? '零配置：不需要地址、密钥或模型名，全部跟随酒馆主 API；模型与采样参数就是你现在聊天用的那套。（非流式，长输出有超时风险，已用分块 + 自动缩段缓解）'
+      : (t === 'server'
+        ? (why ? '⚠ ' + why : '配置完整，可生成；建议先点「🩺 连通性自检」确认能连通')
+        : (why ? '⚠ ' + why : '配置完整，可生成；适用于有 CORS 头的自建/本地接口'));
+  }
 }
 function bindRxPage() {
   rxInit();
@@ -3644,7 +3660,7 @@ function bindRxPage() {
   });
   var bindCfg = function (id, key) {
     var el = getEl(id); if (!el) return;
-    el.addEventListener('change', function () { rxCfg()[key] = this.value; rxCacheSave(); });
+    el.addEventListener('change', function () { rxCfg()[key] = this.value; rxSyncTransportUi(); rxCacheSave(); });
   };
   bindCfg('opf-rx-transport', 'transport');
   bindCfg('opf-rx-source', 'source');
@@ -3663,6 +3679,7 @@ function bindRxPage() {
    ['opf-rx-base', 'baseUrl'], ['opf-rx-key', 'apiKey'], ['opf-rx-chatmodel', 'chatModel']].forEach(function (pair) {
     var el = getEl(pair[0]); if (el) el.value = cur[pair[1]] || '';
   });
+  rxSyncTransportUi();
   getEl('opf-rx-core').addEventListener('input', function(){ ST.rx.core = this.value; rxCacheSave(); });
   rxRenderItems();
 }
@@ -3892,6 +3909,26 @@ function rxCfg() {
   if (!c.reverseProxy && !c.baseUrl) { try { var sh = shxCfg(); c.baseUrl = sh.baseUrl || ''; c.apiKey = sh.apiKey || ''; } catch (e) {} }
   return c;
 }
+// 传输是否可用（不可用时生成会降级到主 API，但绝不静默改写用户配置）
+function rxTransportUsable(cfg) {
+  cfg = cfg || rxCfg();
+  if (cfg.transport === 'st') return true;
+  if (cfg.transport === 'server') return !!(cfg.reverseProxy && cfg.model);
+  if (cfg.transport === 'direct') return !!(cfg.baseUrl && (cfg.chatModel || cfg.model));
+  return true;
+}
+function rxTransportWhy(cfg) {
+  cfg = cfg || rxCfg();
+  if (cfg.transport === 'server') {
+    if (!cfg.reverseProxy) return '还缺「中转/反代地址」';
+    if (!cfg.model) return '还缺「模型名」——可点「🔌 获取模型列表」，或直接手填（填过会记住）';
+  }
+  if (cfg.transport === 'direct') {
+    if (!cfg.baseUrl) return '还缺「直连地址」';
+    if (!cfg.chatModel && !cfg.model) return '还缺「模型名」';
+  }
+  return '';
+}
 function rxHeaders() { var h = { 'Content-Type': 'application/json' }; var k = String(rxCfg().proxyPassword || '').trim(); if (k) h['Authorization'] = 'Bearer ' + k; return h; }
 // 通用 SSE 读取：同时兼容 OpenAI 形状与 Google 原生形状
 // opts: { idleMs: 无新字节多久判定停顿, maxMs: 绝对上限, maxChars: 收满即停（硬顶防跑飞）}
@@ -4021,10 +4058,12 @@ async function rxDirectStream(messages, onDelta, opts) {
 }
 function rxStreamCall(messages, onNote, opts) {
   var cfg = rxCfg();
-  if (cfg.transport === 'st') {
-    return callModel(messages).then(function (t) { return { text: String(t), stalled: false }; });
-  }
   var o = opts || {};
+  if (rxForceSt || cfg.transport === 'st') {
+    // 主 API：零配置，跟随酒馆当前模型与采样；用 responseLength 按段预算硬顶输出长度
+    var ro = o.maxTokens ? { responseLength: Number(o.maxTokens) } : null;
+    return callModel(messages, ro).then(function (t) { return { text: String(t), stalled: false }; });
+  }
   var t0 = Date.now();
   var lastShown = 0;
   var onDelta = function (t, len) {
@@ -4181,6 +4220,7 @@ async function rxPing() {
 }
 // ---------- 并发工具与实时预览（流式传输下大幅缩短总时长）----------
 var RX_PARALLEL = 3;   // 并发段数上限（中转限流时自动少发）
+var rxForceSt = false; // 本次生成强制走酒馆主 API（配置不完整时的降级，不影响用户设置）
 async function rxMapLimit(items, limit, fn) {
   var results = new Array(items.length);
   var cursor = 0;
@@ -4374,7 +4414,10 @@ async function rxGenerate() {
   if (!ST.rx.parsed || !ST.rx.items.length) { toast('请先「🔍 解析语言格式（AI）」', 'warning'); return; }
   var todo = ST.rx.items.filter(function (it) { return !it.replaceHtml; });
   if (!todo.length) todo = ST.rx.items.slice();
-  var streaming = rxCfg().transport !== 'st';   // 流式传输才有资本并发生成
+  var cfgNow = rxCfg();
+  rxForceSt = !rxTransportUsable(cfgNow);
+  if (rxForceSt) toast('当前「生成传输」配置不完整（' + rxTransportWhy(cfgNow) + '），本次改用酒馆主 API 生成；补全后可再试流式', 'warning');
+  var streaming = !rxForceSt;
   ST.running = true; renderRunButtons();
   rxLiveTick.last = 0;
   var log = [];
