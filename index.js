@@ -3557,6 +3557,26 @@ function rxSystemContent() {
   if (ST.worldInfo) lines.push('[世界书参考（世界书页勾选的条目）]\n' + ST.worldInfo);
   return macroFill(lines.join('\n\n'));
 }
+// CSS 生成专用系统提示：不带整本世界书（那是 524 超时的主要负担），只带一小段色彩参考
+function rxSlimSystemContent(colorRef, budget) {
+  var cap = Number(budget) || 3000;
+  var lines = [];
+  lines.push('[角色] ' + macroFill('你是始弦，大图书馆的司书，正在为一个命定系统核心写「对话美化」的 CSS。你把{{user}}当挚友，讲究实用与克制。'));
+  lines.push('[任务] HTML 骨架已由插件生成并锁定，你只写 CSS 规则，不得输出或改动任何 HTML。');
+  lines.push([
+    '【CSS 硬约束】',
+    '1. 只输出 CSS 规则：不要 <style> 标签、不要 HTML、不要解释、不要代码块围栏。',
+    '2. class 前缀必须严格使用给定的前缀，不得自造前缀、不得使用全局选择器（html/body/*）。',
+    '3. 禁止引用任何外部资源（字体 CDN、图片 URL、@import）；字体只用系统字体栈。',
+    '4. 禁止写死像素宽度：容器 max-width:100%，窄屏（≤420px）不得溢出。',
+    '5. 正文里若出现 $ 字符必须写成 $$。',
+    '6. 动效克制：@keyframes 周期 ≥2s，不得高频闪烁。',
+    '7. 每次输出控制在 ' + cap + ' 字符以内——超长会被平台截断（524 / 截断），宁可少写几条规则，也不要写一半。',
+    '8. 颜色从核心世界观与命定之灵人格出发，不要纯黑纯白。'
+  ].join('\n'));
+  if (colorRef) lines.push('[核心气质摘录（配色参考）]\n' + String(colorRef).slice(0, 500));
+  return macroFill(lines.join('\n\n'));
+}
 function rxUserPrompt(item, parsed) {
   var f = parsed.formats.filter(function (x) { return x.key === item.formatKey; })[0] || {};
   var tier = rxTier(item.tier);
@@ -3595,7 +3615,7 @@ function rxExtractHtml(text) {
   return (end > start ? t.slice(start + 1, end) : t.slice(start + 1)).replace(/^\n+/, '').replace(/\s+$/, '');
 }
 // ---------- 页面 ----------
-var RX_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">✦ 正则工坊 · 命定系统对话美化</div><div class="opf-dim">流程：粘贴核心全文（或从 ④ 页带入）→ 解析语言格式 → 勾选要美化的格式 → 选用途与预算档位 → 匹配式由插件确定生成、替换体由模型产出 → 实时预览 → 自检 → 导出 JSON。字段名与你现有 4 条正则一致，可直接粘进预设的 regex_scripts。</div><textarea id="opf-rx-core" class="opf-char-input" placeholder="把命定系统核心条目全文粘在这里（必须含「语言格式」节）"></textarea><div class="opf-char-tools"><button type="button" class="opf-btn ghost" id="opf-rx-pull">⬅ 从 ④ 页带入</button><button type="button" class="opf-btn primary" id="opf-rx-parse">🔍 解析语言格式（AI）</button><button type="button" class="opf-btn ghost" id="opf-rx-parse2">⚙ 脚本解析（离线）</button><button type="button" class="opf-btn ghost" id="opf-rx-gen">🎨 生成替换体</button><button type="button" class="opf-btn ghost" id="opf-rx-check">🔎 自检</button><button type="button" class="opf-btn ghost" id="opf-rx-copy1">⧉ 复制单条 JSON</button><button type="button" class="opf-btn ghost" id="opf-rx-copyall">⧉ 复制 JSON 数组</button><button type="button" class="opf-btn ghost" id="opf-rx-new">🗑 清空</button></div><div class="opf-sec"><div class="opf-sec-label">语言格式解析结果（只读核对）</div><pre id="opf-rx-parsed" class="opf-box opf-char-report">尚未解析</pre></div><div id="opf-rx-items"></div><div class="opf-sec"><div class="opf-sec-label">自检</div><pre id="opf-rx-issues" class="opf-box opf-char-report">尚未自检</pre></div></div>';
+var RX_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">✦ 正则工坊 · 命定系统对话美化</div><div class="opf-dim">流程：粘贴核心全文（或从 ④ 页带入）→ 解析语言格式 → 勾选要美化的格式 → 选用途与预算档位 → 匹配式由插件确定生成、替换体由模型产出 → 实时预览 → 自检 → 导出 JSON。字段名与你现有 4 条正则一致，可直接粘进预设的 regex_scripts。</div><textarea id="opf-rx-core" class="opf-char-input" placeholder="把命定系统核心条目全文粘在这里（必须含「语言格式」节）"></textarea><div class="opf-char-tools"><button type="button" class="opf-btn ghost" id="opf-rx-pull">⬅ 从 ④ 页带入</button><button type="button" class="opf-btn primary" id="opf-rx-parse">🔍 解析语言格式（AI）</button><button type="button" class="opf-btn ghost" id="opf-rx-parse2">⚙ 脚本解析（离线）</button><button type="button" class="opf-btn ghost" id="opf-rx-gen">🎨 生成替换体</button><button type="button" class="opf-btn ghost" id="opf-rx-check">🔎 自检</button><button type="button" class="opf-btn ghost" id="opf-rx-copy1">⧉ 复制单条 JSON</button><button type="button" class="opf-btn ghost" id="opf-rx-copyall">⧉ 复制 JSON 数组</button><button type="button" class="opf-btn ghost" id="opf-rx-new">🗑 清空</button></div><div class="opf-dim" id="opf-rx-statusline">就绪</div><div class="opf-sec"><div class="opf-sec-label">语言格式解析结果（只读核对）</div><pre id="opf-rx-parsed" class="opf-box opf-char-report">尚未解析</pre></div><div id="opf-rx-items"></div><div class="opf-sec"><div class="opf-sec-label">自检</div><pre id="opf-rx-issues" class="opf-box opf-char-report">尚未自检</pre></div></div>';
 
 function rxInit() {
   ST.rx = ST.rx || { core: '', coreName: '', parsed: null, items: [], _inited: false };
@@ -3806,27 +3826,186 @@ function rxPreviewInto(item) {
   }
   st.textContent = '匹配 ' + hits + ' 处' + (item.replaceHtml ? ' ｜ 替换体 ' + item.replaceHtml.length + ' 字符（' + rxTier(item.tier).label + '档）' : ' ｜ 尚未生成替换体');
 }
+// ---------- 替换体：结构由代码生成，模型只写 CSS（防 524 超时与截断）----------
+// 捕获组布局必须与 rxGenFindRegex 完全一致，否则 $n 会指错
+function rxRefs(f) {
+  var refs = { name: '', mood: '', text: '$1', extra: [] };
+  if (!f || f.family !== 'xml') return refs;
+  var idx = 1;
+  refs.name = '$' + idx++;
+  if (f.params.some(function (p) { return p.name === 'mood'; })) refs.mood = '$' + idx++;
+  f.params.forEach(function (p) { if (p.name !== 'mood') { refs.extra.push({ name: p.name, ref: '$' + idx++ }); } });
+  refs.text = '$' + idx;
+  return refs;
+}
+var RX_STYLE_SLOT = '/*__RX_STYLE__*/';
+function rxSkeleton(item, f) {
+  var pre = String(item.prefix || 'core-box').replace(/-box$/, '');   // 归一：避免出现 xxx-box-box
+  var refs = rxRefs(f);
+  var attrs = ' class="' + pre + '-box"';
+  if (refs.mood) attrs += ' data-mood="' + refs.mood + '"';
+  refs.extra.forEach(function (x) { attrs += ' data-' + x.name + '="' + x.ref + '"'; });
+  var L = [];
+  L.push('<div' + attrs + '>');
+  L.push('  <style>');
+  L.push(RX_STYLE_SLOT);
+  L.push('  </style>');
+  L.push('  <div class="' + pre + '-inner">');
+  if (refs.name) L.push('    <div class="' + pre + '-speaker">' + refs.name + '</div>');
+  L.push('    <div class="' + pre + '-text">' + refs.text + '</div>');
+  L.push('  </div>');
+  L.push('</div>');
+  return L.join('\n');
+}
+// CSS 分段：按档位目标字数决定段数与每段预算（每段越小，越不容易触发 524 与截断）
+function rxCssParts(f, tierTarget) {
+  var hasMood = !!(f && f.params.some(function (p) { return p.name === 'mood' && p.values && p.values.length; }));
+  var catalog = [
+    { id: 'base', label: '基础样式', hint: '最外层盒子、内层容器、说话人、正文四组选择器的样式：背景（渐变/纹理）、边框、圆角、内外边距、字体栈（只用系统字体）、字号行高、max-width:100% 与窄屏适配。' },
+    { id: 'mood', label: '情绪分支配色', need: hasMood, hint: '为每个枚举值各写一条属性选择器规则（形如 .PREFIX-box[data-mood="值"]），用颜色/边框/阴影/滤镜区分情绪。' },
+    { id: 'decor', label: '装饰层', hint: '装饰元素与纹理：伪元素、渐变描边、角标、SVG（可内联为 background-image 的 data URI，禁止外链）。' },
+    { id: 'motion', label: '动效', hint: '@keyframes 与入场/呼吸动效（周期 ≥2s，克制）；不需要就回复「无」。' },
+    { id: 'variants', label: '交互与变体', hint: 'hover/长文本/多行/窄屏的变体规则，保持文字始终可读（不得依赖悬停才显示）。' },
+    { id: 'polish', label: '细节打磨', hint: '阴影层次、边框渐变、字距与装饰细节的微调，让整体更完整；不需要就回复「无」。' }
+  ];
+  var want = catalog.filter(function (p) { return p.need !== false; });
+  var target = Number(tierTarget) || 0;
+  var n = target <= 0 ? 6 : target <= 3000 ? 1 : target <= 6000 ? 3 : target <= 10000 ? 4 : 6;
+  // 没情绪分支时把名额让给后面的段
+  var parts = want.slice(0, Math.max(1, Math.min(n, want.length)));
+  if (n > parts.length) {
+    var extra = catalog.filter(function (p) { return p.need !== false && parts.indexOf(p) < 0; });
+    parts = parts.concat(extra.slice(0, n - parts.length));
+  }
+  var per = target > 0 ? Math.max(1200, Math.round(target / parts.length * 0.85)) : 3500;
+  return parts.map(function (p) { return { id: p.id, label: p.label, hint: p.hint, budget: per }; });
+}
+function rxCssPartPrompt(item, f, part, prevText) {
+  var refs = rxRefs(f);
+  var L = [];
+  L.push('[任务] 只为已经定好的 HTML 骨架写 CSS 规则。骨架结构由插件生成，你不得改动、也不得输出 HTML 标签。');
+  L.push('[骨架（供你对照选择器）]\n' + rxSkeleton(item, f).replace(RX_STYLE_SLOT, '/* 这里放你的 CSS */'));
+  L.push('[class 前缀] ' + String(item.prefix || 'core-box').replace(/-box$/, '') + '（必须原样使用；完整的类名形如 ' + String(item.prefix || 'core-box').replace(/-box$/, '') + '-box / -inner / -speaker / -text）');
+  if (refs.mood) L.push('[情绪属性] 最外层带有 data-mood="' + refs.mood + '"，可用属性选择器分支配色');
+  if (f && f.params.length) {
+    f.params.forEach(function (p) {
+      if (p.values && p.values.length) L.push('[参数 ' + p.name + ' 的枚举] ' + p.values.join('、'));
+    });
+  }
+  L.push('[本段只写] ' + part.label + ' —— ' + part.hint);
+  if (part.budget) L.push('[本段字数] 控制在 ' + part.budget + ' 字符左右（宁少勿断，写不完就少写几条规则）');
+  if (prevText) L.push('[已经写好的部分（不要重复、不要冲突）]\n' + prevText.slice(-1200));
+  L.push('[输出要求] 只输出 CSS 规则本身：不要 <style> 标签、不要 HTML、不要注释以外的解释文字、不要代码块围栏。');
+  return L.join('\n\n');
+}
+// 单项 CSS 片段生成：带截断续写与超时重试
+async function rxGenCssPart(item, f, part, prevCss, onNote) {
+  var css = '';
+  var attempt = 0;
+  var colorRef = (part.colorRef !== undefined) ? part.colorRef : '';
+  while (attempt < 3) {
+    attempt++;
+    var ask = rxCssPartPrompt(item, f, part, prevCss + css);
+    if (css) ask += '\n\n[续写要求] 你上一次输出在中途被截断了，已保留的部分结尾是：\n' + css.slice(-500) + '\n只输出**剩余**部分，不要重复已写过的内容，不要重新开头。';
+    var msgs = [{ role: 'system', content: rxSlimSystemContent(colorRef, part.budget) }, { role: 'user', content: macroFill(ask) }];
+    var t0 = Date.now();
+    try {
+      var resp = await callModel(msgs);
+      var chunk = rxExtractCss(resp);
+      if (!chunk) { if (onNote) onNote('第 ' + attempt + ' 次返回为空'); if (attempt < 3) { await waitTick(); continue; } break; }
+      css += (css && !/\n$/.test(css) ? '\n' : '') + chunk;
+      if (onNote) onNote(part.label + ' 第 ' + attempt + ' 次：+' + chunk.length + ' 字符（' + Math.round((Date.now() - t0) / 1000) + 's）');
+      var bal = rxBraceDelta(css);
+      if (bal <= 0) return css;                       // 括号配平（或多余）视为写完
+      if (onNote) onNote(part.label + ' 花括号还差 ' + bal + ' 个，继续续写…');
+    } catch (e) {
+      var msg = (e && e.message) ? e.message : String(e);
+      var transient = /524|502|503|504|timeout|timed out|超时|empty|为空|network|fetch/i.test(msg);
+      if (onNote) onNote(part.label + ' 第 ' + attempt + ' 次失败：' + msg.slice(0, 80) + (transient ? '（判定为可重试）' : ''));
+      if (!transient) throw e;
+      if (attempt >= 3) throw new Error(msg + '（已重试 ' + attempt + ' 次，建议降到更低档位或先停止）');
+      await new Promise(function (r) { setTimeout(r, 1200 * attempt); });
+    }
+  }
+  return css;
+}
+// CSS 花括号净差（跳过字符串与注释）
+function rxBraceDelta(css) {
+  var d = 0, inStr = null, inCmt = false, t = String(css);
+  for (var i = 0; i < t.length; i++) {
+    var c = t[i], n = t[i + 1];
+    if (inCmt) { if (c === '*' && n === '/') { inCmt = false; i++; } continue; }
+    if (inStr) { if (c === '\\') { i++; continue; } if (c === inStr) inStr = null; continue; }
+    if (c === '/' && n === '*') { inCmt = true; i++; continue; }
+    if (c === '"' || c === "'") { inStr = c; continue; }
+    if (c === '{') d++;
+    else if (c === '}') d--;
+  }
+  return d;
+}
+// 从回复里取 CSS（容忍代码块围栏与 <style> 包裹）
+function rxExtractCss(text) {
+  var t = String(text || '').trim();
+  if (!t || /^无[。．.]?$/.test(t)) return '';
+  var F = fence();
+  var i = t.indexOf(F);
+  if (i >= 0) {
+    var s = t.indexOf('\n', i), e = t.indexOf(F, s + 1);
+    if (s > 0) t = (e > s ? t.slice(s + 1, e) : t.slice(s + 1)).trim();
+  }
+  t = t.replace(/^```[a-z]*\s*/i, '').replace(/```\s*$/, '').trim();
+  var m = t.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+  if (m) t = m[1].trim();
+  return t;
+}
+function rxAssemble(item, f, cssText) {
+  return rxSkeleton(item, f).replace(RX_STYLE_SLOT, cssText || '/* 尚无样式 */');
+}
 async function rxGenerate() {
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
-  if (!ST.rx.parsed || !ST.rx.items.length) { toast('请先「🔍 解析语言格式」', 'warning'); return; }
+  if (!ST.rx.parsed || !ST.rx.items.length) { toast('请先「🔍 解析语言格式（AI）」', 'warning'); return; }
   var todo = ST.rx.items.filter(function (it) { return !it.replaceHtml; });
   if (!todo.length) todo = ST.rx.items.slice();
   ST.running = true; renderRunButtons();
+  var status = getEl('opf-shx-status');
+  var log = [];
   try {
     for (var i = 0; i < todo.length; i++) {
       if (isStop()) break;
       var it = todo[i];
-      var msgs = [{ role: 'system', content: rxSystemContent() }, { role: 'user', content: macroFill(rxUserPrompt(it, ST.rx.parsed)) }];
-      var resp = await callModel(msgs);
-      it.replaceHtml = rxExtractHtml(resp);
+      var f = (ST.rx.parsed.formats || []).filter(function (x) { return x.key === it.formatKey; })[0] || { family: 'quote', params: [] };
+      var tier = rxTier(it.tier);
+      var parts = rxCssParts(f, tier.target).map(function (p) { return { id: p.id, label: p.label, hint: p.hint, budget: p.budget, colorRef: (ST.rx.parsed.section || '') }; });
+      var css = '';
+      for (var p = 0; p < parts.length; p++) {
+        if (isStop()) break;
+        var note = function (s) {
+          log.push('[' + it.label + '] ' + s);
+          var st = getEl('opf-rx-statusline');
+          if (st) st.textContent = it.label + ' · ' + s;
+          opfLog('[regex-forge] ' + it.label + ' ' + s);
+        };
+        note('开始生成 ' + parts[p].label + '（' + (p + 1) + '/' + parts.length + '）');
+        css += (css ? '\n' : '') + await rxGenCssPart(it, f, parts[p], css, note);
+      }
+      it.skeleton = rxSkeleton(it, f);
+      it.replaceHtml = rxAssemble(it, f, css);
       it.issues = rxLint(it, ST.rx.parsed);
+      rxRenderItems();
+      rxCacheSave();
       await waitTick();
     }
+    var st2 = getEl('opf-rx-statusline');
+    if (st2) st2.textContent = '完成：' + log.slice(-2).join(' ｜ ');
+    if (isStop()) toast('已停止（已生成的部分已保留）');
+    else toast('替换体生成完成：结构由代码保证、样式分段产出', 'success');
+  } catch (e) {
+    toast('生成替换体出错：' + (e && e.message ? e.message : e) + '（已生成的部分保留，可再点一次续做）', 'error');
+    var st3 = getEl('opf-rx-statusline'); if (st3) st3.textContent = '出错：' + (e && e.message ? e.message : e).slice(0, 120);
+  } finally {
+    ST.running = false; renderRunButtons();
     rxRenderItems(); rxCacheSave();
-    if (isStop()) toast('已停止');
-    else toast('替换体生成完成：可查看右侧预览与自检', 'success');
-  } catch (e) { toast('生成替换体出错：' + (e && e.message ? e.message : e), 'error'); }
-  finally { ST.running = false; renderRunButtons(); }
+  }
 }
 function rxDoCheck(showToast) {
   rxInit();
