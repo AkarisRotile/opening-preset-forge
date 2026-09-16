@@ -1,6 +1,6 @@
 # 始弦的魔法大典 · destiny 开局预设工坊
 
-SillyTavern（酒馆）/ Tavern Helper 浏览器扩展「悬浮窗」· 当前版本 **v1.10.2**
+SillyTavern（酒馆）/ Tavern Helper 浏览器扩展「悬浮窗」· 当前版本 **v1.10.3**
 
 为「始弦的魔法大典 + 命定之诗与黄昏之歌」一类角色卡提供**开局预设一键流水线**：
 
@@ -294,9 +294,9 @@ SillyTavern（酒馆）/ Tavern Helper 浏览器扩展「悬浮窗」· 当前�
 
 **实时进度**：页面上的状态行会逐条打印"基础样式 第1次：+1820 字符（14s）""花括号还差 3 个，继续续写…"，524 发生时你能直接看到是哪一段、第几次。
 
-**🚀 关于 524 与"能不能用流式"（v1.10.2 的关键发现）**
+**🚀 关于 524 与"能不能用流式"（v1.10.3 定稿）**
 
-你的报错是 `gcli.ggchan.dev` 前面的 **Cloudflare 524**——即中转站的源站 100 秒内没有回任何字节。查本机 ST 1.18.0 源码后确认了一个硬事实：
+报错 `524` 来自中转站 `gcli.ggchan.dev` 前面的 Cloudflare——源站 100 秒内没回任何字节。查本机 ST 1.18.0 源码后确认了一个硬事实：
 
 ```js
 // public/script.js
@@ -304,20 +304,28 @@ L4018:  data = await sendOpenAIRequest('quiet', generateData, ...)      // gener
 L5326:  if (isStreamingEnabled() && type !== 'quiet') { ...流式... }     // 流式分支明确排除 'quiet'
 ```
 
-**`generateRaw` 永远是非流式的**——不管你在酒馆里怎么开 Streaming 开关，插件走的这条路都拿不到流式。中转站因此必须等整段生成完才回包，输出越长越容易撞 100 秒墙。
+**`generateRaw` 永远是非流式的**——不管酒馆里的 Streaming 开关怎么设，插件走这条路都拿不到流式。
 
-于是给了两条真正有效的对策（都已实现）：
+**正解：让插件走酒馆自己的服务端转发。** 你用的是类反向代理，反代地址、密钥、Google 协议转换、CORS 本来就该由酒馆服务端处理：
 
-1. **🚀 直连 + 真流式生成（推荐，直击根因）**：勾上后，替换体不再走 `generateRaw`，改由插件直接 `fetch(baseUrl + '/chat/completions', { stream: true })` 并**逐块读取 SSE**——填你自己的接口地址、密钥与聊天模型即可。字节一开始流动，Cloudflare 就不会等到 100 秒，**再长的输出也不会 524**。
-   - 前提：你的接口要发 CORS 头，且**要真的透传 SSE**（很多中转站会缓冲整段再回，那就没救，只能靠下面的第 2 条）；
-   - 未勾选时行为与以前完全一致（走酒馆主 API）。
-2. **自适应缩段**：撞到 524/超时后，**后续段的预算自动折半**（最低 800 字符）继续做，而不是原地重试同一个大请求；单段越小，越不容易超时。
+```
+POST {origin}/api/backends/chat-completions/generate
+body: { chat_completion_source:'makersuite', reverse_proxy:'<你的中转>',
+        proxy_password:'<密钥>', model:'gemini-2.5-pro',
+        messages:[…], use_sysprompt:true, stream:true, max_tokens:8192 }
+```
 
-配套还加了三样：
+依据（ST 1.18.0 源码）：`router.post('/generate')` → `case MAKERSUITE: sendMakerSuiteRequest(...)`；常量 `MAKERSUITE: 'makersuite'`；`responseType = stream ? 'streamGenerateContent' : 'generateContent'` 并追加 `&alt=sse`；`convertGooglePrompt(request.body.messages, …)` 会把 system 转成 `systemInstruction`；`apiKey = request.body.reverse_proxy ? request.body.proxy_password : readSecret(...)`。
 
-- **🩺 连通性自检**：一次极小请求（"回复两个字：正常"）测延迟，用来区分"中转站挂了"和"任务太重"；
-- **524 诊断**：以前会把 8KB 的 Cloudflare HTML 整个弹出来，现在压成一句人话 + 三条对策，并写明这是中转站问题、不是插件问题；
-- **失败保留进度**：某段撞墙不再丢弃已生成内容，状态行会写"已保留 N 字符，可稍后再点一次续做"。
+**「生成传输」三档**（页面下拉）：
+
+| 档 | 走哪条路 | 用途 |
+| --- | --- | --- |
+| **酒馆主 API** | `generateRaw` | 默认；**非流式**，长输出容易撞 100 秒墙 |
+| **经酒馆服务端转发 + 流式** | `/api/backends/chat-completions/generate` + `stream:true` | **反代场景推荐**：无 CORS 问题、密钥与反代地址由服务端处理、Google 协议由 ST 转换、真流式回传 |
+| **浏览器直连 + 流式** | 插件直接 `fetch`（OpenAI 兼容 `/chat/completions`，或 Google 原生 `:streamGenerateContent?alt=sse`） | 有 CORS 头的自建/本地接口 |
+
+配套：**同一份 SSE 解析器同时吃两种形状**（OpenAI 的 `choices[0].delta.content` 与 Google 原生的 `candidates[0].content.parts[].text`），三条路共用收流逻辑。
 
 **另外**：CSS 生成的系统提示已从"带整本世界书（最多 3 万字）"砍到 **484 字符**（只带 500 字气质摘录）——提示词越大，首字节越慢，这本身也是 524 的推手之一。
 
@@ -340,6 +348,7 @@ L5326:  if (isStreamingEnabled() && type !== 'quiet') { ...流式... }     // �
 ## 九、版本历史（简）
 | 版本 | 内容 |
 | --- | --- |
+| v1.10.3 | 正则工坊新增「经酒馆服务端转发 + 流式」传输（`POST /api/backends/chat-completions/generate` + `stream:true` + `reverse_proxy`/`proxy_password`/`use_sysprompt`），直击类反向代理场景下的 Cloudflare 524：无 CORS 问题、协议转换与密钥由酒馆服务端处理、真流式回传；「生成传输」改为三档下拉（酒馆主 API / 服务端转发+流式 / 浏览器直连+流式），直连支持 OpenAI 兼容与 Google 原生双协议；SSE 解析器同时兼容 OpenAI 与 Google 两种分片形状 |
 | v1.10.2 | 针对 524 的**根因修复**：查明 `generateRaw` 在 ST 源码里固定走 `sendOpenAIRequest('quiet', …)`、而流式分支明确排除 `quiet`（`script.js` L4018 / L5326），即**永远非流式**；据此新增「🚀 直连 + 真流式生成」（插件内 `fetch /chat/completions` + 逐块读 SSE，绕开 100 秒墙）；新增自适应缩段（524 后后续段预算折半，最低 800 字符）；新增「🩺 连通性自检」；524 诊断把 Cloudflare HTML 压成一句人话 + 三条对策；失败保留已生成进度 |
 | v1.10.1 | 正则工坊替换体重构为「**结构由代码生成 + 样式按档位分段**」：骨架（含 `$n` 捕获组引用）由插件生成、模型只写 CSS；档位决定段数（1/3/4/6 段）与每段预算（1.3k~3.5k 字符）；花括号净差检测截断并自动续写（≤3 轮）；识别可重试错误退避重试；CSS 生成不再注入整本世界书；新增实时进度状态行 |
 | v1.10.0 | 新增「⑥ 与始弦聊天」：完全独立的面板（自有消息数组不写酒馆记录、自有 `{{user}}` 称呼、自有世界书选择、自有存储）；记忆三层（滚动窗口 + 模型压缩的记忆条目 + 本地向量检索）；向量走**自定义 OpenAI 兼容接口**（填 Base URL/密钥 → 读 `/models` → 选模型）；消息/记忆/向量存 IndexedDB；世界书「勾选=总是注入，检索覆盖全馆藏」；她以**同伴观察者 + 全馆藏查询**定位与 user 一起旁观世界 |

@@ -3615,7 +3615,7 @@ function rxExtractHtml(text) {
   return (end > start ? t.slice(start + 1, end) : t.slice(start + 1)).replace(/^\n+/, '').replace(/\s+$/, '');
 }
 // ---------- 页面 ----------
-var RX_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">✦ 正则工坊 · 命定系统对话美化</div><div class="opf-dim">流程：粘贴核心全文（或从 ④ 页带入）→ 解析语言格式 → 勾选要美化的格式 → 选用途与预算档位 → 匹配式由插件确定生成、替换体由模型产出 → 实时预览 → 自检 → 导出 JSON。字段名与你现有 4 条正则一致，可直接粘进预设的 regex_scripts。</div><textarea id="opf-rx-core" class="opf-char-input" placeholder="把命定系统核心条目全文粘在这里（必须含「语言格式」节）"></textarea><div class="opf-char-tools"><button type="button" class="opf-btn ghost" id="opf-rx-pull">⬅ 从 ④ 页带入</button><button type="button" class="opf-btn primary" id="opf-rx-parse">🔍 解析语言格式（AI）</button><button type="button" class="opf-btn ghost" id="opf-rx-parse2">⚙ 脚本解析（离线）</button><button type="button" class="opf-btn ghost" id="opf-rx-gen">🎨 生成替换体</button><button type="button" class="opf-btn ghost" id="opf-rx-check">🔎 自检</button><button type="button" class="opf-btn ghost" id="opf-rx-copy1">⧉ 复制单条 JSON</button><button type="button" class="opf-btn ghost" id="opf-rx-copyall">⧉ 复制 JSON 数组</button><button type="button" class="opf-btn ghost" id="opf-rx-new">🗑 清空</button><button type="button" class="opf-btn ghost" id="opf-rx-ping">🩺 连通性自检</button></div><div class="opf-shx-cfg"><label id="opf-rx-directwrap"><input type="checkbox" id="opf-rx-direct"> 🚀 直连 + 真流式生成（绕开 generateRaw 的非流式限制，需自备接口）</label><label class="opf-opt">直连地址<input id="opf-rx-base" class="opf-ref-input" placeholder="https://api.example.com/v1"></label><label class="opf-opt">密钥<input id="opf-rx-key" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">聊天模型<input id="opf-rx-chatmodel" class="opf-ref-input" placeholder="如 gemini-2.5-pro / gpt-4o-mini"></label></div><div class="opf-dim" id="opf-rx-statusline">就绪</div><div class="opf-sec"><div class="opf-sec-label">语言格式解析结果（只读核对）</div><pre id="opf-rx-parsed" class="opf-box opf-char-report">尚未解析</pre></div><div id="opf-rx-items"></div><div class="opf-sec"><div class="opf-sec-label">自检</div><pre id="opf-rx-issues" class="opf-box opf-char-report">尚未自检</pre></div></div>';
+var RX_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">✦ 正则工坊 · 命定系统对话美化</div><div class="opf-dim">流程：粘贴核心全文（或从 ④ 页带入）→ 解析语言格式 → 勾选要美化的格式 → 选用途与预算档位 → 匹配式由插件确定生成、替换体由模型产出 → 实时预览 → 自检 → 导出 JSON。字段名与你现有 4 条正则一致，可直接粘进预设的 regex_scripts。</div><textarea id="opf-rx-core" class="opf-char-input" placeholder="把命定系统核心条目全文粘在这里（必须含「语言格式」节）"></textarea><div class="opf-char-tools"><button type="button" class="opf-btn ghost" id="opf-rx-pull">⬅ 从 ④ 页带入</button><button type="button" class="opf-btn primary" id="opf-rx-parse">🔍 解析语言格式（AI）</button><button type="button" class="opf-btn ghost" id="opf-rx-parse2">⚙ 脚本解析（离线）</button><button type="button" class="opf-btn ghost" id="opf-rx-gen">🎨 生成替换体</button><button type="button" class="opf-btn ghost" id="opf-rx-check">🔎 自检</button><button type="button" class="opf-btn ghost" id="opf-rx-copy1">⧉ 复制单条 JSON</button><button type="button" class="opf-btn ghost" id="opf-rx-copyall">⧉ 复制 JSON 数组</button><button type="button" class="opf-btn ghost" id="opf-rx-new">🗑 清空</button><button type="button" class="opf-btn ghost" id="opf-rx-ping">🩺 连通性自检</button></div><div class="opf-shx-cfg"><label class="opf-opt">生成传输<select id="opf-rx-transport" class="opf-ref-input"><option value="st">酒馆主 API（generateRaw，非流式）</option><option value="server">经酒馆服务端转发 + 流式（反代推荐）</option><option value="direct">浏览器直连 + 流式</option></select></label><label class="opf-opt">协议源<select id="opf-rx-source" class="opf-ref-input"><option value="makersuite">Google AI Studio (makersuite)</option><option value="vertexai">Vertex AI (vertexai)</option></select></label><label class="opf-opt">中转/反代地址<input id="opf-rx-reverse" class="opf-ref-input" placeholder="https://gcli.ggchan.dev"></label><label class="opf-opt">代理密码/密钥<input id="opf-rx-proxypass" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">模型名<input id="opf-rx-model" class="opf-ref-input" placeholder="gemini-2.5-pro"></label></div><div class="opf-shx-cfg"><label class="opf-opt">直连协议<select id="opf-rx-proto" class="opf-ref-input"><option value="openai">OpenAI 兼容 (/chat/completions)</option><option value="gemini">Google 原生 (:streamGenerateContent)</option></select></label><label class="opf-opt">直连地址<input id="opf-rx-base" class="opf-ref-input" placeholder="https://api.example.com/v1"></label><label class="opf-opt">直连密钥<input id="opf-rx-key" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">直连模型<input id="opf-rx-chatmodel" class="opf-ref-input" placeholder="直连时用；留空则用上面的模型名"></label></div><div class="opf-dim" id="opf-rx-statusline">就绪</div><div class="opf-sec"><div class="opf-sec-label">语言格式解析结果（只读核对）</div><pre id="opf-rx-parsed" class="opf-box opf-char-report">尚未解析</pre></div><div id="opf-rx-items"></div><div class="opf-sec"><div class="opf-sec-label">自检</div><pre id="opf-rx-issues" class="opf-box opf-char-report">尚未自检</pre></div></div>';
 
 function rxInit() {
   ST.rx = ST.rx || { core: '', coreName: '', parsed: null, items: [], _inited: false };
@@ -3633,20 +3633,25 @@ function bindRxPage() {
   getEl('opf-rx-copyall').addEventListener('click', function(){ rxCopy(true); });
   getEl('opf-rx-new').addEventListener('click', function(){ rxClear(); });
   getEl('opf-rx-ping').addEventListener('click', function(){ rxPing(); });
-  getEl('opf-rx-direct').addEventListener('change', function(){ rxCfg().direct = this.checked; rxCacheSave(); toast(this.checked ? '已切换为直连 + 真流式生成' : '已切回酒馆主 API（generateRaw，非流式）'); });
-  ['opf-rx-base', 'opf-rx-key', 'opf-rx-chatmodel'].forEach(function (id) {
+  var bindCfg = function (id, key) {
     var el = getEl(id); if (!el) return;
-    el.addEventListener('change', function () {
-      var cfg = rxCfg();
-      cfg.baseUrl = getEl('opf-rx-base').value; cfg.apiKey = getEl('opf-rx-key').value; cfg.chatModel = getEl('opf-rx-chatmodel').value;
-      rxCacheSave();
-    });
+    el.addEventListener('change', function () { rxCfg()[key] = this.value; rxCacheSave(); });
+  };
+  bindCfg('opf-rx-transport', 'transport');
+  bindCfg('opf-rx-source', 'source');
+  bindCfg('opf-rx-reverse', 'reverseProxy');
+  bindCfg('opf-rx-proxypass', 'proxyPassword');
+  bindCfg('opf-rx-model', 'model');
+  bindCfg('opf-rx-proto', 'directProtocol');
+  bindCfg('opf-rx-base', 'baseUrl');
+  bindCfg('opf-rx-key', 'apiKey');
+  bindCfg('opf-rx-chatmodel', 'chatModel');
+  var cur = rxCfg();
+  [['opf-rx-transport', 'transport'], ['opf-rx-source', 'source'], ['opf-rx-reverse', 'reverseProxy'],
+   ['opf-rx-proxypass', 'proxyPassword'], ['opf-rx-model', 'model'], ['opf-rx-proto', 'directProtocol'],
+   ['opf-rx-base', 'baseUrl'], ['opf-rx-key', 'apiKey'], ['opf-rx-chatmodel', 'chatModel']].forEach(function (pair) {
+    var el = getEl(pair[0]); if (el) el.value = cur[pair[1]] || '';
   });
-  var c = rxCfg();
-  if (getEl('opf-rx-direct')) getEl('opf-rx-direct').checked = !!c.direct;
-  if (getEl('opf-rx-base')) getEl('opf-rx-base').value = c.baseUrl || '';
-  if (getEl('opf-rx-key')) getEl('opf-rx-key').value = c.apiKey || '';
-  if (getEl('opf-rx-chatmodel')) getEl('opf-rx-chatmodel').value = c.chatModel || '';
   getEl('opf-rx-core').addEventListener('input', function(){ ST.rx.core = this.value; rxCacheSave(); });
   rxRenderItems();
 }
@@ -3856,31 +3861,44 @@ function rxDiagError(err) {
   if (/aborted|Cancelled|停止/i.test(m)) return '已中止。';
   return m.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
 }
-// ---------- 直连 + 真流式（绕开 generateRaw 的非流式限制）----------
+// ---------- 三种传输：酒馆主 API / 经酒馆服务端转发+流式 / 浏览器直连+流式 ----------
+// 「经服务端转发」是类反向代理场景的正解：反代地址、密钥、Gemini 协议转换、CORS 全由酒馆服务端处理
+// 依据：ST 1.18.0 src/endpoints/backends/chat-completions.js
+//   router.post('/generate') → case MAKERSUITE: sendMakerSuiteRequest(...)
+//   responseType = stream ? 'streamGenerateContent' : 'generateContent'  → 追加 &alt=sse
+//   convertGooglePrompt(request.body.messages, …)；apiKey = reverse_proxy ? proxy_password : readSecret(...)
 function rxCfg() {
   rxInit();
-  ST.rx.cfg = ST.rx.cfg || { direct: false, chatModel: '', baseUrl: '', apiKey: '' };
-  if (!ST.rx.cfg.baseUrl) { try { var c = shxCfg(); ST.rx.cfg.baseUrl = c.baseUrl || ''; ST.rx.cfg.apiKey = c.apiKey || ''; } catch (e) {} }
-  return ST.rx.cfg;
+  ST.rx.cfg = ST.rx.cfg || {
+    transport: 'st', source: 'makersuite', model: '', reverseProxy: '', proxyPassword: '',
+    directProtocol: 'openai', baseUrl: '', apiKey: '', chatModel: ''
+  };
+  var c = ST.rx.cfg;
+  if (!c.transport) c.transport = 'st';
+  if (!c.source) c.source = 'makersuite';
+  if (!c.directProtocol) c.directProtocol = 'openai';
+  if (!c.reverseProxy && !c.baseUrl) { try { var sh = shxCfg(); c.baseUrl = sh.baseUrl || ''; c.apiKey = sh.apiKey || ''; } catch (e) {} }
+  return c;
 }
-async function rxDirectStream(messages, onDelta, signal) {
-  var cfg = rxCfg();
-  var base = String(cfg.baseUrl || '').trim().replace(/\/+$/, '');
-  if (!base) throw new Error('未填写直连接口地址');
-  if (!cfg.chatModel) throw new Error('未填写直连聊天模型');
-  var h = { 'Content-Type': 'application/json' };
-  if (String(cfg.apiKey || '').trim()) h['Authorization'] = 'Bearer ' + String(cfg.apiKey).trim();
-  var r = await fetch(base + '/chat/completions', {
-    method: 'POST', headers: h, signal: signal,
-    body: JSON.stringify({ model: cfg.chatModel, stream: true, messages: messages, temperature: 0.8 })
-  });
-  if (!r.ok) {
-    var body = '';
-    try { body = (await r.text()).slice(0, 300); } catch (e) {}
-    throw new Error('HTTP ' + r.status + ' ' + body);
+function rxHeaders() { var h = { 'Content-Type': 'application/json' }; var k = String(rxCfg().proxyPassword || '').trim(); if (k) h['Authorization'] = 'Bearer ' + k; return h; }
+// 通用 SSE 读取：同时兼容 OpenAI 形状与 Google 原生形状
+function rxSseText(obj) {
+  if (!obj) return '';
+  var ch = obj.choices && obj.choices[0];
+  if (ch) {
+    var d = ch.delta || ch.message;
+    if (d && typeof d.content === 'string') return d.content;
+    if (ch.text) return ch.text;
   }
-  if (!r.body || !r.body.getReader) throw new Error('当前环境不支持流式读取（ReadableStream 不可用）');
-  var reader = r.body.getReader(), dec = new TextDecoder(), buf = '', full = '';
+  var cand = obj.candidates && obj.candidates[0];
+  if (cand && cand.content && Array.isArray(cand.content.parts)) {
+    return cand.content.parts.map(function (p) { return (p && typeof p.text === 'string') ? p.text : ''; }).join('');
+  }
+  return '';
+}
+async function rxReadSse(resp, onDelta) {
+  if (!resp.body || !resp.body.getReader) throw new Error('当前环境不支持流式读取（ReadableStream 不可用）');
+  var reader = resp.body.getReader(), dec = new TextDecoder(), buf = '', full = '';
   while (true) {
     var chunk = await reader.read();
     if (chunk.done) break;
@@ -3889,41 +3907,98 @@ async function rxDirectStream(messages, onDelta, signal) {
     buf = lines.pop();
     for (var i = 0; i < lines.length; i++) {
       var line = lines[i].trim();
+      if (!line) continue;
       if (line.indexOf('data:') !== 0) continue;
       var payload = line.slice(5).trim();
       if (!payload || payload === '[DONE]') continue;
       try {
-        var j = JSON.parse(payload);
-        var ch0 = j.choices && j.choices[0];
-        var d = ch0 && (ch0.delta || ch0.message);
-        var t = d && d.content;
+        var t = rxSseText(JSON.parse(payload));
         if (t) { full += t; if (onDelta) onDelta(t, full.length); }
-      } catch (e) { /* 忽略心跳与非 JSON 行 */ }
+      } catch (e) { /* 心跳或非 JSON 行 */ }
     }
   }
   return full;
 }
+// ① 经酒馆服务端转发（推荐：兼容类反向代理、无 CORS 问题、Google 协议由 ST 转换）
+async function rxServerStream(messages, onDelta) {
+  var cfg = rxCfg();
+  if (!cfg.model) throw new Error('未填写模型名（如 gemini-2.5-pro）');
+  if (!cfg.reverseProxy) throw new Error('未填写中转/反代地址');
+  var origin = (typeof window !== 'undefined' && window.location) ? window.location.origin : '';
+  var h = { 'Content-Type': 'application/json' };
+  try {
+    var c = getCtx();
+    if (c && typeof c.getRequestHeaders === 'function') { var rh = c.getRequestHeaders(); for (var k in rh) h[k] = rh[k]; }
+  } catch (e) { /* 拿不到 CSRF 头时仍尝试 */ }
+  var body = {
+    chat_completion_source: cfg.source || 'makersuite',
+    reverse_proxy: cfg.reverseProxy,
+    proxy_password: cfg.proxyPassword || '',
+    model: cfg.model,
+    messages: messages.map(function (m) { return { role: m.role, content: m.content }; }),
+    use_sysprompt: true,
+    stream: true,
+    max_tokens: 8192,
+    temperature: 0.85
+  };
+  var r = await fetch(origin + '/api/backends/chat-completions/generate', { method: 'POST', headers: h, body: JSON.stringify(body) });
+  if (!r.ok) {
+    var txt = '';
+    try { txt = (await r.text()).slice(0, 300); } catch (e) {}
+    throw new Error('酒馆服务端转发失败 HTTP ' + r.status + ' ' + txt);
+  }
+  return rxReadSse(r, onDelta);
+}
+// ② 浏览器直连（OpenAI 兼容 / Google 原生）
+function rxGeminiBody(messages) {
+  var sys = messages.filter(function (m) { return m.role === 'system'; }).map(function (m) { return m.content; }).join('\n\n');
+  var contents = messages.filter(function (m) { return m.role !== 'system'; }).map(function (m) {
+    return { role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] };
+  });
+  var body = { contents: contents, generationConfig: { maxOutputTokens: 8192, temperature: 0.85 } };
+  if (sys) body.systemInstruction = { parts: [{ text: sys }] };
+  return body;
+}
+async function rxDirectStream(messages, onDelta) {
+  var cfg = rxCfg();
+  var base = String(cfg.baseUrl || '').trim().replace(/\/+$/, '');
+  if (!base) throw new Error('未填写直连地址');
+  var model = cfg.chatModel || cfg.model;
+  if (!model) throw new Error('未填写直连聊天模型');
+  var key = String(cfg.apiKey || '').trim();
+  var url, body, headers = { 'Content-Type': 'application/json' };
+  if (cfg.directProtocol === 'gemini') {
+    url = base + '/v1beta/models/' + encodeURIComponent(model) + ':streamGenerateContent?alt=sse' + (key ? '&key=' + encodeURIComponent(key) : '');
+    body = rxGeminiBody(messages);
+    if (key) headers['x-goog-api-key'] = key;
+  } else {
+    url = base + '/chat/completions';
+    body = { model: model, messages: messages, stream: true, temperature: 0.85 };
+    if (key) headers['Authorization'] = 'Bearer ' + key;
+  }
+  var r = await fetch(url, { method: 'POST', headers: headers, body: JSON.stringify(body) });
+  if (!r.ok) { var t = ''; try { t = (await r.text()).slice(0, 300); } catch (e) {} throw new Error('HTTP ' + r.status + ' ' + t); }
+  return rxReadSse(r, onDelta);
+}
 function rxStreamCall(messages, onNote) {
   var cfg = rxCfg();
-  if (!cfg.direct) return callModel(messages);
+  if (cfg.transport === 'st') return callModel(messages);
   var t0 = Date.now();
-  return rxDirectStream(messages, function (t, len) {
-    if (onNote && (len % 800 < t.length)) onNote('流式接收中… ' + len + ' 字符（' + Math.round((Date.now() - t0) / 1000) + 's）');
-  });
+  var onDelta = function (t, len) { if (onNote && len % 900 < t.length) onNote('流式接收中… ' + len + ' 字符（' + Math.round((Date.now() - t0) / 1000) + 's）'); };
+  return cfg.transport === 'server' ? rxServerStream(messages, onDelta) : rxDirectStream(messages, onDelta);
 }
 // 连通性自检：一次极小请求，用于区分「中转站挂了」与「任务太重」
 async function rxPing() {
   var el = getEl('opf-rx-statusline');
   var say = function (s) { if (el) el.textContent = s; };
   var cfg = rxCfg();
-  say('自检中…');
+  var label = cfg.transport === 'st' ? '酒馆主 API（generateRaw，非流式）' : cfg.transport === 'server' ? '经酒馆服务端转发 + 真流式' : '浏览器直连 + 真流式';
+  say('自检中…（' + label + '）');
   var t0 = Date.now();
   try {
-    var out;
-    if (cfg.direct) out = await rxDirectStream([{ role: 'user', content: '回复两个字：正常' }], null, null);
-    else out = await callModel([{ role: 'user', content: '回复两个字：正常' }]);
+    var out = await rxStreamCall([{ role: 'user', content: '回复两个字：正常' }], function (s) { say('自检收流中… ' + s); });
     var ms = Date.now() - t0;
-    say('连通正常：' + ms + 'ms，返回「' + String(out).trim().slice(0, 20) + '」（' + (cfg.direct ? '直连流式' : '酒馆主 API / generateRaw 非流式') + '）');
+    say('连通正常：' + ms + 'ms｜' + label + '｜返回「' + String(out).trim().slice(0, 20) + '」');
     toast('连通性自检通过（' + ms + 'ms）', 'success');
   } catch (e) {
     say('自检失败：' + rxDiagError(e));
