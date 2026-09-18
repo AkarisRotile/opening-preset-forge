@@ -7640,7 +7640,8 @@ var ATL_CSS = '#opf-page-atelier{font-size:13px}'
   + '#opf-page-atelier .opf-box{white-space:pre-wrap;word-break:break-word}';
 var ATL_HTML = '<div class="opf-char-wrap">'
   + '<div class="opf-sec-label">✦ 造物工坊 · 单件生成 + 长期工作区</div>'
-  + '<div class="opf-dim">流程：写需求（可选参考格式）→ 选类型 → 🎨 生成 YAML → 🔎 自检 → 用改进框提要求让 AI 改（可撤回）。产出可以 📥 存成条目攒进「工作区」；<b>勾选的条目会在下一次生成/改进/交火分析时一起发给 AI</b>，没勾的一条都不会发出去。</div>'
+  + '<div class="opf-dim">流程：写需求（可选参考格式）→ 选类型 → 🎨 生成 YAML → 🔎 自检 → 用改进框提要求让 AI 改（可撤回）→ 📥 存成条目。产出可以攒进「工作区」；<b>勾选的条目会在下一次生成/改进/交火分析时一起发给 AI</b>，没勾的一条都不会发出去。<br>'
+  + '⚠ 保存分两种：<b>📥 存成条目</b>＝新建一条；<b>💾 更新「某条」</b>＝覆盖已打开/刚存的那条（按钮文字会写明要覆盖谁）。<b>要做下一件东西：点「🆕 开始下一个条目」清空编辑区，或直接改需求再点「🎨 生成 YAML」——生成会自动另起一条，绝不会覆盖上一条。</b></div>'
 
   + '<div class="opf-sec"><div class="opf-sec-label">① 需求与参考</div></div>'
   + '<div class="opf-step-ref-row">'
@@ -7651,6 +7652,7 @@ var ATL_HTML = '<div class="opf-char-wrap">'
   + '<textarea id="opf-atl-ref" class="opf-char-input" style="min-height:60px" placeholder="参考内容（可不填）：粘一段别处的格式/样例，模型只当格式参考，不会照抄内容"></textarea>'
   + '<div class="opf-char-tools">'
   + '<button type="button" class="opf-btn primary" id="opf-atl-gen">🎨 生成 YAML</button>'
+  + '<button type="button" class="opf-btn ghost" id="opf-atl-new">🆕 开始下一个条目</button>'
   + '<button type="button" class="opf-btn ghost" id="opf-atl-ping">🩺 连通性自检</button>'
   + '<button type="button" class="opf-btn ghost" id="opf-atl-last">📄 上次返回</button>'
   + '<button type="button" class="opf-btn ghost" id="opf-atl-kinds">📐 字段骨架速查</button>'
@@ -7667,7 +7669,9 @@ var ATL_HTML = '<div class="opf-char-wrap">'
   + '<button type="button" class="opf-btn ghost" id="opf-atl-copy">⧉ 复制</button>'
   + '<button type="button" class="opf-btn ghost" id="opf-atl-download">💾 下载 .yaml</button>'
   + '<button type="button" class="opf-btn primary" id="opf-atl-save">📥 存成条目</button>'
+  + '<button type="button" class="opf-btn ghost" id="opf-atl-savenew" style="display:none">＋ 存为新条目</button>'
   + '</div>'
+  + '<div class="opf-dim" id="opf-atl-bind">（未绑定条目：当前产出还没存进工作区）</div>'
   + '<pre id="opf-atl-lint" class="opf-box opf-char-report">尚未自检</pre>'
 
   + '<div class="opf-sec"><div class="opf-sec-label">③ 改进（提要求 → AI 改 → 可撤回）</div></div>'
@@ -7882,18 +7886,61 @@ async function atlDropItem(id) {
   await atlStoreDel('items', id);
   await atlSaveMeta();
 }
-// 存成条目：绑定了条目就更新它，否则按「存放工作区」新建（也可显式指定工作区）
-async function atlSaveAsItem(spaceId) {
+// ---------- 绑定语义（这一条最容易出事，单独讲清楚）----------
+// buf.itemId 非空 = 编辑区绑着工作区里某一条，此时「💾 更新」会覆盖它。
+// 规则：只有「打开条目」与「刚存成条目」会建立绑定；「🎨 生成」「🆕 开始下一个条目」一律解除绑定——
+// 否则接着造下一件时点保存，会把上一件静默覆盖（v1.16.0 实测问题）。
+function atlBoundItem() {
+  var A = atlInit();
+  return A.buf.itemId ? atlItem(A.buf.itemId) : null;
+}
+// mode='keep' 保留编辑区内容（生成用）；'reset' 清空需求/参考/产出（新条目用，调用方先入撤回栈）
+function atlStartNewBuffer(mode) {
+  var A = atlInit();
+  var was = atlBoundItem();
+  A.buf.itemId = '';
+  A.meta.activeItemId = '';
+  A.buf.name = '';
+  A.buf.dir = '';
+  if (mode === 'reset') { A.buf.req = ''; A.buf.ref = ''; A.buf.yaml = ''; }
+  atlSaveMeta();
+  return was;
+}
+function atlSyncSaveButtons() {
+  var it = atlBoundItem();
+  var save = atlEl('opf-atl-save');
+  if (save) {
+    save.textContent = it ? ('💾 更新「' + (it.name || '未命名') + '」') : '📥 存成条目';
+    save.title = it ? '覆盖工作区里的这一条（旧版会留在行内「↩ 回退」里）' : '把当前产出存成工作区里的新条目';
+  }
+  var sn = atlEl('opf-atl-savenew');
+  if (sn) sn.style.display = it ? '' : 'none';
+  var hint = atlEl('opf-atl-bind');
+  if (hint) {
+    if (it) {
+      var sp = atlSpace(it.spaceId);
+      hint.textContent = '✎ 正在编辑条目「' + (it.name || '未命名') + '」' + (sp ? '（工作区：' + sp.name + '）' : '')
+        + '——「💾 更新」会覆盖它，要另存一份请点「＋ 存为新条目」。'
+        + '要做下一件东西：点上面的「🆕 开始下一个条目」，或直接改需求再点「🎨 生成 YAML」（生成会自动另起一条）';
+    } else {
+      hint.textContent = '（未绑定条目：当前产出还没存进工作区，点「📥 存成条目」会新建一条；刚存过的那条不会被改动）';
+    }
+  }
+}
+// 存成条目：绑着某条就更新它，否则新建（forceNew=true 或没绑定＝新建）
+async function atlSaveAsItem(spaceId, forceNew) {
   var A = atlInit();
   var yaml = String(A.buf.yaml || '').trim();
   if (!yaml) { toast('产出还是空的：先点「🎨 生成 YAML」或手写一点内容', 'warning'); return null; }
   var kind = atlKind(A.buf.kind);
   var name = String(A.buf.name || '').trim() || atlGuessName(yaml) || ('未命名' + kind.label);
-  if (A.buf.itemId && atlItem(A.buf.itemId)) {
-    var old = atlItem(A.buf.itemId);
-    var upd = Object.assign({}, old, { name: name, kind: A.buf.kind, req: A.buf.req, ref: A.buf.ref, yaml: yaml, prev: old.yaml || '', prevAt: Date.now() });
+  var target = (!forceNew && A.buf.itemId) ? atlItem(A.buf.itemId) : null;
+  if (target) {
+    var upd = Object.assign({}, target, { name: name, kind: A.buf.kind, req: A.buf.req, ref: A.buf.ref, yaml: yaml, prev: target.yaml || '', prevAt: Date.now() });
     await atlPutItem(upd);
-    toast('已更新条目「' + name + '」（旧版留在行内「↩」里）', 'success');
+    A.buf.name = name;
+    var ni0 = atlEl('opf-atl-name'); if (ni0) ni0.value = name;
+    toast('已更新条目「' + name + '」（旧版留在行内「↩ 回退」里）', 'success');
     atlRender();
     return upd;
   }
@@ -7904,10 +7951,12 @@ async function atlSaveAsItem(spaceId) {
     sel: true, createdAt: Date.now(), updatedAt: Date.now(), prev: ''
   };
   await atlPutItem(it);
-  A.buf.itemId = it.id;
+  A.buf.itemId = it.id;                 // 刚存完仍绑着它：再点一次＝更新，不会存出重复条目
+  A.buf.name = name;
   A.meta.activeItemId = it.id;
+  var ni = atlEl('opf-atl-name'); if (ni) ni.value = name;
   await atlSaveMeta();
-  toast('已存进工作区「' + space.name + '」（默认勾选，会随下次生成一起发给 AI）', 'success');
+  toast('已新建条目「' + name + '」到工作区「' + space.name + '」（默认勾选）。接着点「🎨 生成 YAML」会自动开始新的一条，不会覆盖它', 'success');
   atlRender();
   return it;
 }
@@ -8170,6 +8219,14 @@ function atlDownload(name, text) {
   } catch (e) { toast('下载失败：' + (e && e.message ? e.message : e), 'error'); }
 }
 function atlStat(s) { var e = atlEl('opf-atl-status'); if (e) e.textContent = s; }
+// 确认框：没有 window 的环境（离线验收/脚本里）不抛异常。
+// 默认可撤销的操作在无 UI 时放行（fallback=true），不可撤销的删除类一律拦下（fallback=false）。
+function atlConfirm(msg, fallback) {
+  try {
+    if (typeof window !== 'undefined' && window && typeof window.confirm === 'function') return !!window.confirm(msg);
+  } catch (e) {}
+  return !!fallback;
+}
 function atlSetRunning(on) {
   ['opf-atl-gen', 'opf-atl-ping', 'opf-atl-kinds', 'opf-atl-check', 'opf-atl-copy', 'opf-atl-download', 'opf-atl-save',
     'opf-atl-fix', 'opf-atl-sug', 'opf-atl-newspace', 'opf-atl-regroup', 'opf-atl-all', 'opf-atl-none', 'opf-atl-export',
@@ -8360,6 +8417,7 @@ function atlRender() {
   atlRenderSpaceSelect();
   atlRenderSpaces();
   atlRenderCtxNote();
+  atlSyncSaveButtons();
   atlLintRun();
 }
 // ---------- 条目/工作区的小动作 ----------
@@ -8401,7 +8459,7 @@ async function atlSetSpaceOpen(id, open) {
 }
 async function atlDeleteItem(id) {
   var it = atlItem(id); if (!it) return;
-  if (!window.confirm('删除条目「' + (it.name || '未命名') + '」？删了就找不回来了（可先「⧉ 导出全部」备份）')) return;
+  if (!atlConfirm('删除条目「' + (it.name || '未命名') + '」？删了就找不回来了（可先「⧉ 导出全部」备份）')) return;
   await atlDropItem(id);
   atlRender();
   toast('已删除');
@@ -8409,7 +8467,7 @@ async function atlDeleteItem(id) {
 async function atlDeleteSpace(id) {
   var sp = atlSpace(id); if (!sp) return;
   var items = atlItemsOf(id);
-  if (!window.confirm('删除工作区「' + sp.name + '」' + (items.length ? '及其中的 ' + items.length + ' 条条目' : '') + '？此操作不可撤销')) return;
+  if (!atlConfirm('删除工作区「' + sp.name + '」' + (items.length ? '及其中的 ' + items.length + ' 条条目' : '') + '？此操作不可撤销')) return;
   for (var i = 0; i < items.length; i++) await atlDropItem(items[i].id);
   var A = atlInit();
   A.spaces = A.spaces.filter(function (s) { return s.id !== id; });
@@ -8434,9 +8492,25 @@ function atlOpenItem(id) {
   A.buf.req = it.req || ''; A.buf.ref = it.ref || ''; A.buf.yaml = it.yaml || '';
   A.meta.activeItemId = it.id;
   A.hist = [];
-  atlSyncInputsFromBuf(); atlLintRun(); atlRenderCtxNote(); atlRenderSpaces(); atlSaveMeta(); atlDraftSave();
+  atlSyncInputsFromBuf(); atlLintRun(); atlSyncSaveButtons(); atlRenderCtxNote(); atlRenderSpaces(); atlSaveMeta(); atlDraftSave();
   var sp = atlSpace(it.spaceId);
-  toast('已打开「' + (it.name || '未命名') + '」' + (sp ? '（工作区：' + sp.name + '）' : '') + '，改完点「📥 存成条目」或「✨ 改进」');
+  toast('已打开「' + (it.name || '未命名') + '」' + (sp ? '（工作区：' + sp.name + '）' : '')
+    + '——接下来「💾 更新」覆盖的就是这一条；要做下一件东西请点「🆕 开始下一个条目」', 'success');
+}
+// 「🆕 新条目」：解绑并清空编辑区（先入撤回栈，误点也能退回）
+function atlDoNewBuffer() {
+  var A = atlInit();
+  var was = atlBoundItem();
+  var dirty = String(A.buf.yaml || '').trim() || String(A.buf.req || '').trim();
+  if (dirty && !atlConfirm('开始下一个条目会把编辑区的需求/参考/产出清空'
+    + (was ? '（条目「' + (was.name || '未命名') + '」已存在工作区里，不会被删）' : '（当前产出还没存过，清掉后可以用「↩ 撤回上次改动」拿回来）')
+    + '。继续？', true)) return;
+  atlPushHist('新条目');
+  A.buf.itemId = ''; A.buf.name = ''; A.buf.req = ''; A.buf.ref = ''; A.buf.yaml = ''; A.buf.dir = '';
+  A.meta.activeItemId = '';
+  atlSyncInputsFromBuf(); atlLintRun(); atlSyncSaveButtons(); atlRenderCtxNote(); atlRenderSpaces();
+  atlSaveMeta(); atlDraftSave();
+  toast(was ? '已开始新条目（「' + (was.name || '未命名') + '」仍在工作区里，没被动过）' : '已开始新条目', 'success');
 }
 async function atlSaveBufferInto(spaceId) {
   var A = atlInit();
@@ -8464,7 +8538,7 @@ async function atlRegroup() {
   toast('已把 ' + moved + ' 条按类型归位到各自工作区', 'success');
 }
 async function atlClearAll() {
-  if (!window.confirm('清空全部工作区与条目？（编辑区里的当前产出不受影响；建议先「⧉ 导出全部」备份）')) return;
+  if (!atlConfirm('清空全部工作区与条目？（编辑区里的当前产出不受影响；建议先「⧉ 导出全部」备份）')) return;
   await atlStoreClear('items');
   await atlStoreClear('spaces');
   var A = atlInit();
@@ -8535,6 +8609,7 @@ async function atlDoGenerate() {
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
   var A = atlInit();
   if (!String(A.buf.req || '').trim() && !String(A.buf.ref || '').trim()) { toast('先写一句需求（或粘一段参考），再生成', 'warning'); return; }
+  var wasBound = atlBoundItem();          // 生成＝造新的一条：成功后解绑，避免保存时覆盖上一条
   ST.running = true; atlSetRunning(true);
   try {
     var msgs = [{ role: 'system', content: atlSystem(A.buf.kind) }, { role: 'user', content: atlGenPrompt() }];
@@ -8546,16 +8621,20 @@ async function atlDoGenerate() {
       return;
     }
     atlPushHist('生成');
+    atlStartNewBuffer('keep');            // 解绑 + 清名字（内容随后覆盖）
     A.buf.yaml = yaml;
-    if (!String(A.buf.name || '').trim()) {
-      var g = atlGuessName(yaml);
-      if (g) { A.buf.name = g; var ni = atlEl('opf-atl-name'); if (ni) ni.value = g; }
-    }
+    var g = atlGuessName(yaml);
+    A.buf.name = g || '';
+    var ni = atlEl('opf-atl-name'); if (ni) ni.value = A.buf.name;
     atlSyncOut();
     var r = atlLintRun();
+    atlSyncSaveButtons();
     atlDraftSave();
-    atlStat('生成完成：' + yaml.length + ' 字符' + (r && r.issues.length ? '｜自检发现 ' + r.issues.length + ' 条，见下方' : '｜自检通过'));
-    toast('已生成（' + yaml.length + ' 字符）' + (r && r.issues.length ? '，自检有 ' + r.issues.length + ' 条提醒' : ''), 'success');
+    atlStat('生成完成：' + yaml.length + ' 字符｜未绑定条目（点「📥 存成条目」新建）'
+      + (r && r.issues.length ? '｜自检发现 ' + r.issues.length + ' 条，见下方' : '｜自检通过'));
+    toast('已生成（' + yaml.length + ' 字符）'
+      + (wasBound ? '；这是**新的一条**，上一条「' + (wasBound.name || '未命名') + '」没有被改动（要改它请在工作区点「打开」）' : '')
+      + (r && r.issues.length ? '，自检有 ' + r.issues.length + ' 条提醒' : ''), 'success');
   } catch (e) {
     atlStat('生成失败：' + atlDiag(e));
     toast('生成失败：' + atlDiag(e), 'error');
@@ -8707,11 +8786,15 @@ function bindAtelierPage() {
   var out = atlEl('opf-atl-out');
   if (out) out.addEventListener('input', function () { atlInit().buf.yaml = this.value; atlDraftSave(); });
   var nameIn = atlEl('opf-atl-name');
-  if (nameIn) nameIn.addEventListener('input', function () {
-    var a = atlInit(); a.buf.name = this.value;
-    if (a.buf.itemId && atlItem(a.buf.itemId)) atlRenameItem(a.buf.itemId, this.value);
-    atlDraftSave();
-  });
+  if (nameIn) {
+    // 打字只改缓冲区（不写数据）；失焦/回车才落到绑定的条目上，避免边打边改名
+    nameIn.addEventListener('input', function () { atlInit().buf.name = this.value; atlDraftSave(); });
+    nameIn.addEventListener('change', function () {
+      var a = atlInit(); a.buf.name = this.value;
+      if (atlBoundItem()) atlRenameItem(a.buf.itemId, this.value);
+      atlSyncSaveButtons(); atlDraftSave();
+    });
+  }
   var kindSel = atlEl('opf-atl-kind');
   if (kindSel) kindSel.addEventListener('change', function () {
     atlInit().buf.kind = this.value;
@@ -8734,6 +8817,13 @@ function bindAtelierPage() {
     atlDownload(safeName(nm) + '.yaml', a.buf.yaml);
   });
   on('opf-atl-save', function () { atlSaveAsItem(); });
+  on('opf-atl-savenew', function () {
+    var A = atlInit();
+    if (!String(A.buf.yaml || '').trim()) { toast('产出还是空的：先「🎨 生成 YAML」或手写一点内容', 'warning'); return; }
+    A.buf.itemId = '';                  // 强制新建：先把绑定摘掉，再存
+    atlSaveAsItem(null, true);
+  });
+  on('opf-atl-new', function () { atlDoNewBuffer(); });
   on('opf-atl-fix', function () { atlDoFix(); });
   on('opf-atl-sug', function () { atlDoSug(); });
   on('opf-atl-newspace', function () {
