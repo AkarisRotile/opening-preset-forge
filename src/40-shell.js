@@ -10,7 +10,7 @@ var PAGE_DEFS = [
   { id: "regex",  label: "⑤ 正则工坊" },
   { id: "shixian",label: "⑥ 与始弦聊天" },
   { id: "refine", label: "⑦ 核心精修" },
-  { id: "p4",     label: "⑧ DLC剧情", ph: true },
+  { id: "atelier",label: "⑧ 造物工坊" },
   { id: "p5",     label: "⑨ DLC物品", ph: true },
   { id: "p6",     label: "⑩ 更多功能", ph: true }
 ];
@@ -50,6 +50,8 @@ function buildShell(){
       d.innerHTML = SHX_HTML;
     } else if (p.id === "refine") {
       d.innerHTML = REFINE_HTML;
+    } else if (p.id === "atelier") {
+      d.innerHTML = ATL_HTML;
     } else if (p.id === "world") {
       /* 世界书侧栏由 buildWorldSide 挂载到本页 */
     } else {
@@ -73,6 +75,7 @@ function buildShell(){
   try { bindRxPage(); } catch (e) { opfErr("regex page", e); }
   try { bindShxPage(); } catch (e) { opfErr("shixian page", e); }
   try { bindRefinePage(); } catch (e) { opfErr("refine page", e); }
+  try { bindAtelierPage(); } catch (e) { opfErr("atelier page", e); }
   try { buildWorldSide(); } catch (e) { opfErr("buildWorldSide", e); }
   if (getSettings().visible) showPanel();
 }
@@ -89,6 +92,7 @@ function switchPage(id, force){
   if (id === "destiny") { try { renderDestinyPage(); } catch (e) {} }
   if (id === "regex") { try { rxRenderItems(); } catch (e) {} }
   if (id === "shixian") { try { renderShxWb(); renderShxMsgs(); shxRenderMem(); } catch (e) {} }
+  if (id === "atelier") { try { atlRender(); } catch (e) {} }
 }
 function currentPage(){ return getSettings().activePage || "preset"; }
 
