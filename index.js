@@ -4447,9 +4447,9 @@ var RX_RULES = [
   '【美化正则·硬约束（写替换体时必须逐条遵守）】',
   '1. 匹配式已由插件生成并锁定，你只写替换体（HTML）；不得改动匹配式的捕获组编号与含义。',
   '2. 替换体只做显示层：markdownOnly=true、promptOnly=false，禁止两者同时为 true。',
-  '3. 必须在最外层 div 内自带 <style>，所有 class 必须带唯一前缀（前缀已给定），不得复用他人前缀。',
+  '3. 替换体自带 <style>（骨架已给出位置与 class），class 前缀必须严格用给定的那个，不得复用他人前缀。',
   '4. 禁止 <script>；禁止引用任何外部资源（字体 CDN / 图片 URL / @import）；字体只用系统字体栈。',
-  '5. 禁止写死像素宽度：容器一律 max-width:100%，窄屏（≤420px）不得溢出。',
+  '5. 最外层容器一律 max-width:100%，窄屏（≤420px）不得溢出；但法阵/粒子/角标这类装饰层允许固定像素尺寸与破框显示。',
   '6. 正文里若出现 $ 字符，必须写成 $$，避免被当成捕获组引用。',
   '7. 情绪/情景参数用 data-mood="$2" 之类属性挂到最外层 div，再用属性选择器分支配色——一条替换体覆盖全部枚举，不要为每个情绪写一条正则。',
   '8. 不残留裸 > 引语；替换后正文必须仍然可读，不得依赖悬停才显示文字。',
@@ -4458,6 +4458,123 @@ var RX_RULES = [
   '11. 颜色从核心的世界观与命定之灵人格出发（傲慢用冷金、狂热用灼红、冰冷用青白…），不要用纯黑纯白。',
   '12. 只输出 HTML 本体，放在一个 ```html 代码块里；代码块外不写任何解释文字。'
 ].join('\n');
+// ============================================================================
+// 初始框架（骨架款式）：标准取自 4 条现网可用的正则，而不是「一个带边框的 div」
+//   ① 大比目鱼对话    紧凑卡 + 左缘光带 + 呼吸底色 + hover 涟漪
+//   ② 月蚀对话        三层 SVG 法阵 + 漂浮光尘 + 标题栏 + 装饰破框
+//   ③ 飨宴            details/summary 揭幕式，点开播放爆发动效
+//   ④ 崩坏意志        同一框架用 data-mood 属性选择器覆盖全部枚举（只改变量）
+// 骨架仍由代码生成（$n 引用、class 前缀、变量契约都不会错），模型只写 CSS。
+// ============================================================================
+var RX_FRAMES = [
+  {
+    id: 'card', label: '标准卡·左缘光带', from: '标准 ≈ 范例① 大比目鱼对话',
+    decor: 'dust', tierHint: 'std', interactive: false,
+    desc: '外框 + 左缘光带 + 标题行（纹章·名号·情绪胶囊）+ 正文；呼吸底色，hover 浮起并放出涟漪。',
+    parts: [
+      ['{P}-box', '最外层：变量、底色渐变、边框（左缘用强调色加粗）、圆角、内外边距、hover 位移与发光'],
+      ['{P}-head', '标题行：flex 两端对齐、底部分隔线'],
+      ['{P}-emblem', '纹章符号：颜色、发光、缓慢旋转或脉冲'],
+      ['{P}-name', '名号：字距、渐变文字或发光'],
+      ['{P}-mood', '情绪胶囊（核心有 mood 参数时才有）'],
+      ['{P}-rule', '标题行右侧渐隐分隔线'],
+      ['{P}-body', '正文：行高、字色、文字阴影、长文与换行'],
+      ['{P}-dust', '两枚漂浮微尘：位置、大小、上浮动画']
+    ]
+  },
+  {
+    id: 'array', label: '法阵卡·装饰破框', from: '标准 ≈ 范例② 月蚀 / 范例④ 崩坏意志',
+    decor: 'array', tierHint: 'fine', interactive: false,
+    desc: '三层 SVG 法阵（描边环 + 环形铭文 + 几何核心）+ 漂浮光尘 + 标题栏 + 正文；装饰允许破框，hover 时换层缩放。',
+    parts: [
+      ['{P}-box', '最外层：变量、底色、边框、内外边距；装饰要破框，所以不要 overflow:hidden'],
+      ['{P}-visual', '视觉层：绝对定位铺满、pointer-events:none、z-index 低于文字'],
+      ['{P}-array', '法阵 SVG：尺寸、定位（一角外溢）、透明度、hover 放大'],
+      ['{P}-orbit-1/-2/-3', '三层轨道：各自的方向与周期（≥2s）+ 变换原点（240 视图里是 120px 120px）'],
+      ['{P}-head / -emblem / -name / -mood / -rule', '标题行（同标准卡）'],
+      ['{P}-body', '正文：始终可读，压在视觉层之上'],
+      ['{P}-dust', '漂浮光尘：位置、大小、上浮与淡出动画']
+    ]
+  },
+  {
+    id: 'reveal', label: '揭幕式·点击爆发', from: '标准 ≈ 范例③ 飨宴',
+    decor: 'array', tierHint: 'lux', interactive: true,
+    desc: 'details/summary 结算卡：点开播放分解/爆发动效并揭示正文；适合战斗结算、命运抽卡、缔结契约。',
+    parts: [
+      ['{P}-box（details）', '最外层 details：卡片外观 + list-style:none；[open] 时切换状态'],
+      ['{P}-face（summary）', '未展开时的卡面：居中排布、隐藏原生三角（list-style:none 与 ::-webkit-details-marker）'],
+      ['{P}-visual / -array / -orbit-1..3', '法阵（同法阵卡）'],
+      ['{P}-head / -name / -mood / -rule', '标题行'],
+      ['{P}-hint', '「点击展开」提示：字距、呼吸闪烁（周期 ≥2s）'],
+      ['{P}-panel', '展开后的面板：内边距、上边框'],
+      ['{P}-body', '正文（展开后显示，必须清晰可读）']
+    ]
+  },
+  {
+    id: 'plain', label: '极简·纯文字框', from: '极简 / 轻量档',
+    decor: 'none', tierHint: 'mini', interactive: false,
+    desc: '只有变量、边框与正文，最短最稳；窄屏与超长文本优先。',
+    parts: [
+      ['{P}-box', '最外层：变量、边框、底色、内外边距、max-width:100%'],
+      ['{P}-head / -name', '名号行（可只留一行小字）'],
+      ['{P}-body', '正文：行高、字色、换行']
+    ]
+  }
+];
+function rxFrameById(id) {
+  return RX_FRAMES.filter(function (x) { return x.id === id; })[0] || null;
+}
+// 条目前缀 → 骨架里的公共前缀（`xxx-box` 归一成 `xxx`，避免出现 xxx-box-box）
+function rxPreOf(item) { return String((item && item.prefix) || 'core-box').replace(/-box$/, ''); }
+// 框架编号 → 分层清单（{P} 换成真实前缀）；只给模型看，用来对齐「该写哪几层」
+function rxFrameLayers(frameId, pre) {
+  var fr = rxFrameById(frameId) || RX_FRAMES[0];
+  return fr.parts.map(function (p) { return '  ' + String(p[0]).replace(/\{P\}/g, pre) + ' —— ' + p[1]; }).join('\n');
+}
+// 骨架里写死的变量名 = 模型必须定义的变量（自检 undefvar 会核对，范例④ 就是这套写法）
+function rxRequiredVars(pre, frameId) {
+  var v = ['--' + pre + '-accent', '--' + pre + '-bg', '--' + pre + '-text', '--' + pre + '-line'];
+  if ((rxFrameById(frameId) || {}).decor === 'array') v.push('--' + pre + '-accent-2');
+  return v;
+}
+// 初始框架标准模板：注入「设计基调」那一段的提示词，让模型照这个层次写（不是只写一个边框）
+function rxCssStandard(pre, hasMood, frameId) {
+  var fr = rxFrameById(frameId) || RX_FRAMES[0];
+  var L = [];
+  L.push('/* —— 初始框架标准（骨架已经给好 class 与变量，请照这个层次写满）—— */');
+  L.push('.' + pre + '-box {');
+  L.push('  --' + pre + '-bg: #0b1020; --' + pre + '-accent: #7fd7ff; --' + pre + '-accent-2: #d4af37;');
+  L.push('  --' + pre + '-text: #e8f1ff; --' + pre + '-line: rgba(127,215,255,.28);');
+  L.push('  position: relative; max-width: 100%; margin: 12px auto; padding: 20px 24px;');
+  L.push('  background: linear-gradient(135deg, var(--' + pre + '-bg), #05070f 60%); color: var(--' + pre + '-text);');
+  L.push('  border: 1px solid var(--' + pre + '-line); border-left: 4px solid var(--' + pre + '-accent); border-radius: 8px;');
+  if (fr.decor === 'array') L.push('  overflow: visible;                 /* 装饰要破框，不要再写 hidden 把法阵切掉 */');
+  L.push('  transition: transform .4s ease, box-shadow .4s ease;');
+  L.push('}');
+  L.push('.' + pre + '-box:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(0,0,0,.6), 0 0 22px -4px var(--' + pre + '-accent); }');
+  if (hasMood) L.push('.' + pre + '-box[data-mood="愉悦"] { --' + pre + '-accent: #eab33a; --' + pre + '-bg: #15110d; }   /* 每个枚举一条，只改变量 */');
+  L.push('.' + pre + '-head { display: flex; align-items: center; gap: 9px; margin-bottom: 12px; padding-bottom: 9px; border-bottom: 1px solid var(--' + pre + '-line); }');
+  L.push('.' + pre + '-name { font-weight: 700; letter-spacing: .15em; color: var(--' + pre + '-accent); text-shadow: 0 0 12px var(--' + pre + '-accent); }');
+  L.push('.' + pre + '-rule { flex-grow: 1; height: 1px; background: linear-gradient(90deg, var(--' + pre + '-line), transparent); }');
+  L.push('.' + pre + '-body { position: relative; z-index: 2; line-height: 1.85; text-shadow: 0 2px 4px rgba(0,0,0,.9); }');
+  if (fr.decor === 'array') {
+    L.push('/* 装饰层（法阵 / 粒子 / 角标）可以写固定 px、可以超出外框；只有最外层容器必须 max-width:100% */');
+    L.push('.' + pre + '-visual { position: absolute; inset: 0; pointer-events: none; z-index: 0; }');
+    L.push('.' + pre + '-array { position: absolute; right: -30px; bottom: -30px; width: 220px; height: 220px; opacity: .55; overflow: visible; }');
+    L.push('.' + pre + '-orbit { transform-origin: 120px 120px; animation: ' + pre + '-spin 45s linear infinite; }');
+    L.push('@keyframes ' + pre + '-spin { to { transform: rotate(360deg); } }');
+  }
+  if (fr.decor !== 'none') {
+    L.push('.' + pre + '-dust { position: absolute; width: 2px; height: 2px; border-radius: 50%; background: var(--' + pre + '-accent); box-shadow: 0 0 6px var(--' + pre + '-accent); animation: ' + pre + '-float 6s linear infinite; }');
+    L.push('@keyframes ' + pre + '-float { 0% { opacity: 0; transform: translateY(0) } 50% { opacity: .8 } 100% { opacity: 0; transform: translateY(-38px) } }');
+  }
+  if (fr.interactive) {
+    L.push('.' + pre + '-box summary { list-style: none; cursor: pointer; }');
+    L.push('.' + pre + '-box summary::-webkit-details-marker { display: none; }');
+    L.push('.' + pre + '-box[open] ' + '.' + pre + '-hint { opacity: 0; }');
+  }
+  return L.join('\n');
+}
 // ---------- 语言格式解析（移植自已验证原型）----------
 function rxStripMd(s) {
   return String(s)
@@ -4498,6 +4615,29 @@ function rxLangSection(text) {
   return out.join('\n');
 }
 function rxEsc(s) { return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+// 骨架/提示词里的字面文案：转义 HTML 并去掉 $（替换体里的裸 $ 会被酒馆当成捕获组引用）
+function rxText(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+    .replace(/\$/g, '');
+}
+// ---------- 方括号族（范例③ 飨宴：`【战斗结算：{结算结果}】`）----------
+// 识别「整行就是一个方括号标记」的格式；必须带占位符或冒号，免得把 【提示】 这类词当成格式
+function rxParseBracket(v) {
+  var m = String(v).trim().match(/^([【\[])\s*([\s\S]*?)\s*([】\]])$/);
+  if (!m) return null;
+  var open = m[1], close = m[3], inner = String(m[2]).trim();
+  if (!inner) return null;
+  var body = '';
+  var ph = inner.match(/\{[^}]*\}|<[^>]+>|「[^」]*」|『[^』]*』/);
+  if (ph) { body = ph[0]; inner = inner.slice(0, ph.index); }
+  var colon = /[:：]\s*$/.test(inner) || /[:：]/.test(String(m[2]));
+  var marker = inner.replace(/[:：]\s*$/, '').trim();
+  if (!marker || marker.length > 24) return null;
+  if (/[{}<>「」『』]/.test(marker)) return null;
+  if (!body && !colon) return null;                 // 只有标记、没有占位符也没有冒号 → 不是格式
+  return { family: 'bracket', open: open, close: close, marker: marker, colon: colon, params: [], quote: false, raw: v, fmtVal: String(v).trim() };
+}
 function rxParseFormatLine(raw) {
   var s = rxStripMd(raw);
   var v = s.replace(/^(?:强制|规定|输出|专属|标准)?格式\s*[:：]\s*/, '');
@@ -4517,6 +4657,8 @@ function rxParseFormatLine(raw) {
     return { family: 'quote', speaker: qM[1], params: [], quote: /[「『]/.test(v), innerTag: innerTag, raw: s, fmtVal: v };
   }
   if (/^[「『][\s\S]*[」』]$/.test(v) || /\$\{对白\}|\{对白\}/.test(v)) return { family: 'bare', params: [], quote: true, raw: s, fmtVal: v };
+  var br = rxParseBracket(v);
+  if (br) return br;
   return null;
 }
 function rxParseLangFormat(coreText) {
@@ -4538,13 +4680,16 @@ function rxParseLangFormat(coreText) {
     }
     var prefixed = /(?:强制|规定|输出|专属|标准)?格式\s*[:：]/.test(s);
     var placeholder = /\{[^}]*\}/.test(s) && (/<[A-Za-z_]\w*\b[^>]*\bname\s*="/.test(s) || /^>\s*\S+\s*[:：]/.test(s));
-    if (prefixed || placeholder) cands.push(raw);
+    if (prefixed || placeholder || rxParseBracket(s)) cands.push(raw);
   }
   cands.forEach(function (l) {
     var f = rxParseFormatLine(l);
     if (!f) return;
-    f.key = f.family === 'xml' ? ('xml:' + f.tag) : f.family === 'quote' ? ('q:' + f.speaker + '|' + (f.innerTag || '')) : ('bare:' + f.fmtVal);
-    f.label = f.family === 'quote' ? (f.speaker + (f.innerTag ? '(' + f.innerTag + ')' : '')) : (f.tag || '裸引号');
+    f.key = f.family === 'xml' ? ('xml:' + f.tag)
+      : f.family === 'quote' ? ('q:' + f.speaker + '|' + (f.innerTag || ''))
+      : f.family === 'bracket' ? ('br:' + f.open + f.marker + f.close) : ('bare:' + f.fmtVal);
+    f.label = f.family === 'quote' ? (f.speaker + (f.innerTag ? '(' + f.innerTag + ')' : ''))
+      : f.family === 'bracket' ? (f.marker + f.open + f.close) : (f.tag || '裸引号');
     if (res.formats.some(function (x) { return x.key === f.key; })) return;
     res.formats.push(f);
   });
@@ -4585,6 +4730,15 @@ function rxParseLangFormat(coreText) {
         if (/\{[^}]*\}/.test(ex)) return;
         f.examples.push(ex);
       });
+    } else if (f.family === 'bracket') {
+      // 方括号族的范例就是「带了实际内容的同类括号」：用刚推出的形态在整节里扫一遍
+      var bre = new RegExp(rxEsc(f.open) + '\\s*' + rxEsc(f.marker) + '[\\s\\S]*?' + rxEsc(f.close), 'g'), bm;
+      while ((bm = bre.exec(sec)) !== null) {
+        if (!bm[0]) break;
+        var bex = bm[0].replace(/\s*\n\s*/g, ' ').trim();
+        if (/\{[^}]*\}/.test(bex) || /[…]/.test(bex)) continue;
+        f.examples.push(bex);
+      }
     }
     f.examples = f.examples.filter(function (v, idx, arr) { return arr.indexOf(v) === idx; });
   });
@@ -4604,23 +4758,34 @@ function rxParseLangFormat(coreText) {
   });
   return res;
 }
+// 属性捕获：顺序无关（范例④ 的 `mood=` 可以出现在 `name=` 前后）、引号可选、值允许空格。
+// 用零宽先行断言取组，捕获组编号仍是「name → 各参数 → 正文」，与 rxRefs 的 $n 布局严格一致。
+// 缺属性时仍要能命中（$n 取到空串），所以断言要可跳过——注意必须写成 `(?:断言|)`，
+// 不能写成 `(断言)?`：V8 在「可选量词包住先行断言」时会走空分支并丢掉里面的捕获组。
+function rxAttrLook(name) {
+  return '(?:' + '(?=[^>]*\\s' + name + '\\s*=\\s*["\']?([^"\'>]*?)["\']?(?=[\\s>]))' + '|)';
+}
+// 引语式的收尾：核心/范例里有 」』 就要求它（范例①②），否则退化为「行尾锚定」——
+// 绝不能让惰性量词在没有任何收尾的情况下匹配空串（那会生成一条「只吃说话人、不吃台词」的废正则）
+function rxQuoteTail(f) {
+  var hasQ = function (s) { return /[」』]/.test(String(s == null ? '' : s)); };
+  if (hasQ(f && f.fmtVal)) return '\\s*[」』]';
+  if (((f && f.examples) || []).some(hasQ)) return '\\s*[」』]';
+  return '\\s*(?=\\n|$)';
+}
 function rxGenFindRegex(f, opts) {
   if (!f || f.family === 'bare') return null;
-  var o = opts || {};
   if (f.family === 'xml') {
-    if (o.orderFree) {
-      var names = ['name'].concat(f.params.map(function (x) { return x.name; }));
-      var look = names.map(function (n) { return '(?=[^>]*\\b' + n + '="([^"]*)")'; }).join('');
-      return new RegExp('<' + f.tag + '\\b' + look + '[^>]*>\\s*[「『]?\\s*([\\s\\S]*?)\\s*[」』]?\\s*<\\/' + f.tag + '>', 'g');
-    }
-    var moodPart = f.params.some(function (x) { return x.name === 'mood'; }) ? '\\s+mood="([^"]*)"' : '';
-    var extra = f.params.filter(function (x) { return x.name !== 'mood'; }).map(function (x) { return '(?:\\s+' + x.name + '="([^"]*)")?'; }).join('');
-    return new RegExp('<' + f.tag + '\\s+name="([^"]*)"' + moodPart + extra + '\\s*>\\s*[「『]?\\s*([\\s\\S]*?)\\s*[」』]?\\s*<\\/' + f.tag + '>', 'g');
+    var look = ['name'].concat(f.params.map(function (x) { return x.name; })).map(rxAttrLook).join('');
+    return new RegExp('<' + f.tag + '\\b' + look + '[^>]*>\\s*[「『]?\\s*([\\s\\S]*?)\\s*[」』]?\\s*<\\/' + f.tag + '>', 'g');
   }
   if (f.family === 'quote') {
     var inner = f.innerTag ? '(?=[\\s\\S]*?<' + f.innerTag + '\\b)' : (f.siblingInnerTag ? '(?![\\s\\S]*?<' + f.siblingInnerTag + '\\b)' : '');
-    var closing = /[」』]/.test(f.fmtVal) ? '\\s*[」』]' : '';
-    return new RegExp('>\\s*' + rxEsc(f.speaker) + '\\s*[:：]\\s*[「『]?\\s*' + inner + '([\\s\\S]*?)' + closing, 'g');
+    return new RegExp('>\\s*' + rxEsc(f.speaker) + '\\s*[:：]\\s*[「『]?\\s*' + inner + '([\\s\\S]*?)' + rxQuoteTail(f), 'g');
+  }
+  if (f.family === 'bracket') {
+    var mid = rxEsc(f.marker) + '\\s*' + (f.colon ? '[:：]' : '[:：]?');
+    return new RegExp(rxEsc(f.open) + '\\s*' + mid + '\\s*([\\s\\S]*?)\\s*' + rxEsc(f.close), 'g');
   }
   return null;
 }
@@ -4669,6 +4834,55 @@ function rxBuildObject(item) {
 
 // ---------- 正则自检 ----------
 function rxTier(id) { return RX_TIERS.filter(function (t) { return t.id === id; })[0] || RX_TIERS[3]; }
+// 「外层容器」的判据：类名里带 box/card/frame/wrap/container/panel，或就是本条的骨架容器。
+// 写死像素宽、overflow 这类约束只对容器成立——法阵 / 粒子 / 角标本来就该用固定 px（范例②③④都这么写）。
+var RX_BOXY_SEL = /[.#][\w-]*(?:box|card|frame|wrap|container|panel)\b/i;
+function rxLintCss(item, rep) {
+  var out = [];
+  var cssM = rep.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+  var css = cssM ? cssM[1] : '';
+  if (!css) return out;
+  var rules = [];
+  try { rules = rxCssRules(css); } catch (e) { rules = []; }
+  var pre = rxPreOf(item);
+  var boxSel = new RegExp('\\.' + rxEsc(pre + '-box') + '(?![\\w-])');
+  var frame = rxFrameById(item && item.frame) || null;
+  var decor = frame ? frame.decor : '';
+  // ① 写死像素宽：只看外层容器（装饰层允许）
+  var wide = rules.filter(function (r) {
+    if (r.at) return false;
+    if (!(boxSel.test(r.prelude) || RX_BOXY_SEL.test(r.prelude))) return false;
+    return /(?:^|[;{\s])width\s*:\s*\d+(?:\.\d+)?px/i.test(r.raw);
+  });
+  if (wide.length) out.push({ key: 'fixedwidth', msg: '外层容器写死了像素宽度（' + wide[0].prelude.slice(0, 40) + '）：窄屏会溢出，容器请用 max-width:100%（装饰层用 px 没问题）' });
+  // ② 变量契约：骨架 SVG 引用 var(--前缀-accent)，模型必须自己定义；用了没定义会静默变黑
+  var used = [], def = [], mm;
+  var reUse = /var\(\s*--([\w-]+)\s*\)/g;
+  while ((mm = reUse.exec(css)) !== null) if (used.indexOf(mm[1]) < 0) used.push(mm[1]);
+  var reDef = /--([\w-]+)\s*:/g;
+  while ((mm = reDef.exec(css)) !== null) if (def.indexOf(mm[1]) < 0) def.push(mm[1]);
+  var miss = used.filter(function (x) { return def.indexOf(x) < 0; });
+  if (miss.length) out.push({ key: 'undefvar', msg: '用了没定义的 CSS 变量（' + miss.slice(0, 4).map(function (x) { return '--' + x; }).join('、') + '）：骨架里的颜色全靠这些变量，不定义会掉成默认色' });
+  // ③ 破框装饰被容器切掉（范例② 专门注释过这条）
+  if (decor === 'array') {
+    var clip = rules.filter(function (r) {
+      if (r.at) return false;
+      if (!(boxSel.test(r.prelude) || RX_BOXY_SEL.test(r.prelude))) return false;
+      return /overflow\s*:\s*hidden/i.test(r.raw);
+    });
+    if (clip.length) out.push({ key: 'clipdecor', msg: '外层容器写了 overflow:hidden：法阵/光尘会被切在框内（范例②③④ 都是 overflow:visible）' });
+  }
+  // ④ 正文默认被藏起来（范例③ 的揭幕式是点击展开，其余框架必须直接可读）
+  var isReveal = (frame && frame.interactive) || /<summary[\s>]/i.test(rep);
+  if (!isReveal) {
+    var bodyRe = new RegExp('\\.' + rxEsc(pre + '-body') + '(?![\\w-])[^{]*\\{[^}]*', 'i');
+    var bm = rep.match(bodyRe);
+    if (bm && /(?:display\s*:\s*none|visibility\s*:\s*hidden|opacity\s*:\s*0(?![\d.])|height\s*:\s*0(?![\d.]))/i.test(bm[0])) {
+      out.push({ key: 'hiddenbody', msg: '正文默认被藏起来（display:none / opacity:0 之类）：文字必须直接可读，不能靠悬停或点击才出现' });
+    }
+  }
+  return out;
+}
 function rxLint(item, parsed) {
   var issues = [];
   var src = String(item.findSource || ''), rep = String(item.replaceHtml || '');
@@ -4688,20 +4902,30 @@ function rxLint(item, parsed) {
   }
   if (rep.indexOf('<script') >= 0) issues.push({ side: 'regex', key: 'script', msg: '替换体含 <script>（禁止）', fix: 'stripScript' });
   if (/https?:\/\/(?!www\.w3\.org)/.test(rep)) issues.push({ side: 'regex', key: 'external', msg: '替换体引用外部资源（字体/图片 CDN 禁止）', fix: 'none' });
-  if (/width:\s*\d{2,}px/.test(rep)) issues.push({ side: 'regex', key: 'fixedwidth', msg: '替换体用了固定像素宽度，窄屏会溢出', fix: 'none' });
-  if (rep && !/data-mood|data-tag/.test(rep) && item.hasMood) issues.push({ side: 'regex', key: 'moodbranch', msg: '核心有 mood 参数，但替换体没有用 data-mood 分支配色', fix: 'none' });
+  var styledItem = /<style[^>]*>[\s\S]*?<\/style>/i.test(rep);
+  if (styledItem) {
+    rxLintCss(item, rep).forEach(function (x) { issues.push({ side: 'regex', key: x.key, msg: x.msg, fix: 'none' }); });
+  } else if (/(?:^|[;{\s])width\s*:\s*\d+(?:\.\d+)?px/i.test(rep) && RX_BOXY_SEL.test(rep)) {
+    issues.push({ side: 'regex', key: 'fixedwidth', msg: '外层容器写死了像素宽度：窄屏会溢出，容器请用 max-width:100%', fix: 'none' });
+  }
+  if (item.hasMood) {
+    var hasBranch = /\[\s*data-mood\s*[~|^$*]?=/i.test(rep);
+    if (!hasBranch) issues.push({ side: 'regex', key: 'moodbranch', msg: '核心有 mood 参数，但没有一条 [data-mood="…"] 属性选择器：范例④ 的做法是给每个枚举只改变量（--前缀-accent / --前缀-bg）', fix: 'none' });
+  }
   var obj = rxBuildObject(item);
   if (!/^[0-9a-f]{8}-/.test(obj.id)) issues.push({ side: 'regex', key: 'id', msg: 'id 不是 uuid v4', fix: 'newid' });
   if (!/^命定核心-/.test(obj.scriptName)) issues.push({ side: 'regex', key: 'name', msg: 'scriptName 缺少「命定核心-」前缀', fix: 'name' });
   if (obj.markdownOnly && obj.promptOnly) issues.push({ side: 'regex', key: 'flags', msg: 'markdownOnly 与 promptOnly 同时为 true（契约矛盾）', fix: 'flags' });
   if (obj.placement.join(',') !== '2') issues.push({ side: 'regex', key: 'placement', msg: 'placement 与现网展示类（[2]）不一致', fix: 'placement' });
   var tier = rxTier(item.tier);
-  var len = rep.length;
-  if (!len) issues.push({ side: 'regex', key: 'empty', msg: '替换体为空，点「🎨 生成替换体」先产出', fix: 'none' });
+  // 体量按「样式层」算：骨架是插件生成的固定结构，不该算进档位预算（否则豪华骨架会把极简档顶爆）
+  var len = styledItem ? rxItemCss(item).length : rep.length;
+  var unit = styledItem ? '样式 ' : '替换体 ';
+  if (!rep.length) issues.push({ side: 'regex', key: 'empty', msg: '替换体为空，点「🎨 生成替换体」先产出', fix: 'none' });
   else if (tier.target > 0) {
     var dev = (len - tier.target) / tier.target;
-    if (dev < -0.4) issues.push({ side: 'regex', key: 'toosmall', msg: '体量 ' + len + ' 字符，' + tier.label + '档目标 ≈' + tier.target + '，偏差 ' + Math.round(dev * 100) + '%（疑似未充分展开）', fix: 'none' });
-    else if (dev > 0.3) issues.push({ side: 'regex', key: 'toobig', msg: '体量 ' + len + ' 字符，超出' + tier.label + '档目标 ' + Math.round(dev * 100) + '%（可考虑降档或精简装饰）', fix: 'none' });
+    if (dev < -0.4) issues.push({ side: 'regex', key: 'toosmall', msg: unit + len + ' 字符，' + tier.label + '档目标 ≈' + tier.target + '，偏差 ' + Math.round(dev * 100) + '%（疑似未充分展开）', fix: 'none' });
+    else if (dev > 0.3) issues.push({ side: 'regex', key: 'toobig', msg: unit + len + ' 字符，超出' + tier.label + '档目标 ' + Math.round(dev * 100) + '%（可考虑降档或精简装饰）', fix: 'none' });
   }
   if (re && item.testText) {
     var fx = rxRunFixture(re, [item.testText]);
@@ -4761,13 +4985,15 @@ function rxSlimSystemContent(colorRef, budget) {
   lines.push([
     '【CSS 硬约束】',
     '1. 只输出 CSS 规则：不要 <style> 标签、不要 HTML、不要解释、不要代码块围栏。',
-    '2. class 前缀必须严格使用给定的前缀，不得自造前缀、不得使用全局选择器（html/body/*）。',
+    '2. class 前缀必须严格使用给定的前缀，不得自造前缀、不得使用全局选择器（html/body/*/:root 之外的全局改动）。',
     '3. 禁止引用任何外部资源（字体 CDN、图片 URL、@import）；字体只用系统字体栈。',
-    '4. 禁止写死像素宽度：容器 max-width:100%，窄屏（≤420px）不得溢出。',
+    '4. 最外层容器一律 max-width:100%，窄屏（≤420px）不得溢出；但法阵/粒子/角标这类装饰层允许固定像素尺寸与破框显示（overflow:visible）。',
     '5. 正文里若出现 $ 字符必须写成 $$。',
     '6. 动效克制：@keyframes 周期 ≥2s，不得高频闪烁。',
-    '7. 每次输出控制在 ' + cap + ' 字符以内——超长会被平台截断（524 / 截断），宁可少写几条规则，也不要写一半。',
-    '8. 颜色从核心世界观与命定之灵人格出发，不要纯黑纯白。'
+    '7. 骨架里的 SVG 用 var(--前缀-accent) 上色：你必须先把这些变量定义出来（在 .前缀-box 上定义，每个情绪分支只改变量）。',
+    '8. 至少覆盖四层：变量与外框 → hover 状态 → 装饰/标题层 → 正文排版；正文必须始终可读，不得只靠悬停或点击才显示。',
+    '9. 每次输出控制在 ' + cap + ' 字符以内——超长会被平台截断（524 / 截断），宁可少写几条规则，也不要写一半。',
+    '10. 颜色从核心世界观与命定之灵人格出发，不要纯黑纯白。'
   ].join('\n'));
   if (colorRef) lines.push('[核心气质摘录（配色参考）]\n' + String(colorRef).slice(0, 500));
   return macroFill(lines.join('\n\n'));
@@ -4810,7 +5036,7 @@ function rxExtractHtml(text) {
   return (end > start ? t.slice(start + 1, end) : t.slice(start + 1)).replace(/^\n+/, '').replace(/\s+$/, '');
 }
 // ---------- 页面 ----------
-var RX_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">✦ 正则工坊 · 命定系统对话美化</div><div class="opf-dim">流程：粘贴核心全文（或从 ④ 页带入）→ 解析语言格式 → 勾选要美化的格式 → 选用途与预算档位 → 匹配式由插件确定生成、替换体由模型产出 → 实时预览 → 自检 → 导出 JSON。字段名与你现有 4 条正则一致，可直接粘进预设的 regex_scripts。</div><textarea id="opf-rx-core" class="opf-char-input" placeholder="把命定系统核心条目全文粘在这里（必须含「语言格式」节）"></textarea><div class="opf-char-tools"><button type="button" class="opf-btn ghost" id="opf-rx-pull">⬅ 从 ④ 页带入</button><button type="button" class="opf-btn primary" id="opf-rx-parse">🔍 解析语言格式（AI）</button><button type="button" class="opf-btn ghost" id="opf-rx-parse2">⚙ 脚本解析（离线）</button><button type="button" class="opf-btn ghost" id="opf-rx-gen">🎨 生成替换体</button><button type="button" class="opf-btn ghost" id="opf-rx-check">🔎 自检</button><button type="button" class="opf-btn ghost" id="opf-rx-fix">🔧 自动修复</button><button type="button" class="opf-btn ghost" id="opf-rx-copy1">⧉ 复制单条 JSON</button><button type="button" class="opf-btn ghost" id="opf-rx-copyall">⧉ 复制 JSON 数组</button><button type="button" class="opf-btn ghost" id="opf-rx-new">🗑 清空</button><button type="button" class="opf-btn ghost" id="opf-rx-ping">🩺 连通性自检</button><button type="button" class="opf-btn ghost" id="opf-rx-last">📄 上次返回</button></div><pre id="opf-rx-lastraw" class="opf-box opf-char-report" style="display:none">尚未调用</pre><div class="opf-shx-cfg"><label class="opf-opt">生成传输<select id="opf-rx-transport" class="opf-ref-input"><option value="st">酒馆主 API（零配置·推荐）</option><option value="server">经酒馆服务端转发 + 流式（需自填反代）</option><option value="direct">浏览器直连 + 流式（需自填接口）</option></select></label><span class="opf-dim" id="opf-rx-txnote"></span></div><div class="opf-shx-cfg" id="opf-rx-cfg-server" style="display:none"><button type="button" class="opf-btn ghost" id="opf-rx-pulltavern">📋 用酒馆的反代设置</button><label class="opf-opt">协议源<select id="opf-rx-source" class="opf-ref-input"><option value="makersuite">Google AI Studio (makersuite)</option><option value="vertexai">Vertex AI (vertexai)</option></select></label><label class="opf-opt">中转/反代地址<input id="opf-rx-reverse" class="opf-ref-input" placeholder="https://你的中转域名"></label><label class="opf-opt">代理密码/密钥<input id="opf-rx-proxypass" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">模型名<input id="opf-rx-model" class="opf-ref-input" list="opf-rx-modellist" placeholder="点右侧按钮获取；也可直接手填，填过会记住"><datalist id="opf-rx-modellist"></datalist></label><button type="button" class="opf-btn ghost" id="opf-rx-models">🔌 获取模型列表</button></div><div class="opf-shx-cfg" id="opf-rx-cfg-direct" style="display:none"><label class="opf-opt">直连协议<select id="opf-rx-proto" class="opf-ref-input"><option value="openai">OpenAI 兼容 (/chat/completions)</option><option value="gemini">Google 原生 (:streamGenerateContent)</option></select></label><label class="opf-opt">直连地址<input id="opf-rx-base" class="opf-ref-input" placeholder="https://api.example.com/v1"></label><label class="opf-opt">直连密钥<input id="opf-rx-key" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">直连模型<input id="opf-rx-chatmodel" class="opf-ref-input" placeholder="留空则用上面的模型名"></label></div><div class="opf-dim" id="opf-rx-statusline">就绪</div><div class="opf-sec"><div class="opf-sec-label">语言格式解析结果（只读核对）</div><pre id="opf-rx-parsed" class="opf-box opf-char-report">尚未解析</pre></div><div id="opf-rx-items"></div><div class="opf-sec"><div class="opf-sec-label">自检</div><pre id="opf-rx-issues" class="opf-box opf-char-report">尚未自检</pre></div></div>';
+var RX_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">✦ 正则工坊 · 命定系统对话美化</div><div class="opf-dim">流程：粘贴核心全文（或从 ④ 页带入）→ 解析语言格式 → 勾选要美化的格式 → 选用途、预算档位与「初始框架」（4 款，对标现网在用的美化正则：紧凑卡 / 法阵卡 / 揭幕式 / 极简）→ 匹配式由插件确定生成、骨架由插件按框架搭好、替换体样式由模型产出 → 实时预览 → 自检 → 导出 JSON。字段名与你现有 4 条正则一致，可直接粘进预设的 regex_scripts。</div><textarea id="opf-rx-core" class="opf-char-input" placeholder="把命定系统核心条目全文粘在这里（必须含「语言格式」节）"></textarea><div class="opf-char-tools"><button type="button" class="opf-btn ghost" id="opf-rx-pull">⬅ 从 ④ 页带入</button><button type="button" class="opf-btn primary" id="opf-rx-parse">🔍 解析语言格式（AI）</button><button type="button" class="opf-btn ghost" id="opf-rx-parse2">⚙ 脚本解析（离线）</button><button type="button" class="opf-btn ghost" id="opf-rx-gen">🎨 生成替换体</button><button type="button" class="opf-btn ghost" id="opf-rx-check">🔎 自检</button><button type="button" class="opf-btn ghost" id="opf-rx-fix">🔧 自动修复</button><button type="button" class="opf-btn ghost" id="opf-rx-copy1">⧉ 复制单条 JSON</button><button type="button" class="opf-btn ghost" id="opf-rx-copyall">⧉ 复制 JSON 数组</button><button type="button" class="opf-btn ghost" id="opf-rx-new">🗑 清空</button><button type="button" class="opf-btn ghost" id="opf-rx-ping">🩺 连通性自检</button><button type="button" class="opf-btn ghost" id="opf-rx-last">📄 上次返回</button></div><pre id="opf-rx-lastraw" class="opf-box opf-char-report" style="display:none">尚未调用</pre><div class="opf-shx-cfg"><label class="opf-opt">生成传输<select id="opf-rx-transport" class="opf-ref-input"><option value="st">酒馆主 API（零配置·推荐）</option><option value="server">经酒馆服务端转发 + 流式（需自填反代）</option><option value="direct">浏览器直连 + 流式（需自填接口）</option></select></label><span class="opf-dim" id="opf-rx-txnote"></span></div><div class="opf-shx-cfg" id="opf-rx-cfg-server" style="display:none"><button type="button" class="opf-btn ghost" id="opf-rx-pulltavern">📋 用酒馆的反代设置</button><label class="opf-opt">协议源<select id="opf-rx-source" class="opf-ref-input"><option value="makersuite">Google AI Studio (makersuite)</option><option value="vertexai">Vertex AI (vertexai)</option></select></label><label class="opf-opt">中转/反代地址<input id="opf-rx-reverse" class="opf-ref-input" placeholder="https://你的中转域名"></label><label class="opf-opt">代理密码/密钥<input id="opf-rx-proxypass" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">模型名<input id="opf-rx-model" class="opf-ref-input" list="opf-rx-modellist" placeholder="点右侧按钮获取；也可直接手填，填过会记住"><datalist id="opf-rx-modellist"></datalist></label><button type="button" class="opf-btn ghost" id="opf-rx-models">🔌 获取模型列表</button></div><div class="opf-shx-cfg" id="opf-rx-cfg-direct" style="display:none"><label class="opf-opt">直连协议<select id="opf-rx-proto" class="opf-ref-input"><option value="openai">OpenAI 兼容 (/chat/completions)</option><option value="gemini">Google 原生 (:streamGenerateContent)</option></select></label><label class="opf-opt">直连地址<input id="opf-rx-base" class="opf-ref-input" placeholder="https://api.example.com/v1"></label><label class="opf-opt">直连密钥<input id="opf-rx-key" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">直连模型<input id="opf-rx-chatmodel" class="opf-ref-input" placeholder="留空则用上面的模型名"></label></div><div class="opf-dim" id="opf-rx-statusline">就绪</div><div class="opf-sec"><div class="opf-sec-label">语言格式解析结果（只读核对）</div><pre id="opf-rx-parsed" class="opf-box opf-char-report">尚未解析</pre></div><div id="opf-rx-items"></div><div class="opf-sec"><div class="opf-sec-label">自检</div><pre id="opf-rx-issues" class="opf-box opf-char-report">尚未自检</pre></div></div>';
 
 function rxInit() {
   ST.rx = ST.rx || { core: '', coreName: '', parsed: null, items: [], _inited: false };
@@ -5632,6 +5858,20 @@ function rxShowParsed(parsed, engine, notes) {
   (notes || []).forEach(function (n) { L.push('  ⚠ ' + n); });
   if (box) box.textContent = L.join('\n');
 }
+// 每种格式一条：class 前缀按「核心名 + 格式名」取，保证同一个核心的多套格式互不撞名
+function rxItemPrefix(coreName, f) {
+  var base = rxSlug(coreName);
+  var tag = rxSlug(f && (f.label || f.tag || f.speaker || '')) || 'x';
+  var s = base + '-' + tag;
+  if (/^[0-9]/.test(s)) s = 'rx-' + s;
+  return s.slice(0, 40) + '-box';
+}
+// 初始框架的默认选择：结算/抽卡这类「揭幕」用途用 details 款，其余默认法阵卡
+function rxPickFrame(f, purpose) {
+  if (/抽卡|结算|契约/.test(String(purpose || ''))) return 'reveal';
+  if (f && f.family === 'bare') return 'plain';
+  return 'array';
+}
 function rxBuildItems(parsed) {
   parsed.formats.forEach(function (f) {
     if (!f.regex) return;
@@ -5639,12 +5879,14 @@ function rxBuildItems(parsed) {
     if (exist) {
       exist.examples = f.examples;
       exist.hasMood = f.params.some(function (x) { return x.name === 'mood'; });
+      if (!exist.frame) exist.frame = rxPickFrame(f, exist.purpose);
       if (!exist.testText) exist.testText = f.examples[0] || '';
       return;
     }
+    var purpose = (RX_PURPOSES.indexOf(f.purposeHint) >= 0 ? f.purposeHint : '对话美化');
     ST.rx.items.push({
       id: rxUuid(), coreName: ST.rx.coreName, formatKey: f.key, label: f.label,
-      purpose: (RX_PURPOSES.indexOf(f.purposeHint) >= 0 ? f.purposeHint : '对话美化'), tier: 'fine', prefix: rxSlug(ST.rx.coreName) + '-box',
+      purpose: purpose, tier: 'fine', frame: rxPickFrame(f, purpose), prefix: rxItemPrefix(ST.rx.coreName, f),
       findSource: '/' + f.regex.source + '/' + f.regex.flags,
       replaceHtml: '', testText: f.examples[0] || '', examples: f.examples,
       hasMood: f.params.some(function (x) { return x.name === 'mood'; }), issues: []
@@ -5661,7 +5903,9 @@ function rxRenderItems() {
     var head = document.createElement('div'); head.className = 'opf-step-head';
     var idxEl = document.createElement('span'); idxEl.className = 'opf-idx'; idxEl.textContent = String(idx + 1);
     var ttl = document.createElement('span'); ttl.className = 'opf-step-title'; ttl.textContent = item.label + ' · ' + item.purpose;
-    var sub = document.createElement('span'); sub.className = 'opf-step-sub'; sub.textContent = (item.replaceHtml || '').length + ' 字符 / ' + rxTier(item.tier).label;
+    var fr = rxFrameOf(item);
+    var sub = document.createElement('span'); sub.className = 'opf-step-sub';
+    sub.textContent = fr.label + '｜' + (item.replaceHtml || '').length + ' 字符 / ' + rxTier(item.tier).label + (item.cssStale ? '｜样式待重生成' : '');
     var del = document.createElement('button'); del.type = 'button'; del.className = 'opf-step-act'; del.textContent = '删除';
     del.addEventListener('click', function (ev) { ev.stopPropagation(); ST.rx.items.splice(idx, 1); rxRenderItems(); rxCacheSave(); });
     head.appendChild(idxEl); head.appendChild(ttl); head.appendChild(sub); head.appendChild(del);
@@ -5677,8 +5921,26 @@ function rxRenderItems() {
     var tsel = document.createElement('select'); tsel.className = 'opf-ref-input';
     RX_TIERS.forEach(function (t) { var o = document.createElement('option'); o.value = t.id; o.textContent = t.label + (t.target ? '（≈' + t.target + '）' : '（不设上限）'); if (t.id === item.tier) o.selected = true; tsel.appendChild(o); });
     tsel.addEventListener('change', function () { item.tier = this.value; rxRenderItems(); rxCacheSave(); });
-    row1.appendChild(psel); row1.appendChild(tsel);
+    // 初始框架：换款 → 结构由代码重搭（$n 引用不会错），样式标记为待重生成
+    var fsel = document.createElement('select'); fsel.className = 'opf-ref-input';
+    RX_FRAMES.forEach(function (fr) { var o = document.createElement('option'); o.value = fr.id; o.textContent = fr.label; o.title = fr.from + '：' + fr.desc; if (fr.id === rxFrameOf(item).id) o.selected = true; fsel.appendChild(o); });
+    fsel.addEventListener('change', function () {
+      var wasSkeleton = rxIsSkeletonItem(item);
+      item.frame = this.value;
+      var nf = rxFrameOf(item);
+      if (wasSkeleton) {
+        rxSetItemCss(item, rxItemCss(item));
+        item.cssStale = true;
+        item.issues = rxLint(item, ST.rx.parsed);
+        toast('已换成「' + nf.label + '」：HTML 骨架已重搭，点「🎨 生成替换体」按新框架重写样式', 'success');
+      } else {
+        toast('已选「' + nf.label + '」（' + nf.from + '）；这条是手写替换体，框架只在重搭骨架时生效');
+      }
+      rxRenderItems(); rxCacheSave();
+    });
+    row1.appendChild(psel); row1.appendChild(tsel); row1.appendChild(fsel);
     body.appendChild(row1);
+    body.appendChild(rxLabel('初始框架｜' + fr.from + ' —— ' + fr.desc));
     // 匹配式
     body.appendChild(rxLabel('匹配式（插件生成，可手改）'));
     var fin = document.createElement('input'); fin.type = 'text'; fin.className = 'opf-ref-input'; fin.value = item.findSource;
@@ -5870,7 +6132,7 @@ function rxLooksLikeFullCss(patchCss, curCss) {
   return a > 0 && b > 0 && a >= Math.max(4, Math.ceil(b * 0.6));
 }
 // ---------- 自动修复：先本地（纯字符串、立即），剩下交给 AI ----------
-var RX_AI_FIXABLE = ['ref', 'moodbranch', 'external', 'fixedwidth', 'nomatch', 'toosmall', 'toobig', 'exmatch', 'empty'];
+var RX_AI_FIXABLE = ['ref', 'moodbranch', 'external', 'fixedwidth', 'undefvar', 'clipdecor', 'hiddenbody', 'nomatch', 'toosmall', 'toobig', 'exmatch', 'empty'];
 // 条目是否「就是插件生成的骨架 + CSS」——只有这种才能安全地只换 CSS 层。
 // 判据是逐字重建比对：把现有 CSS 塞回骨架，能与条文一字不差，才认定结构没被动过；
 // 用户手改过（哪怕只改了标签）就一律走「整段替换」模式，绝不拿骨架覆盖他的手写内容。
@@ -5896,7 +6158,7 @@ var RX_REFINE_RULES = [
   '【修改规则】',
   '1. 只改用户要求/问题清单点到的部分，未提到的保持原样；不要顺手重构、不要换配色体系、不要改 class 名与骨架结构。',
   '2. 颜色继续使用已有的 CSS 变量；确实需要新颜色就新增变量并在最外层定义。',
-  '3. 禁止：<script>、外部字体/图片资源、写死像素宽度、依赖 :hover 才显示文字、@import。',
+  '3. 禁止：<script>、外部字体/图片资源、把最外层容器写成固定像素宽、依赖 :hover 才显示文字、@import。装饰层（法阵/粒子/角标）用固定 px 和破框显示是允许的。',
   '4. 必须保留骨架里出现的所有 $n 捕获组引用，不得新增或删除引用。'
 ].join('\n');
 var RX_REFINE_RULES_FULL = RX_REFINE_RULES + '\n5. 这条替换体是用户手写的整段内容：直接输出改好的整段替换体全文（含 <style> 与标签），不要套用任何别的骨架。';
@@ -5995,8 +6257,10 @@ function rxRepairPrompt(item, f, issues, dir, scope, mode) {
   L.push('[当前匹配式' + (scope === 'find' ? '（本次允许修改：改完必须仍能匹配核心自带的范例）' : '（本次不要改动）') + ']\n' + item.findSource);
   L.push(mode === 'css' ? ('[当前 CSS（共 ' + cur.length + ' 字符）]\n' + (cur || '（空，需要你写）')) : ('[当前替换体全文（共 ' + cur.length + ' 字符）]\n' + (cur || '（空，需要你写）')));
   L.push(mode === 'css'
-    ? ('[骨架（HTML 结构由插件生成并锁定，绝不能改动）]\n' + rxSkeleton(item, f))
+    ? ('[骨架（HTML 结构由插件生成并锁定，绝不能改动）· 初始框架「' + rxFrameOf(item).label + '」]\n' + rxSkeleton(item, f))
     : ('[本条在核心里的典型形态（仅供你对齐 $n 引用布局，结构可自行组织）]\n' + rxSkeleton(item, f)));
+  if (mode === 'css') L.push('[框架分层职责]\n' + rxFrameLayers(rxFrameOf(item).id, rxPreOf(item)));
+  if (mode === 'css') L.push('[必须定义的变量] ' + rxRequiredVars(rxPreOf(item), rxFrameOf(item).id).join(' / '));
   if (f.params && f.params.length) f.params.forEach(function (p) { if (p.values && p.values.length) L.push('[参数 ' + p.name + ' 的枚举值] ' + p.values.join('、')); });
   L.push(mode === 'css' ? RX_REFINE_RULES : RX_REFINE_RULES_FULL);
   L.push('[完整性要求] 你必须输出**完整**的结果，不是改动片段：未被要求改动的规则原样逐字保留（包括注释、选择器、变量定义、@keyframes、data-mood 分支），禁止 "/* 其余不变 */"「以下省略」这类占位。原始内容有 ' + cur.length + ' 字符，除非用户明确要求精简，你的输出不应明显短于这个长度。');
@@ -6057,16 +6321,17 @@ var RX_REFINE_RULES_PATCH = [
   '【修改规则】',
   '1. 只改用户要求点到的部分，未提到的规则一个字都不要动（也不用抄）。',
   '2. 颜色优先使用现有 CSS 变量；确实需要新颜色可以在规则里写死，或用 :root 之外的自定义属性。',
-  '3. 禁止：<script>、外部字体/图片资源、写死像素宽度、依赖 :hover 才显示文字、@import。',
+  '3. 禁止：<script>、外部字体/图片资源、把最外层容器写成固定像素宽、依赖 :hover 才显示文字、@import。装饰层（法阵/粒子/角标）的固定 px 与破框显示是允许的。',
   '4. 必须保留现有的 class 名与骨架结构，不得重命名选择器。'
 ].join('\n');
 function rxPatchPrompt(item, f, dir) {
   var cur = rxItemCss(item);
+  var frame = rxFrameOf(item);
   var L = [];
   L.push('[任务] 修改一条「对话美化正则」的样式层。**你只输出需要新增或替换的 CSS 规则**——未改动的规则一律不要重复输出：插件会把你的规则按选择器合并进现有 CSS，没提到的部分逐字保留。');
   L.push('[用户要求]\n' + String(dir));
   L.push('[当前完整 CSS（共 ' + cur.length + ' 字符）——只供你确认选择器、变量与既有写法，不要原样重抄]\n' + cur);
-  L.push('[骨架（HTML 结构由插件生成并锁定，绝不能改动）]\n' + rxSkeleton(item, f));
+  L.push('[骨架（HTML 结构由插件生成并锁定，绝不能改动）· 初始框架「' + frame.label + '」]\n' + rxSkeleton(item, f));
   if (f.params && f.params.length) f.params.forEach(function (p) { if (p.values && p.values.length) L.push('[参数 ' + p.name + ' 的枚举值] ' + p.values.join('、')); });
   L.push('[合并规则]\n1. 改已有规则：输出**同选择器**的完整规则块（选择器写法与现有一致，大小写与空白会被规范化后匹配）；\n2. 新增规则：用新选择器，插件会追加到末尾；\n3. 一条规则必须整体写出（选择器 + 完整花括号内容），不要只写半截声明；\n4. 不要输出 @media / @keyframes / @font-face / @import 等 @ 块——需要改这类整块时提示改用「整段重写」档；\n5. 一次最多输出 12 条规则，只覆盖用户要求涉及的部分。');
   L.push(RX_REFINE_RULES_PATCH);
@@ -6565,13 +6830,20 @@ function rxLivePreview(it, cssMap, order) {
   if (st && !st.dataset.prog) st.textContent = '实时预览已更新（' + css.length + ' 字符 CSS）';
 }
 // 设计基调：一组 CSS 变量 + 风格基调注释，供并发块引用，保证配色一致
-function rxBriefPart() {
+function rxBriefPart(item, frame) {
+  var pre = rxPreOf(item);
+  var fr = frame || RX_FRAMES[0];
+  var vars = rxRequiredVars(pre, fr.id).join(' / ');
   return {
-    id: 'brief', label: '设计基调', budget: 900,
-    hint: '只输出一组 CSS 自定义属性（--rx-bg / --rx-accent / --rx-text / --rx-font / --rx-line 等，至少 4 个）与 2~4 条 CSS 注释风格基调（配色气质、字体取向、边框风格）；不要写具体选择器的完整规则，后续每个块都会引用这些变量。'
+    id: 'brief', label: '设计基调', budget: 1400,
+    hint: '只输出一组 CSS 自定义属性与 2~4 条注释，不要写完整选择器规则。'
+      + '必须以「.' + pre + '-box { … }」为载体，把骨架已经引用的这几个变量定出来（缺一个颜色就会掉成默认黑）：' + vars + '。'
+      + '另外可再定义字号/圆角/阴影这类变量。变量值要贴合核心的世界观与命格气质（傲慢用冷金、狂热用灼红、冰冷用青白…），不要纯黑纯白。'
   };
 }
 // ---------- 替换体：结构由代码生成，模型只写 CSS（防 524 超时与截断）----------
+// 骨架款式（初始框架）取自 4 条现网可用正则，见 72 的 RX_FRAMES
+function rxFrameOf(item) { return rxFrameById(item && item.frame) || RX_FRAMES[0]; }
 // 捕获组布局必须与 rxGenFindRegex 完全一致，否则 $n 会指错
 function rxRefs(f) {
   var refs = { name: '', mood: '', text: '$1', extra: [] };
@@ -6584,64 +6856,175 @@ function rxRefs(f) {
   return refs;
 }
 var RX_STYLE_SLOT = '/*__RX_STYLE__*/';
+// 法阵（范例②④ 的三层结构）：描边环 + 环形铭文 + 八角几何 + 核心；颜色全部走变量，等模型来定义
+function rxSvgLines(pre, ringText) {
+  var v = 'var(--' + pre + '-accent)';
+  return [
+    '    <svg class="' + pre + '-array" viewBox="0 0 240 240" aria-hidden="true">',
+    '      <defs>',
+    '        <filter id="' + pre + '-glow" x="-50%" y="-50%" width="200%" height="200%">',
+    '          <feGaussianBlur stdDeviation="3" result="b" />',
+    '          <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>',
+    '        </filter>',
+    '        <path id="' + pre + '-ring-path" d="M 120,120 m -78,0 a 78,78 0 1,1 156,0 a 78,78 0 1,1 -156,0" />',
+    '      </defs>',
+    '      <g class="' + pre + '-orbit ' + pre + '-orbit-1">',
+    '        <circle cx="120" cy="120" r="112" fill="none" stroke="' + v + '" stroke-width="0.8" stroke-dasharray="3 5" opacity="0.45" />',
+    '        <circle cx="120" cy="120" r="98" fill="none" stroke="' + v + '" stroke-width="1.4" opacity="0.7" />',
+    '        <text fill="' + v + '" font-size="8" letter-spacing="2.4" opacity="0.8">',
+    '          <textPath href="#' + pre + '-ring-path" startOffset="0%" textLength="490" lengthAdjust="spacing">✦ ' + ringText + ' ✦</textPath>',
+    '        </text>',
+    '      </g>',
+    '      <g class="' + pre + '-orbit ' + pre + '-orbit-2">',
+    '        <polygon points="120,40 180,120 120,200 60,120" fill="none" stroke="' + v + '" stroke-width="1.1" opacity="0.7" />',
+    '        <polygon points="120,40 180,120 120,200 60,120" fill="none" stroke="' + v + '" stroke-width="1.1" opacity="0.7" transform="rotate(45 120 120)" />',
+    '      </g>',
+    '      <g class="' + pre + '-orbit ' + pre + '-orbit-3">',
+    '        <polygon points="120,74 152,120 120,166 88,120" fill="rgba(255,255,255,0.03)" stroke="' + v + '" stroke-width="1.6" filter="url(#' + pre + '-glow)" />',
+    '        <circle cx="120" cy="120" r="5" fill="' + v + '" filter="url(#' + pre + '-glow)" />',
+    '      </g>',
+    '    </svg>'
+  ];
+}
+function rxDustLines(pre, n, indent) {
+  var pad = indent == null ? '  ' : indent;
+  var L = [];
+  for (var i = 1; i <= n; i++) L.push(pad + '<span class="' + pre + '-dust d' + i + '"></span>');
+  return L;
+}
+// 标题行：纹章 + 名号 + 情绪胶囊 + 渐隐线（范例①④ 的头部；名号是静态字面量或 $n）
+function rxHeadLines(pre, title, moodRef, emblem) {
+  if (!title && !moodRef) return [];
+  var L = ['  <div class="' + pre + '-head">'];
+  if (emblem) L.push('    <span class="' + pre + '-emblem">' + emblem + '</span>');
+  if (title) L.push('    <span class="' + pre + '-name">' + title + '</span>');
+  if (moodRef) L.push('    <span class="' + pre + '-mood">' + moodRef + '</span>');
+  if (emblem) L.push('    <span class="' + pre + '-rule"></span>');
+  L.push('  </div>');
+  return L;
+}
 function rxSkeleton(item, f) {
-  var pre = String(item.prefix || 'core-box').replace(/-box$/, '');   // 归一：避免出现 xxx-box-box
+  var pre = rxPreOf(item);                                   // 归一：避免出现 xxx-box-box
   var refs = rxRefs(f);
+  var frame = rxFrameOf(item);
   var attrs = ' class="' + pre + '-box"';
   if (refs.mood) attrs += ' data-mood="' + refs.mood + '"';
   refs.extra.forEach(function (x) { attrs += ' data-' + x.name + '="' + x.ref + '"'; });
+  // 名号：xml 族取 $1（name 属性），引语/方括号族取核心里写死的说话人或标记（字面量）
+  var title = refs.name || rxText((f && (f.speaker || f.marker || f.label)) || '');
+  var emblem = frame.id === 'plain' ? '' : (frame.id === 'reveal' ? '◆' : (frame.id === 'array' ? '✦' : '❂'));
+  var head = rxHeadLines(pre, title, refs.mood, emblem);
+  var body = ['  <div class="' + pre + '-body">' + refs.text + '</div>'];
   var L = [];
-  L.push('<div' + attrs + '>');
-  L.push('  <style>');
+  if (frame.id === 'reveal') {
+    L.push('<details' + attrs + '>');
+    L.push('  <summary class="' + pre + '-face">');
+    L.push('    <div class="' + pre + '-visual" aria-hidden="true">');
+    L = L.concat(rxSvgLines(pre, rxText(item.coreName || '').slice(0, 12) || 'ARCANUM'));
+    L = L.concat(rxDustLines(pre, 4, '      '));
+    L.push('    </div>');
+    L = L.concat(head);
+    L.push('    <div class="' + pre + '-hint">▸ 点击展开</div>');
+    L.push('  </summary>');
+    L.push('  <div class="' + pre + '-panel">');
+    L = L.concat(body);
+    L.push('  </div>');
+    L.push('</details>');
+  } else {
+    L.push('<div' + attrs + '>');
+    if (frame.decor === 'array') {
+      L.push('  <div class="' + pre + '-visual" aria-hidden="true">');
+      L = L.concat(rxSvgLines(pre, rxText(item.coreName || '').slice(0, 12) || 'ARCANUM'));
+      L = L.concat(rxDustLines(pre, 4, '    '));
+      L.push('  </div>');
+    }
+    L = L.concat(head);
+    L = L.concat(body);
+    if (frame.decor === 'dust') L = L.concat(rxDustLines(pre, 2));
+    L.push('</div>');
+  }
+  L.push('<style>');
   L.push(RX_STYLE_SLOT);
-  L.push('  </style>');
-  L.push('  <div class="' + pre + '-inner">');
-  if (refs.name) L.push('    <div class="' + pre + '-speaker">' + refs.name + '</div>');
-  L.push('    <div class="' + pre + '-text">' + refs.text + '</div>');
-  L.push('  </div>');
-  L.push('</div>');
+  L.push('</style>');
   return L.join('\n');
 }
+// 骨架里真实出现的 class（提示词里给模型对着写，避免它自造选择器）
+function rxClassList(item, f) {
+  var seen = [];
+  var m, re = /class="([^"]+)"/g;
+  var sk = rxSkeleton(item, f);
+  while ((m = re.exec(sk)) !== null) {
+    m[1].split(/\s+/).forEach(function (c) { if (c && seen.indexOf(c) < 0) seen.push(c); });
+  }
+  return seen;
+}
 // CSS 分段：按档位目标字数决定段数与每段预算（每段越小，越不容易触发 524 与截断）
+// 段清单随「初始框架」变：法阵卡会多出「视觉层与法阵」段，揭幕式会多出「揭幕交互」段。
+// 函数签名保持不变（tools/verify-destiny-page.js 逐字校验），框架由 rxGenerate 通过下面的
+// 提示变量传入，避免改动签名。
+var rxPartsFrameHint = '';
 function rxCssParts(f, tierTarget) {
   var hasMood = !!(f && f.params.some(function (p) { return p.name === 'mood' && p.values && p.values.length; }));
+  var frame = rxFrameById(rxPartsFrameHint) || RX_FRAMES[0];
+  var decor = frame.decor;
+  var P = '{P}';
   var catalog = [
-    { id: 'base', label: '基础样式', hint: '最外层盒子、内层容器、说话人、正文四组选择器的样式：背景（渐变/纹理）、边框、圆角、内外边距、字体栈（只用系统字体）、字号行高、max-width:100% 与窄屏适配。' },
-    { id: 'mood', label: '情绪分支配色', need: hasMood, hint: '为每个枚举值各写一条属性选择器规则（形如 .PREFIX-box[data-mood="值"]），用颜色/边框/阴影/滤镜区分情绪。' },
-    { id: 'decor', label: '装饰层', hint: '装饰元素与纹理：伪元素、渐变描边、角标、SVG（可内联为 background-image 的 data URI，禁止外链）。' },
-    { id: 'motion', label: '动效', hint: '@keyframes 与入场/呼吸动效（周期 ≥2s，克制）；不需要就回复「无」。' },
-    { id: 'variants', label: '交互与变体', hint: 'hover/长文本/多行/窄屏的变体规则，保持文字始终可读（不得依赖悬停才显示）。' },
-    { id: 'polish', label: '细节打磨', hint: '阴影层次、边框渐变、字距与装饰细节的微调，让整体更完整；不需要就回复「无」。' }
+    { id: 'base', label: '变量与外框',
+      hint: '以 .' + P + '-box 为载体：先定义骨架已经引用到的变量（缺一个颜色就会掉成默认黑），再写容器本身——底色渐变、边框（左缘用强调色加粗）、圆角、内外边距、字体栈（只用系统字体）、max-width:100%，以及 :hover 的位移与发光。' },
+    { id: 'mood', label: '情绪分支配色', need: hasMood,
+      hint: '为每个枚举值各写一条属性选择器规则（形如 .' + P + '-box[data-mood="值"]），只重定义变量与背景（范例④ 的写法：一条分支改 --' + P + '-accent / --' + P + '-bg 就够，不要重抄整套规则）。' },
+    { id: 'layers', label: '视觉层与装饰', need: decor !== 'none',
+      hint: '写 .' + P + '-visual 视觉层（绝对定位铺满、pointer-events:none、z-index 低于文字）'
+        + (decor === 'array'
+          ? '、.' + P + '-array 法阵（尺寸、向外溢出的一角定位、透明度、hover 放大，装饰层允许固定 px 与破框）与三层 .' + P + '-orbit-1/-2/-3 各自的旋转方向与周期（transform-origin 要用 120px 120px，因为 viewBox 是 240）'
+          : '')
+        + '、.' + P + '-dust 漂浮光尘（位置、大小、上浮与淡出）。' },
+    { id: 'head', label: '标题栏与正文排版',
+      hint: '.' + P + '-head 标题行（flex 排布、底部分隔线）、.' + P + '-emblem 纹章、.' + P + '-name 名号（字距/渐变文字/发光）'
+        + (hasMood ? '、.' + P + '-mood 情绪胶囊' : '') + '、.' + P + '-rule 右侧渐隐线，以及 .' + P + '-body 正文（行高、字色、文字阴影、长文与多行换行）。' },
+    { id: 'motion', label: '动效', hint: '@keyframes 与入场/呼吸/流光动效（周期 ≥2s，克制，不要高频闪烁）；给关键的 .' + P + '-box 一个入场动画；不需要就回复「无」。' },
+    { id: 'variants', label: '交互与变体',
+      need: frame.interactive !== true,
+      hint: 'hover / 长文本 / 多行 / 窄屏（≤420px）的变体规则；文字必须始终可读，绝不允许只靠悬停才显示。' },
+    { id: 'reveal', label: '揭幕交互', need: frame.interactive === true,
+      hint: '写好 details/summary 的揭幕：summary 去掉原生三角（list-style:none 与 ::-webkit-details-marker{display:none}）、.' + P
+        + '-face 卡面居中、.' + P + '-hint 的呼吸提示、[open] 状态下 .' + P + '-panel 与 .' + P + '-body 的揭示与爆发动效（只改样式，不许改 HTML）。' },
+    { id: 'polish', label: '细节打磨', hint: '阴影层次、边框渐变、角标与纹理的微调，让整体更完整；不需要就回复「无」。' }
   ];
   var want = catalog.filter(function (p) { return p.need !== false; });
   var target = Number(tierTarget) || 0;
-  var n = target <= 0 ? 6 : target <= 3000 ? 1 : target <= 6000 ? 3 : target <= 10000 ? 4 : 6;
-  // 没情绪分支时把名额让给后面的段
+  var n = target <= 0 ? 8 : target <= 1500 ? 1 : target <= 3000 ? 2 : target <= 6000 ? 4 : target <= 10000 ? 5 : target <= 20000 ? 7 : 8;
+  // 没情绪分支 / 非揭幕式时，把名额让给后面的段
   var parts = want.slice(0, Math.max(1, Math.min(n, want.length)));
   if (n > parts.length) {
     var extra = catalog.filter(function (p) { return p.need !== false && parts.indexOf(p) < 0; });
     parts = parts.concat(extra.slice(0, n - parts.length));
   }
-  var per = target > 0 ? Math.max(1200, Math.round(target / parts.length * 0.85)) : 3500;
+  var per = target > 0 ? Math.max(1400, Math.round(target / parts.length * 0.85)) : 3500;
   return parts.map(function (p) { return { id: p.id, label: p.label, hint: p.hint, budget: per }; });
 }
 function rxCssPartPrompt(item, f, part, prevText, brief) {
   var refs = rxRefs(f);
+  var pre = rxPreOf(item);
+  var frame = rxFrameOf(item);
   var L = [];
-  L.push('[任务] 只为已经定好的 HTML 骨架写 CSS 规则。骨架结构由插件生成，你不得改动、也不得输出 HTML 标签。');
+  L.push('[任务] 只为已经定好的 HTML 骨架写 CSS 规则。骨架结构（初始框架「' + frame.label + '」）由插件生成，你不得改动、也不得输出 HTML 标签。');
   L.push('[骨架（供你对照选择器）]\n' + rxSkeleton(item, f).replace(RX_STYLE_SLOT, '/* 这里放你的 CSS */'));
-  L.push('[class 前缀] ' + String(item.prefix || 'core-box').replace(/-box$/, '') + '（必须原样使用；完整的类名形如 ' + String(item.prefix || 'core-box').replace(/-box$/, '') + '-box / -inner / -speaker / -text）');
-  if (refs.mood) L.push('[情绪属性] 最外层带有 data-mood="' + refs.mood + '"，可用属性选择器分支配色');
+  L.push('[class 前缀] ' + pre + '（必须原样使用，不得自造 class）\n可用 class：' + rxClassList(item, f).join('、'));
+  L.push('[初始框架的分层职责]\n' + rxFrameLayers(frame.id, pre));
+  L.push('[必须定义的变量] ' + rxRequiredVars(pre, frame.id).join(' / ') + '（骨架里的 SVG 与光尘就靠它们上色；定义了却不用没关系，用了没定义会掉成默认色）');
+  if (refs.mood) L.push('[情绪属性] 最外层带有 data-mood="' + refs.mood + '"，用属性选择器分支配色');
   if (f && f.params.length) {
     f.params.forEach(function (p) {
       if (p.values && p.values.length) L.push('[参数 ' + p.name + ' 的枚举] ' + p.values.join('、'));
     });
   }
   if (brief) L.push('[设计基调（必须引用其中的 CSS 变量，不要另起炉灶）]\n' + brief.slice(-1500));
-  L.push('[本段只写] ' + part.label + ' —— ' + part.hint);
+  if (part.id === 'brief') L.push('[初始框架标准模板（照这个层次与写法来，变量名换成你这条的前缀）]\n' + rxCssStandard(pre, !!refs.mood, frame.id));
+  L.push('[本段只写] ' + part.label + ' —— ' + String(part.hint).replace(/\{P\}/g, pre));
   if (part.budget) L.push('[本段字数] 控制在 ' + part.budget + ' 字符左右（宁少勿断，写不完就少写几条规则）');
   if (prevText) L.push('[已经写好的部分（不要重复、不要冲突）]\n' + prevText.slice(-1200));
-  L.push('[输出要求] 只输出 CSS 规则本身：不要 <style> 标签、不要 HTML、不要注释以外的解释文字、不要代码块围栏。');
+  L.push('[输出要求] 只输出 CSS 规则本身：不要 <style> 标签、不要 HTML、不要解释文字、不要代码块围栏。');
   return L.join('\n\n');
 }
 // 单项 CSS 片段生成：真流式 + 停顿检测 + 截断续写；失败不丢已生成内容
@@ -6726,7 +7109,8 @@ function rxAssemble(item, f, cssText) {
 async function rxGenerate() {
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
   if (!ST.rx.parsed || !ST.rx.items.length) { toast('请先「🔍 解析语言格式（AI）」', 'warning'); return; }
-  var todo = ST.rx.items.filter(function (it) { return !it.replaceHtml; });
+  // 优先补「还没生成」与「换了初始框架、样式已过期」的条目；都有内容时才是全量重生成
+  var todo = ST.rx.items.filter(function (it) { return !it.replaceHtml || it.cssStale; });
   if (!todo.length) todo = ST.rx.items.slice();
   var cfgNow = rxCfg();
   rxForceSt = !rxTransportUsable(cfgNow);
@@ -6750,6 +7134,7 @@ async function rxGenerate() {
       var f = (ST.rx.parsed.formats || []).filter(function (x) { return x.key === it.formatKey; })[0] || { family: 'quote', params: [] };
       var tier = rxTier(it.tier);
       it.partial = false;
+      rxPartsFrameHint = (rxFrameOf(it) || RX_FRAMES[0]).id;   // 段清单随初始框架变
       if (streaming) {
         // ===== 流式路径：基调先行 + 并发分段 =====
         var blocks = rxCssParts(f, tier.target).map(function (p) {
@@ -6757,7 +7142,7 @@ async function rxGenerate() {
         });
         var cssMap = {};
         var order = ['brief'].concat(blocks.map(function (b) { return b.id; }));
-        var brief = await rxGenCssPart(it, f, rxBriefPart(), '', function (s) { note(it, s); rxLivePreview(it, cssMap, order); });
+        var brief = await rxGenCssPart(it, f, rxBriefPart(it), '', function (s) { note(it, s); rxLivePreview(it, cssMap, order); });
         cssMap.brief = brief.css;
         if (brief.partial) note(it, '设计基调未完成：' + String(brief.err).slice(0, 100));
         note(it, '基调完成（' + brief.css.length + ' 字符），并发生成 ' + blocks.length + ' 个样式块（并发上限 ' + RX_PARALLEL + '）…');
@@ -6797,6 +7182,7 @@ async function rxGenerate() {
         it.css = css;
         it.replaceHtml = rxAssemble(it, f, css);
       }
+      it.cssStale = false;
       it.issues = rxLint(it, ST.rx.parsed);
       rxRenderItems();
       rxCacheSave();
