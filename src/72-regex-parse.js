@@ -32,16 +32,18 @@ var RX_RULES = [
   '12. 只输出 HTML 本体，放在一个 ```html 代码块里；代码块外不写任何解释文字。'
 ].join('\n');
 // ============================================================================
-// 初始框架（骨架款式）：标准取自 4 条现网可用的正则，而不是「一个带边框的 div」
-//   ① 大比目鱼对话    紧凑卡 + 左缘光带 + 呼吸底色 + hover 涟漪
-//   ② 月蚀对话        三层 SVG 法阵 + 漂浮光尘 + 标题栏 + 装饰破框
-//   ③ 飨宴            details/summary 揭幕式，点开播放爆发动效
-//   ④ 崩坏意志        同一框架用 data-mood 属性选择器覆盖全部枚举（只改变量）
-// 骨架仍由代码生成（$n 引用、class 前缀、变量契约都不会错），模型只写 CSS。
+// 初始框架（骨架款式）：给对话美化正则一个「一上手就有层次」的起点，
+// 而不是「一个带边框的 div」。四款各自对应一类常见做法——
+//   紧凑卡   外框 + 左缘强调 + 标题行 + 正文，hover 浮起
+//   法阵卡   再加视觉层：SVG 法阵 + 漂浮光尘，装饰破框显示
+//   揭幕式   details/summary 卡片，点开播放动效再揭示正文
+//   极简     只有变量、边框与正文，最短最稳
+// 骨架由代码生成（$n 引用、class 前缀、变量契约都不会错），模型只写 CSS。
+// 四款都只是可选起点：用户可随时换款，也可以直接手写替换体贴回来。
 // ============================================================================
 var RX_FRAMES = [
   {
-    id: 'card', label: '标准卡·左缘光带', from: '标准 ≈ 范例① 大比目鱼对话',
+    id: 'card', label: '标准卡·左缘光带', from: '日常对话 · 轻量~标准档',
     decor: 'dust', tierHint: 'std', interactive: false,
     desc: '外框 + 左缘光带 + 标题行（纹章·名号·情绪胶囊）+ 正文；呼吸底色，hover 浮起并放出涟漪。',
     parts: [
@@ -56,7 +58,7 @@ var RX_FRAMES = [
     ]
   },
   {
-    id: 'array', label: '法阵卡·装饰破框', from: '标准 ≈ 范例② 月蚀 / 范例④ 崩坏意志',
+    id: 'array', label: '法阵卡·装饰破框', from: '主对话 · 标准~精致档',
     decor: 'array', tierHint: 'fine', interactive: false,
     desc: '三层 SVG 法阵（描边环 + 环形铭文 + 几何核心）+ 漂浮光尘 + 标题栏 + 正文；装饰允许破框，hover 时换层缩放。',
     parts: [
@@ -70,7 +72,7 @@ var RX_FRAMES = [
     ]
   },
   {
-    id: 'reveal', label: '揭幕式·点击爆发', from: '标准 ≈ 范例③ 飨宴',
+    id: 'reveal', label: '揭幕式·点击爆发', from: '结算 / 抽卡 / 契约等揭晓场合',
     decor: 'array', tierHint: 'lux', interactive: true,
     desc: 'details/summary 结算卡：点开播放分解/爆发动效并揭示正文；适合战斗结算、命运抽卡、缔结契约。',
     parts: [
@@ -84,7 +86,7 @@ var RX_FRAMES = [
     ]
   },
   {
-    id: 'plain', label: '极简·纯文字框', from: '极简 / 轻量档',
+    id: 'plain', label: '极简·纯文字框', from: '极短文本 · 极简档',
     decor: 'none', tierHint: 'mini', interactive: false,
     desc: '只有变量、边框与正文，最短最稳；窄屏与超长文本优先。',
     parts: [
@@ -104,7 +106,7 @@ function rxFrameLayers(frameId, pre) {
   var fr = rxFrameById(frameId) || RX_FRAMES[0];
   return fr.parts.map(function (p) { return '  ' + String(p[0]).replace(/\{P\}/g, pre) + ' —— ' + p[1]; }).join('\n');
 }
-// 骨架里写死的变量名 = 模型必须定义的变量（自检 undefvar 会核对，范例④ 就是这套写法）
+// 骨架里写死的变量名 = 模型必须定义的变量（骨架引用、模型定义，自检 undefvar 会核对）
 function rxRequiredVars(pre, frameId) {
   var v = ['--' + pre + '-accent', '--' + pre + '-bg', '--' + pre + '-text', '--' + pre + '-line'];
   if ((rxFrameById(frameId) || {}).decor === 'array') v.push('--' + pre + '-accent-2');
@@ -194,7 +196,7 @@ function rxText(s) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
     .replace(/\$/g, '');
 }
-// ---------- 方括号族（范例③ 飨宴：`【战斗结算：{结算结果}】`）----------
+// ---------- 方括号族（整行就是一个方括号标记，如「【战斗结算：{结算结果}】」）----------
 // 识别「整行就是一个方括号标记」的格式；必须带占位符或冒号，免得把 【提示】 这类词当成格式
 function rxParseBracket(v) {
   var m = String(v).trim().match(/^([【\[])\s*([\s\S]*?)\s*([】\]])$/);
@@ -331,14 +333,14 @@ function rxParseLangFormat(coreText) {
   });
   return res;
 }
-// 属性捕获：顺序无关（范例④ 的 `mood=` 可以出现在 `name=` 前后）、引号可选、值允许空格。
+// 属性捕获：顺序无关（`mood=` 出现在 `name=` 前后都能取到）、引号可选、值允许空格。
 // 用零宽先行断言取组，捕获组编号仍是「name → 各参数 → 正文」，与 rxRefs 的 $n 布局严格一致。
 // 缺属性时仍要能命中（$n 取到空串），所以断言要可跳过——注意必须写成 `(?:断言|)`，
 // 不能写成 `(断言)?`：V8 在「可选量词包住先行断言」时会走空分支并丢掉里面的捕获组。
 function rxAttrLook(name) {
   return '(?:' + '(?=[^>]*\\s' + name + '\\s*=\\s*["\']?([^"\'>]*?)["\']?(?=[\\s>]))' + '|)';
 }
-// 引语式的收尾：核心/范例里有 」』 就要求它（范例①②），否则退化为「行尾锚定」——
+// 引语式的收尾：核心或范例里出现过 」』 就要求它，否则退化为「行尾锚定」——
 // 绝不能让惰性量词在没有任何收尾的情况下匹配空串（那会生成一条「只吃说话人、不吃台词」的废正则）
 function rxQuoteTail(f) {
   var hasQ = function (s) { return /[」』]/.test(String(s == null ? '' : s)); };
@@ -408,7 +410,7 @@ function rxBuildObject(item) {
 // ---------- 正则自检 ----------
 function rxTier(id) { return RX_TIERS.filter(function (t) { return t.id === id; })[0] || RX_TIERS[3]; }
 // 「外层容器」的判据：类名里带 box/card/frame/wrap/container/panel，或就是本条的骨架容器。
-// 写死像素宽、overflow 这类约束只对容器成立——法阵 / 粒子 / 角标本来就该用固定 px（范例②③④都这么写）。
+// 写死像素宽、overflow 这类约束只对容器成立——法阵 / 粒子 / 角标本来就该用固定 px。
 var RX_BOXY_SEL = /[.#][\w-]*(?:box|card|frame|wrap|container|panel)\b/i;
 function rxLintCss(item, rep) {
   var out = [];
@@ -436,16 +438,16 @@ function rxLintCss(item, rep) {
   while ((mm = reDef.exec(css)) !== null) if (def.indexOf(mm[1]) < 0) def.push(mm[1]);
   var miss = used.filter(function (x) { return def.indexOf(x) < 0; });
   if (miss.length) out.push({ key: 'undefvar', msg: '用了没定义的 CSS 变量（' + miss.slice(0, 4).map(function (x) { return '--' + x; }).join('、') + '）：骨架里的颜色全靠这些变量，不定义会掉成默认色' });
-  // ③ 破框装饰被容器切掉（范例② 专门注释过这条）
+  // ③ 破框装饰被容器切掉
   if (decor === 'array') {
     var clip = rules.filter(function (r) {
       if (r.at) return false;
       if (!(boxSel.test(r.prelude) || RX_BOXY_SEL.test(r.prelude))) return false;
       return /overflow\s*:\s*hidden/i.test(r.raw);
     });
-    if (clip.length) out.push({ key: 'clipdecor', msg: '外层容器写了 overflow:hidden：法阵/光尘会被切在框内（范例②③④ 都是 overflow:visible）' });
+    if (clip.length) out.push({ key: 'clipdecor', msg: '外层容器写了 overflow:hidden：法阵/光尘会被切在框内（要装饰破框就把容器改成 overflow:visible）' });
   }
-  // ④ 正文默认被藏起来（范例③ 的揭幕式是点击展开，其余框架必须直接可读）
+  // ④ 正文默认被藏起来（揭幕式是点击展开，其余框架必须直接可读）
   var isReveal = (frame && frame.interactive) || /<summary[\s>]/i.test(rep);
   if (!isReveal) {
     var bodyRe = new RegExp('\\.' + rxEsc(pre + '-body') + '(?![\\w-])[^{]*\\{[^}]*', 'i');
@@ -483,7 +485,7 @@ function rxLint(item, parsed) {
   }
   if (item.hasMood) {
     var hasBranch = /\[\s*data-mood\s*[~|^$*]?=/i.test(rep);
-    if (!hasBranch) issues.push({ side: 'regex', key: 'moodbranch', msg: '核心有 mood 参数，但没有一条 [data-mood="…"] 属性选择器：范例④ 的做法是给每个枚举只改变量（--前缀-accent / --前缀-bg）', fix: 'none' });
+    if (!hasBranch) issues.push({ side: 'regex', key: 'moodbranch', msg: '核心有 mood 参数，但没有一条 [data-mood="…"] 属性选择器：推荐每条分支只重定义变量（--前缀-accent / --前缀-bg），不要重抄整套规则', fix: 'none' });
   }
   var obj = rxBuildObject(item);
   if (!/^[0-9a-f]{8}-/.test(obj.id)) issues.push({ side: 'regex', key: 'id', msg: 'id 不是 uuid v4', fix: 'newid' });
@@ -609,7 +611,7 @@ function rxExtractHtml(text) {
   return (end > start ? t.slice(start + 1, end) : t.slice(start + 1)).replace(/^\n+/, '').replace(/\s+$/, '');
 }
 // ---------- 页面 ----------
-var RX_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">✦ 正则工坊 · 命定系统对话美化</div><div class="opf-dim">流程：粘贴核心全文（或从 ④ 页带入）→ 解析语言格式 → 勾选要美化的格式 → 选用途、预算档位与「初始框架」（4 款，对标现网在用的美化正则：紧凑卡 / 法阵卡 / 揭幕式 / 极简）→ 匹配式由插件确定生成、骨架由插件按框架搭好、替换体样式由模型产出 → 实时预览 → 自检 → 导出 JSON。字段名与你现有 4 条正则一致，可直接粘进预设的 regex_scripts。</div><textarea id="opf-rx-core" class="opf-char-input" placeholder="把命定系统核心条目全文粘在这里（必须含「语言格式」节）"></textarea><div class="opf-char-tools"><button type="button" class="opf-btn ghost" id="opf-rx-pull">⬅ 从 ④ 页带入</button><button type="button" class="opf-btn primary" id="opf-rx-parse">🔍 解析语言格式（AI）</button><button type="button" class="opf-btn ghost" id="opf-rx-parse2">⚙ 脚本解析（离线）</button><button type="button" class="opf-btn ghost" id="opf-rx-gen">🎨 生成替换体</button><button type="button" class="opf-btn ghost" id="opf-rx-check">🔎 自检</button><button type="button" class="opf-btn ghost" id="opf-rx-fix">🔧 自动修复</button><button type="button" class="opf-btn ghost" id="opf-rx-copy1">⧉ 复制单条 JSON</button><button type="button" class="opf-btn ghost" id="opf-rx-copyall">⧉ 复制 JSON 数组</button><button type="button" class="opf-btn ghost" id="opf-rx-new">🗑 清空</button><button type="button" class="opf-btn ghost" id="opf-rx-ping">🩺 连通性自检</button><button type="button" class="opf-btn ghost" id="opf-rx-last">📄 上次返回</button></div><pre id="opf-rx-lastraw" class="opf-box opf-char-report" style="display:none">尚未调用</pre><div class="opf-shx-cfg"><label class="opf-opt">生成传输<select id="opf-rx-transport" class="opf-ref-input"><option value="st">酒馆主 API（零配置·推荐）</option><option value="server">经酒馆服务端转发 + 流式（需自填反代）</option><option value="direct">浏览器直连 + 流式（需自填接口）</option></select></label><span class="opf-dim" id="opf-rx-txnote"></span></div><div class="opf-shx-cfg" id="opf-rx-cfg-server" style="display:none"><button type="button" class="opf-btn ghost" id="opf-rx-pulltavern">📋 用酒馆的反代设置</button><label class="opf-opt">协议源<select id="opf-rx-source" class="opf-ref-input"><option value="makersuite">Google AI Studio (makersuite)</option><option value="vertexai">Vertex AI (vertexai)</option></select></label><label class="opf-opt">中转/反代地址<input id="opf-rx-reverse" class="opf-ref-input" placeholder="https://你的中转域名"></label><label class="opf-opt">代理密码/密钥<input id="opf-rx-proxypass" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">模型名<input id="opf-rx-model" class="opf-ref-input" list="opf-rx-modellist" placeholder="点右侧按钮获取；也可直接手填，填过会记住"><datalist id="opf-rx-modellist"></datalist></label><button type="button" class="opf-btn ghost" id="opf-rx-models">🔌 获取模型列表</button></div><div class="opf-shx-cfg" id="opf-rx-cfg-direct" style="display:none"><label class="opf-opt">直连协议<select id="opf-rx-proto" class="opf-ref-input"><option value="openai">OpenAI 兼容 (/chat/completions)</option><option value="gemini">Google 原生 (:streamGenerateContent)</option></select></label><label class="opf-opt">直连地址<input id="opf-rx-base" class="opf-ref-input" placeholder="https://api.example.com/v1"></label><label class="opf-opt">直连密钥<input id="opf-rx-key" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">直连模型<input id="opf-rx-chatmodel" class="opf-ref-input" placeholder="留空则用上面的模型名"></label></div><div class="opf-dim" id="opf-rx-statusline">就绪</div><div class="opf-sec"><div class="opf-sec-label">语言格式解析结果（只读核对）</div><pre id="opf-rx-parsed" class="opf-box opf-char-report">尚未解析</pre></div><div id="opf-rx-items"></div><div class="opf-sec"><div class="opf-sec-label">自检</div><pre id="opf-rx-issues" class="opf-box opf-char-report">尚未自检</pre></div></div>';
+var RX_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">✦ 正则工坊 · 命定系统对话美化</div><div class="opf-dim">流程：粘贴核心全文（或从 ④ 页带入）→ 解析语言格式 → 勾选要美化的格式 → 选用途、预算档位与初始框架 → 生成（匹配式与 HTML 骨架由插件确定，样式由模型产出）→ 实时预览 → 自检 → 导出 JSON。</div><textarea id="opf-rx-core" class="opf-char-input" placeholder="把命定系统核心条目全文粘在这里（必须含「语言格式」节）"></textarea><div class="opf-char-tools"><button type="button" class="opf-btn ghost" id="opf-rx-pull">⬅ 从 ④ 页带入</button><button type="button" class="opf-btn primary" id="opf-rx-parse">🔍 解析语言格式（AI）</button><button type="button" class="opf-btn ghost" id="opf-rx-parse2">⚙ 脚本解析（离线）</button><button type="button" class="opf-btn ghost" id="opf-rx-gen">🎨 生成替换体</button><button type="button" class="opf-btn ghost" id="opf-rx-check">🔎 自检</button><button type="button" class="opf-btn ghost" id="opf-rx-fix">🔧 自动修复</button><button type="button" class="opf-btn ghost" id="opf-rx-copy1">⧉ 复制单条 JSON</button><button type="button" class="opf-btn ghost" id="opf-rx-copyall">⧉ 复制 JSON 数组</button><button type="button" class="opf-btn ghost" id="opf-rx-new">🗑 清空</button><button type="button" class="opf-btn ghost" id="opf-rx-ping">🩺 连通性自检</button><button type="button" class="opf-btn ghost" id="opf-rx-last">📄 上次返回</button></div><pre id="opf-rx-lastraw" class="opf-box opf-char-report" style="display:none">尚未调用</pre><div class="opf-shx-cfg"><label class="opf-opt">生成传输<select id="opf-rx-transport" class="opf-ref-input"><option value="st">酒馆主 API（零配置·推荐）</option><option value="server">经酒馆服务端转发 + 流式（需自填反代）</option><option value="direct">浏览器直连 + 流式（需自填接口）</option></select></label><span class="opf-dim" id="opf-rx-txnote"></span></div><div class="opf-shx-cfg" id="opf-rx-cfg-server" style="display:none"><button type="button" class="opf-btn ghost" id="opf-rx-pulltavern">📋 用酒馆的反代设置</button><label class="opf-opt">协议源<select id="opf-rx-source" class="opf-ref-input"><option value="makersuite">Google AI Studio (makersuite)</option><option value="vertexai">Vertex AI (vertexai)</option></select></label><label class="opf-opt">中转/反代地址<input id="opf-rx-reverse" class="opf-ref-input" placeholder="https://你的中转域名"></label><label class="opf-opt">代理密码/密钥<input id="opf-rx-proxypass" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">模型名<input id="opf-rx-model" class="opf-ref-input" list="opf-rx-modellist" placeholder="点右侧按钮获取；也可直接手填，填过会记住"><datalist id="opf-rx-modellist"></datalist></label><button type="button" class="opf-btn ghost" id="opf-rx-models">🔌 获取模型列表</button></div><div class="opf-shx-cfg" id="opf-rx-cfg-direct" style="display:none"><label class="opf-opt">直连协议<select id="opf-rx-proto" class="opf-ref-input"><option value="openai">OpenAI 兼容 (/chat/completions)</option><option value="gemini">Google 原生 (:streamGenerateContent)</option></select></label><label class="opf-opt">直连地址<input id="opf-rx-base" class="opf-ref-input" placeholder="https://api.example.com/v1"></label><label class="opf-opt">直连密钥<input id="opf-rx-key" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">直连模型<input id="opf-rx-chatmodel" class="opf-ref-input" placeholder="留空则用上面的模型名"></label></div><div class="opf-dim" id="opf-rx-statusline">就绪</div><div class="opf-sec"><div class="opf-sec-label">语言格式解析结果（只读核对）</div><pre id="opf-rx-parsed" class="opf-box opf-char-report">尚未解析</pre></div><div id="opf-rx-items"></div><div class="opf-sec"><div class="opf-sec-label">自检</div><pre id="opf-rx-issues" class="opf-box opf-char-report">尚未自检</pre></div></div>';
 
 function rxInit() {
   ST.rx = ST.rx || { core: '', coreName: '', parsed: null, items: [], _inited: false };

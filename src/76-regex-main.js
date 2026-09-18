@@ -1121,7 +1121,7 @@ function rxBriefPart(item, frame) {
   };
 }
 // ---------- 替换体：结构由代码生成，模型只写 CSS（防 524 超时与截断）----------
-// 骨架款式（初始框架）取自 4 条现网可用正则，见 72 的 RX_FRAMES
+// 骨架款式（初始框架）见 72 的 RX_FRAMES：紧凑卡 / 法阵卡 / 揭幕式 / 极简
 function rxFrameOf(item) { return rxFrameById(item && item.frame) || RX_FRAMES[0]; }
 // 捕获组布局必须与 rxGenFindRegex 完全一致，否则 $n 会指错
 function rxRefs(f) {
@@ -1135,7 +1135,7 @@ function rxRefs(f) {
   return refs;
 }
 var RX_STYLE_SLOT = '/*__RX_STYLE__*/';
-// 法阵（范例②④ 的三层结构）：描边环 + 环形铭文 + 八角几何 + 核心；颜色全部走变量，等模型来定义
+// 法阵：描边环 + 环形铭文 + 八角几何 + 核心三层；颜色全部走变量，等模型来定义
 function rxSvgLines(pre, ringText) {
   var v = 'var(--' + pre + '-accent)';
   return [
@@ -1171,7 +1171,7 @@ function rxDustLines(pre, n, indent) {
   for (var i = 1; i <= n; i++) L.push(pad + '<span class="' + pre + '-dust d' + i + '"></span>');
   return L;
 }
-// 标题行：纹章 + 名号 + 情绪胶囊 + 渐隐线（范例①④ 的头部；名号是静态字面量或 $n）
+// 标题行：纹章 + 名号 + 情绪胶囊 + 渐隐线（名号是静态字面量或 $n）
 function rxHeadLines(pre, title, moodRef, emblem) {
   if (!title && !moodRef) return [];
   var L = ['  <div class="' + pre + '-head">'];
@@ -1251,7 +1251,7 @@ function rxCssParts(f, tierTarget) {
     { id: 'base', label: '变量与外框',
       hint: '以 .' + P + '-box 为载体：先定义骨架已经引用到的变量（缺一个颜色就会掉成默认黑），再写容器本身——底色渐变、边框（左缘用强调色加粗）、圆角、内外边距、字体栈（只用系统字体）、max-width:100%，以及 :hover 的位移与发光。' },
     { id: 'mood', label: '情绪分支配色', need: hasMood,
-      hint: '为每个枚举值各写一条属性选择器规则（形如 .' + P + '-box[data-mood="值"]），只重定义变量与背景（范例④ 的写法：一条分支改 --' + P + '-accent / --' + P + '-bg 就够，不要重抄整套规则）。' },
+      hint: '为每个枚举值各写一条属性选择器规则（形如 .' + P + '-box[data-mood="值"]），只重定义变量与背景即可（一条分支改 --' + P + '-accent / --' + P + '-bg 就够，不要重抄整套规则）。' },
     { id: 'layers', label: '视觉层与装饰', need: decor !== 'none',
       hint: '写 .' + P + '-visual 视觉层（绝对定位铺满、pointer-events:none、z-index 低于文字）'
         + (decor === 'array'
