@@ -8684,7 +8684,9 @@ function atlCrossSystem() {
 // 页面接线
 // ============================================================================
 function bindAtelierPage() {
-  var root = atlEl('opf-page-atelier');
+  // 页面容器由外壳（buildShell）创建为 opf-page-atelier；离线冒烟时没有外壳，
+  // 就退化为用页内第一个控件当锚点——两种情况下都只绑定一次
+  var root = atlEl('opf-page-atelier') || atlEl('opf-atl-kind');
   if (!root || root._b) return;
   root._b = true;
   try {
