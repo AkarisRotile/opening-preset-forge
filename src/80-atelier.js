@@ -22,11 +22,12 @@ var ATL_KINDS = [
   {
     id: 'skill', label: '技能', noun: '技能', book: '《技能之书》',
     hint: '技能分攻击技（消耗[攻击]、造成即时伤害、必填威力）与动作技（消耗[动作]、禁止即时伤害与威力，用于治疗/控制/增益/减益/功能，可含 DoT）；核心功能「伤害」只有攻击技可用。'
-      + '品质与消耗、威力三者必须同档：低耗小威力挂传说/神话是最常见的错（实测反馈「180MP 挂传说」），要求「终极技」必须从史诗及以上选品质，消耗同时落进该档区间。',
+      + '消耗与威力必须落进品质所在档位（见下方注入的《核心数值总表》档位）：低档数值挂高档品质是最常见的错（实测反馈「180MP/180SP 挂传说」＝消耗与威力都只在史诗档内）；史诗及以上还要按《品质效果限定规则》补一条「微弱要素/权能/法则」词条。',
     yaml: [
       '名称: ',
       '品质: ',
       '类型: 攻击技',
+      '消耗: [攻击: XXXX MP/SP]',
       '标签:',
       '  - ',
       '  - ',
@@ -36,7 +37,7 @@ var ATL_KINDS = [
       '    效果内容: ',
       '背景: '
     ].join('\n'),
-    fields: ['名称', '品质', '类型', '标签', '效果', '背景']
+    fields: ['名称', '品质', '类型', '消耗', '标签', '效果', '背景']
   },
   {
     id: 'equip', label: '装备', noun: '装备', book: '《装备之书》',
@@ -152,31 +153,34 @@ var ATL_KINDS = [
 function atlKind(id) {
   return ATL_KINDS.filter(function (k) { return k.id === id; })[0] || ATL_KINDS[0];
 }
-// 技能专属：把「品质」和「消耗 / 威力」钉在一起。
-// 来源是实测反馈——玩家要"大量消耗的大招"，拿到的是"180MP/180SP 的传说级小消耗雷霆"，
-// 根因是品质被模型当成稀有度标签写，没有与消耗量级、威力挂钩。
+// 技能专属：把「品质」和「消耗 / 威力 / 词条」钉在世界书的口径上。
+// 数值全部取自《核心数值总表》与《品质效果限定规则》，一个字都不许自己编——
+// 这两条是世界书里的权威表，改动它们等于改世界规则。
+var ATL_SKILL_RULE_SRC = '《核心数值总表》《品质效果限定规则》';
 var ATL_SKILL_QUALITY_RULES = [
-  '【技能专属：品质 ↔ 消耗 ↔ 威力 必须同档（硬约束）】',
-  '1. 品质决定的是量级与规模，不只是稀有度：品质必须同时体现在「消耗」数值、效果规模、背景分量上，三者一致才算合规。',
-  '2. 消耗档位（主动技，MP/SP/二者合计，与《核心数值表》同量级；动作技同理但数值取下沿）：',
-  '   · 普通 5~30｜优良 20~60｜稀有 35~100｜史诗 80~200｜传说 150~400｜神话 300~1000｜唯一 按专规',
-  '3. 威力档位（仅攻击技；动作技禁用威力）：普通 ≤200｜优良 200~400｜稀有 350~700｜史诗 600~1200｜传说 1000~2000｜神话 1800+。',
-  '4. 词条上限：普通 1 / 优良 2 / 稀有 2 / 史诗 3 / 传说 3 / 神话 3（唯一按专规）；史诗及以上至少有一条与本档相称的机制（微弱的要素 / 权能 / 法则，或同规模的规则改动），不能只是倍率变大。',
-  '5. 硬性禁止：低消耗挂高品级、高消耗低威力、标签里的消耗数值与正文消耗互相矛盾、"大量消耗的大招"配"小消耗"；判定看三挡是否互相打架（对照例：威力 900 挂传说＝没撑起来，威力 1500 挂传说＝撑起来了）。',
-  '6. 当{{user}}提到「大招 / 终结技 / 底牌 / 全力一击」这类诉求时，应把品质定在史诗或以上，消耗定在该品质区间，并另写一条对应的代价或限制（充能、反噬、冷却、可被打断）。',
-  '7. 若{{user}}明确指定了品质，就遵守它并把消耗、威力、效果规模一起对齐；宁可写清「这品质配不上你要的规模」也不要三挡互相打架。'
+  '【技能专属：品质、消耗、威力、效果一律照世界书口径核（硬约束）】',
+  '1. 消耗档位（《核心数值总表》「技能消耗(MP/SP)」）——主动技的消耗必须落进本档，MP 与 SP 同时写就按两者之和核：',
+  '   普通 10~100｜优良 50~500｜稀有 200~1000｜史诗 800~4000｜传说 2400~10000｜神话 7200~25000｜唯一 不设档（按专规）',
+  '2. 威力档位（《核心数值总表》「攻击技威力」，动作技禁用威力）——攻击技必须按本档给威力：',
+  '   普通 50~100（普攻 20）｜优良 120~200｜稀有 250~600｜史诗 800~1500｜传说 2000~4000｜神话 5000~8000',
+  '3. 效果数值也照本档走（《品质效果限定规则》「品质数值总表」）：固伤 普 +5~25 / 优 +45~85 / 稀 +120~180 / 史 +220~450 / 传 +600~1100 / 神 +1400~2500；',
+  '   百分比 普 +3~5% / 优 +6~8% / 稀 +9~12% / 史 +13~16% / 传 +17~24% / 神 +25~30%；资源类 普 +45~75 / 优 +150~300 / 稀 +500~800 / 史 +1200~2000 / 传 +2600~4800 / 神 +5900~11000。',
+  '4. 词条上限：普通 1 / 优良 2 / 稀有 2 / 史诗 3 / 传说 3 / 神话 3（唯一按专规）；效果每行一条「效果名: 效果」，只写「效果名: 效果」这一段。',
+  '5. 品质特殊要求（《品质效果限定规则》「品质特殊要求」）：史诗（四层）三条词条其一须为「微弱要素[名称]: 效果」；传说（五层）其一须为「微弱权能[名称]: 效果」；神话（六层）其一须为「微弱法则[名称]: 效果」——这是词条映射，不等同完整登神能力。',
+  '6. 越级判定：若消耗与威力都只到低一档（例：传说品质配消耗 180、威力 900，两个数都只在史诗档内），那不是"传说级技能"，先把品质降到与数值相称的档位；不要用品质去贴一个拿不出对应数值的技能。',
+  '7. 数值优先级：本页需求与世界书冲突时以世界书为准；{{user}} 只给类型与效果、没给数值时，按本档中位取值，不要自造档位之外的数字。'
 ].join('\n');
 function atlKindRules(kindId) {
   return atlKind(kindId).id === 'skill' ? ATL_SKILL_QUALITY_RULES : '';
 }
-// 品质 / 消耗 / 威力 三挡的机械核对（零 AI）：实测反馈就是从这里漏出去的
+// 品质档位表：逐字来自《核心数值总表》。tier 为生命层级对照，用于把「品质」译成人话。
 var ATL_BAND = {
-  '普通': { cost: [5, 30], power: [0, 200] },
-  '优良': { cost: [20, 60], power: [200, 400] },
-  '稀有': { cost: [35, 100], power: [350, 700] },
-  '史诗': { cost: [80, 200], power: [600, 1200] },
-  '传说': { cost: [150, 400], power: [1000, 2000] },
-  '神话': { cost: [300, 1000], power: [1800, Infinity] }
+  '普通': { cost: [10, 100], power: [50, 100], entries: 1, tier: '一层' },
+  '优良': { cost: [50, 500], power: [120, 200], entries: 2, tier: '二层' },
+  '稀有': { cost: [200, 1000], power: [250, 600], entries: 2, tier: '三层' },
+  '史诗': { cost: [800, 4000], power: [800, 1500], entries: 3, tier: '四层', need: '微弱要素' },
+  '传说': { cost: [2400, 10000], power: [2000, 4000], entries: 3, tier: '五层', need: '微弱权能' },
+  '神话': { cost: [7200, 25000], power: [5000, 8000], entries: 3, tier: '六层', need: '微弱法则' }
 };
 function atlBandOf(q) { return ATL_BAND[String(q || '').trim()] || null; }
 function atlNumbersNear(text, headRe) {
@@ -184,12 +188,25 @@ function atlNumbersNear(text, headRe) {
   var out = [];
   lines.forEach(function (l) {
     if (!headRe.test(l)) return;
-    var nums = l.match(/\d{1,5}/g) || [];
+    var nums = l.match(/\d{1,6}/g) || [];
     nums.forEach(function (n) { out.push(Number(n)); });
   });
   return out;
 }
-// 只报"证据确凿"的矛盾：既有明确品质、又读得到消耗/威力数值，且明显不相称。
+// 效果词条：只数「效果:」块下的 `- 效果名:`（`- 效果内容:` 属于上一条）。返回 { count, names }
+function atlEffectEntries(t) {
+  var lines = String(t || '').split(/\r?\n/);
+  var inBlock = false, names = [];
+  lines.forEach(function (l) {
+    var top = l.match(/^([^\s#].*?)[ \t]*[:：]/);
+    if (top) { inBlock = /^效果$/.test(String(top[1]).trim()); return; }
+    if (!inBlock) return;
+    var nm = l.match(/^\s*-\s*效果名[ \t]*[:：][ \t]*(.*)$/);
+    if (nm) names.push(String(nm[1]).trim());
+  });
+  return { count: names.length, names: names };
+}
+// 只报"证据确凿"的矛盾：既有明确品质、又读得到对应数值。
 // 读不到就什么都不说（宁可不报，也不要为猜错的东西报警）。
 function atlSkillQualityAudit(t) {
   var body = String(t || '');
@@ -200,39 +217,43 @@ function atlSkillQualityAudit(t) {
   var band = atlBandOf(q);
   if (!band) return [];                       // 「唯一」按专规，不参与档位核对
   var issues = [];
-  // MP 与 SP 同时写入时，取两者之和与该档下沿比较（双资源同投不算"小消耗"）
-  var mpVals = atlNumbersNear(body, /MP/i);
-  var spVals = atlNumbersNear(body, /SP/i);
-  var mpMax = mpVals.length ? Math.max.apply(null, mpVals) : 0;
-  var spMax = spVals.length ? Math.max.apply(null, spVals) : 0;
+  var isAction = /类型[ \t]*[:：][ \t]*动作技/.test(body);
+  // 消耗：MP/SP 同时写入按合计核（世界书给的是"MP/SP"这个合并档位）
+  var mpMax = Math.max.apply(null, [0].concat(atlNumbersNear(body, /MP/i)));
+  var spMax = Math.max.apply(null, [0].concat(atlNumbersNear(body, /SP/i)));
   var cost = (mpMax && spMax) ? (mpMax + spMax) : Math.max(mpMax, spMax);
-  if (cost && cost < band.cost[0] * 0.6) {
+  if (cost && cost < band.cost[0]) {
     issues.push({
       level: 'warn',
-      msg: '品质「' + q + '」配的是消耗 ' + cost + '（本档参考 ' + band.cost[0] + '~' + band.cost[1]
-        + '）：低消耗挂高品级是最常见的错，请把消耗提进本档，或把品质降到与消耗相称的档位'
+      msg: '消耗 ' + cost + ' 低于品质「' + q + '」的档位（《核心数值总表》本档 ' + band.cost[0] + '~' + band.cost[1]
+        + '）：这是拿低档数值挂了高档品质，把消耗提到本档，或把品质降到与消耗相称的档位'
     });
+  } else if (cost && cost > band.cost[1]) {
+    issues.push({ level: 'warn', msg: '消耗 ' + cost + ' 超出品质「' + q + '」的档位上限（本档 ' + band.cost[0] + '~' + band.cost[1] + '）：调低消耗或提高品质' });
   }
+  // 威力：动作技禁用（世界书原话），攻击技按本档核
   var powers = atlNumbersNear(body, /威力/);
-  if (powers.length) {
+  if (isAction) {
+    if (powers.length) issues.push({ level: 'warn', msg: '动作技不允许写威力（世界书口径：威力仅攻击技必填、动作技禁用）' });
+  } else if (powers.length) {
     var maxPower = Math.max.apply(null, powers);
-    // 威力这一侧判得比消耗严：攻击技的威力是必填、可比的硬数字，
-    // 而消耗量级在《技能之书》口径里本身有浮动空间（双资源同投也常见）。
-    if (band.power[1] !== Infinity && maxPower > band.power[1] * 1.5) {
-      issues.push({ level: 'warn', msg: '威力 ' + maxPower + ' 超出品质「' + q + '」的参考上限（' + band.power[1] + '）：调低威力或提高品质' });
-    }
-    // 判据就是「低于本档下沿」：威力是硬数字，读得到就没必要给它留缓冲。
-    // 实测反馈「威力 900 挂传说」正落在这里（传说档下沿 1000）。
     if (maxPower > 0 && maxPower < band.power[0]) {
       issues.push({
         level: 'warn',
-        msg: '威力 ' + maxPower + ' 撑不起品质「' + q + '」（本档参考 ' + band.power[0] + '~' + band.power[1]
-          + '）：这就是「挂了个高品级的空壳」，请把威力提进本档，或把品质降到与威力相称的档位'
+        msg: '威力 ' + maxPower + ' 低于品质「' + q + '」的档位（《核心数值总表》本档 ' + band.power[0] + '~' + band.power[1]
+          + '）：这数值撑不起该品质，把威力提进本档，或把品质降到与威力相称的档位'
       });
+    } else if (maxPower > band.power[1]) {
+      issues.push({ level: 'warn', msg: '威力 ' + maxPower + ' 超出品质「' + q + '」的档位上限（本档 ' + band.power[0] + '~' + band.power[1] + '）：调低威力或提高品质' });
     }
   }
-  if (/类型\s*[:：]\s*动作技/.test(body) && /威力\s*[:：]\s*\S/.test(body)) {
-    issues.push({ level: 'warn', msg: '动作技不允许写威力（世界口径：威力仅攻击技必填、动作技禁用）' });
+  // 词条上限与品质特殊要求（《品质效果限定规则》）
+  var eff = atlEffectEntries(body);
+  if (eff.count > band.entries) {
+    issues.push({ level: 'warn', msg: '效果写了 ' + eff.count + ' 条，超出品质「' + q + '」的词条上限 ' + band.entries + '（品质效果限定规则：普1/优2/稀2/史3/传3/神3）' });
+  }
+  if (band.need && eff.count && eff.names.join('、').indexOf(band.need) < 0) {
+    issues.push({ level: 'warn', msg: '品质「' + q + '」（' + band.tier + '）按《品质效果限定规则》要求词条里有一条「' + band.need + '[名称]: 效果」，现在一条都没有' });
   }
   return issues;
 }
@@ -782,9 +803,9 @@ function atlFixPrompt(dir) {
   L.push('[任务] 按{{user}}的要求改进下面这一件' + kind.noun + '的 YAML。' + (atlWantsShort(dir) ? '' : '未提到的字段与内容逐字保留。'));
   L.push('[用户要求]\n' + String(dir || '').trim());
   if (kind.id === 'skill') {
-    L.push('[联动提醒] 只要这条要求牵动品质、消耗或威力中的任意一项，就把另外两项一起改到同档——'
-      + '要求"变大招／更强"就同时把品质提到史诗或以上、消耗与威力提进该档区间并补一条代价；'
-      + '不许出现「低消耗挂高品级」或「提高了品级却留着原来的小消耗」。');
+    L.push('[联动提醒] 只要这条要求牵动品质、消耗、威力或词条中的任意一项，就把其余各项一起改到同档：'
+      + '把品质提到某一档，消耗与威力必须落进那一档的《核心数值总表》区间（如提到传说＝消耗 2400~10000、威力 2000~4000，并补「微弱权能」词条）；'
+      + '只加数值不动品质、或只动品质不管数值，都会让技能挂空档。');
   }
   L.push('[当前 YAML（共 ' + cur.length + ' 字符）——输出必须是改好的**完整** YAML，不是片段，不要写"其余不变"这类占位]\n' + cur);
   L.push('[完整性要求] 原始内容 ' + cur.length + ' 字符；除非用户明确要求精简，你的输出不应明显短于它。');
