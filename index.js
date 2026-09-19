@@ -2058,14 +2058,14 @@ var CHAR_SEG_PROMPTS = {
   base: "为二创角色敲定“身份底座”，并在本段开头先定下【名称】（后续所有分段沿用这个名字，禁止再改）：\n- 命名：按《角色命名指导》确定风格→语言→音素种子转写；种族命名规则——人类:底层无姓/强者贵族有姓/顶层有中间名；精灵:{音译名}·{自然意象音译}；翼民:{音译名}·{音译姓}(古典庄重)；兽族:底层仅名、贵族带{氏族名}；血族:{名字}·{中间名}·{氏族名}；巨龙:凡世名+真名+史诗称号；矮人:{名字}·{氏族名意译}；半身人:{名字}·{家族姓氏意译}；巨人仅名字；妖精/花灵:诗意短语≤8字；亡灵保留生前名、高阶可用称号。\n- 核心概念：一句话定义（例：“未竟的破晓之星”）+ 特质标签3个。\n- 种族（大类/亚种，从世界书种族条目中选）；外貌年龄与实龄（实龄按生命层级自洽：三层数十年/五层数百年，延寿缓老可驻颜）。\n- 生命层级(一~七)与等级Lv(1-25)自洽；身份/职业数量不限；社会称号/尊号仅 Lv≥13。\n- 注意：不写属性面板（五维/HP·MP·SP），这些留给游玩时按世界规则结算。\n- 只输出本段内容，简洁列出，不写后续分段内容。",
   mind: "按《角色辅助指导》性格码为角色定型：\n- 五维动机模型：[关系动机Rc/Rr/Rh/Rf]-[情绪定位Eu/Ed/Et/Ep]-[行动触发Ap/Ac/Ai/Aw]-[冲突核心Cp/Cr/Ct/Cm]-[意义安置Pf/Pw/Pv/Ps]-[稳定性Sk/Sm/Sf]，写出完整码并解释每维选择理由。\n- 禁止按种族/身份/职业套用刻板印象；从性格池顺取或按需求定码，与出身经历呼应。\n- 行为逻辑：日常/战斗/雷点；喜好与厌恶。\n- 只输出本段，外貌、战斗配置留给后续分段。",
   look: "按《角色辅助指导》毛色瞳色指导写外观：魔法世界毛发/羽毛/眼瞳颜色与形态可多样化（混色/渐变/流光/竖瞳/重瞳/星型/十字/发光/多眼），可体现元素亲和。\n- 外貌特质：外观年龄/实龄/身高/身体细节（头到脚趾、种族特征）/生理特征/身体改造（可选）。\n- 衣物装饰：全部衣着（材质/颜色/款式/破损程度）——外衣/内衬/内衣裤/鞋袜/饰品。\n- 必须与性格、种族、出身、身份一致（如配色映衬性格、风格匹配身份）。只输出本段。",
-  fight: "按《技能装备道具生成规则》《品质效果限定规则》配置战斗：\n- 品质写中文七等：普通/优良/稀有/史诗/传说/神话/唯一；词条强度上限：普1/优良2/稀有2/史诗3/传说3/神话3；史诗三词条其一须为“微弱要素”效果、传说“微弱权能”、神话“微弱法则”；学习/领悟所得品质≤自身层级，血脉觉醒/种族转换可越阶。\n- 技能数量 = 基础(0-1)+ceil((层级-1)/2)+额外(0-3)；攻击技（消耗[攻击]、即时伤害）与动作技（消耗[动作]、禁即时伤害与威力、可含DoT）自然区分；武器0-2/防具饰品0-3/道具0-2。\n- 输出形式（重要）：每件武器/装备/道具/技能只写三条——名称、品质（中文七等）、叙述（一段文字，先写效果、再写描述；效果写清伤害/增益/机制即可，不单独列类型、消耗、标签这些字段）。\n- 装备不增减持有者属性。\n- 战斗风格一句话：与性格互映射。\n- 登神长阶：Lv1-12无；13-16要素1-3；17-20权能1；21-24法则1；Lv25法则+神位——按等级填，未达不写。\n- 不写属性面板（五维/HP·MP·SP）。只输出本段。",
+  fight: "按《技能装备道具生成规则》《品质效果限定规则》配置战斗：\n- 品质写中文七等：普通/优良/稀有/史诗/传说/神话/唯一；词条强度上限：普1/优良2/稀有2/史诗3/传说3/神话3；史诗三词条其一须为“微弱要素”效果、传说“微弱权能”、神话“微弱法则”；学习/领悟所得品质≤自身层级，血脉觉醒/种族转换可越阶。\n- 技能数量 = 基础(0-1)+ceil((层级-1)/2)+额外(0-3)；攻击技（消耗[攻击]、即时伤害）与动作技（消耗[动作]、禁即时伤害与威力、可含DoT）自然区分；武器0-2/防具饰品0-3/道具0-2。\n- 输出形式（重要）：每件武器/装备/道具/技能只写三条——名称、品质（中文七等）、叙述（一段文字，先写效果、再写描述；效果写清伤害/增益/机制即可，不单独列类型、消耗、标签这些字段）。\n- 装备不增减持有者属性。\n- 战斗风格一句话：与性格互映射。\n- 登神长阶：Lv1-12无；13-16要素1-3；17-20权能1；21-24法则1；Lv25法则+神位——按等级填，未达不写。\n- 分流说明（写给你自己/{{user}}看，不要写进角色条目）：本段是为角色**写设定**，技能品质受“学习/领悟所得≤自身层级”限制；要单独给已有角色补一件技能、或要冲击更高档位，请走工作台第 ⑧ 页「造物工坊」单独造，那一页不受本页层级限制。提“大招/底牌”这类要求时，记得同时把品质、消耗、威力三挡对齐，别出现低消耗挂高品级。\n- 不写属性面板（五维/HP·MP·SP）。只输出本段。",
   story: "写背景与经历，与层级/等级/技能品质/性格全链自洽：\n- 起源（家庭/家乡/时代）→ 转折事件（塑造性格与技能来源）→ 现状与未来。\n- 实力来源必须交代清楚：为什么是这个层级/等级、为什么拥有这些品质的技能装备（学习/领悟≤自身层级；血脉觉醒/种族转换可越阶）。\n- 关系锚点1-2个：定位/共鸣/冲突，为后续演绎提供张力。\n- 只输出本段。",
   play: "按 DLC 角色卡惯例写演绎层：\n- 语料示例4-6句：口头禅/战斗台词/日常对白，风格与性格码一致，用词呼应出身与经历。\n- 行为参考：日常小动作/战斗偏好/癖好（呼应外貌与战斗方式）。\n- 禁忌（绝不能做/说）与提倡（演绎要点）。\n- 不预设对特定{{user}}的态度——每位用户的设定不同，只写角色自身的互动方式。只输出本段。"
 };
 var CHAR_LINK_CHAIN = "L1 背景经历→层级等级/身份职业：实力必须有来历，禁止“凭空强者”。\nL2 背景经历→性格码：重大事件塑造动机（关系/情绪/行动/冲突/意义），创伤或誓言落在具体经历。\nL3 种族+命名指导→姓名结构：命名规则与阶级格式必须匹配。\nL4 性格→外貌衣着：神情/配色/风格/破损与心境映射；身份与着装一致。\nL5 性格+层级→战斗方式：攻击技/动作技配比、风格、武器类型与性格互映射。\nL6 战斗方式+品质规则→技能装备道具：品质七等/词条上限合规；技能来源与经历呼应。\nL7 性格+背景→演绎语料：口头禅呼应经历、雷点呼应创伤、行为呼应动机。\n反向校验：技能/装备的来源必须在经历中有交代；登神长阶严格按等级档位；唯一品质仅在出处特殊时使用；五维与资源面板不写入角色条目，由游玩时按世界规则自行结算。";
 var CHAR_STYLE_RULES = "【用词与文风规范（分段、梳理与最终 YAML 的叙述文字全程遵守）】\n目标：写得像“会写的人”——具体、克制、直接。用事实和细节说话，不堆词、不喊口号、不向读者解释。\n1. 少用连词腔：能不用“而是/名为/被称为/取而代之”就不用，需要转折时直接换一句说。\n2. 控制程度副词：删掉“极其/极度/极为/无比”和“令人××”这类空转形容，用具体细节替代强度。\n3. 禁论文腔与口号词：像“底层逻辑/张力/解构/本质/主体性”这类术语一律换成日常语言；自由解放、压迫凝视、规训赋权之类的大词不进入人物描写。\n4. 禁比喻与类比：不写“像/如同/仿佛/犹如/好似”及其一切变体，不用“心湖/涟漪/深渊/浮木/手术刀/教科书”这类意象化说法；是什么就写什么。\n5. 禁网文腔：不写“冷笑/冷哼/嘴角勾起弧度/指节泛白/不容置疑/灭顶之灾”这类套路动作与成语堆砌；情绪用行为与台词呈现，不贴标签。\n6. 禁口号式评判：不写“征服/支配/弱肉强食/丛林法则/内卷”这类社达判词；写动机、写行动，不下评语。\n7. 不写语音提示：禁止“他的声音/她的语气/这番话/这句话”这类引导旁白，直接写台词与动作。\n8. 禁句式模板：禁止“不是A而是B”“没有A只有B”“并非A而是B”等否定-转折/排除-定义句式；禁止“名为X”命名句式；同一句式在一段里不出现第二遍。\n9. 少用括号解释、少用引号强调：人物说话像人，旁白像冷静的写作者。";
 var CHAR_YAML_SPEC = "【YAML 输出规范（二创角色最终稿件）】\n顶层唯一键为「角色卡」，必须是合法 YAML，按下面的字段顺序输出（中文键名固定，不要增删顶层字段；多行文本用 |- 块标量；列表用 - 或行内[]；所有内容与各分段一一对应）：\n\n角色卡:\n  名称: （定位与基础段的名字）\n  核心概念: （一句话定义）\n  特质: [标签1, 标签2, 标签3]\n  种族: （大类/亚种）\n  外貌年龄: （数字）\n  实龄: （数字或描述）\n  生命层级: （第X层级(名)）\n  等级: （Lv数字）\n  身份: [身份1, ...]\n  职业: [职业1, ...]\n  称号: （Lv≥13 才写，否则省略本行）\n  性格码: （五维动机码-稳定性码）\n  性格: |-\n    （性格与行为逻辑，多行）\n  喜好: [..]\n  厌恶: [..]\n  外貌: |-\n    （外貌特质，多行）\n  服装: |-\n    （衣物装饰，多行）\n  武器:\n    - 名称: ..\n      品质: （中文七等：普通/优良/稀有/史诗/传说/神话/唯一）\n      叙述: |-\n        （一段文字：先写效果，再写描述）\n  装备:\n    - 名称: ..\n      品质: ..\n      叙述: |-\n        ..\n  道具:\n    - 名称: ..\n      品质: ..\n      叙述: |-\n        ..\n  技能:\n    - 名称: ..\n      品质: ..\n      叙述: |-\n        （一段文字：先写效果，再写描述）\n  登神长阶: （无则写“无”）\n  过去: |-\n    （背景与经历，多行）\n  关系锚点: [..]\n  语料示例:\n    - \"..\"\n  行为参考:\n    - ..\n  禁忌:\n    - ..\n  提倡:\n    - ..\n\n规则：\n1. 只从分段内容转写，不新增、不删改、不扩写；缺失的段保留现有内容或写“无”。\n2. 缩进用两个空格，禁止制表符(Tab)；块标量 | 保留换行；含冒号/井号等特殊字符的字符串加引号。\n3. 武器/装备/道具/技能每项只有 名称/品质/叙述 三个字段，不写类型/消耗/标签；品质只写中文七等之一。\n4. 不写「面板」（五维/HP·MP·SP 由游玩时按世界规则结算），不写对user的态度（每位用户的设定不同）。\n5. 列表条数、数值、名称与分段一一对应。\n6. 用词与文风规范全程生效。\n7. 输出放在一个 ```yaml 代码块内；代码块内不允许出现注释或解释文字。";
-var CHAR_HTML = "<div class=\"opf-char-wrap\"><div class=\"opf-sec-label\">✦ 二创角色工坊 · 分段式生成（产出世界书 DLC 角色条目）</div><div class=\"opf-dim\">流程：① 分段初稿（6段串行）→ ② 交火梳理（先整体审查出报告，再逐段应用联动修订，防截断）→ ③ 逐段定点修改（只改你指定的段，其它段冻结）→ ④ 最终封装：按 YAML 规范输出纯 YAML 文档（不写面板、不预设对user态度，武器/装备/道具/技能只写 名称/品质/叙述）。</div><textarea id=\"opf-char-demand\" class=\"opf-char-input\" placeholder=\"写谁？给出大致设定与需求（例：一位出身瓦伦蒂亚贫民区、靠街头格斗活下来的少女，性格倔强护短……）\"></textarea><textarea id=\"opf-char-ref\" class=\"opf-char-input\" placeholder=\"（可选）参考文本：已有设定/原型描述/世界书片段，将作为参考注入\"></textarea><div class=\"opf-char-tools\"><button type=\"button\" class=\"opf-btn primary\" id=\"opf-char-run\">▶ 分段初稿</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-link\">⚔ 交火梳理</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-final\">🎁 最终封装</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-new\">🗑 新角色</button></div><div id=\"opf-char-steps\"></div><div class=\"opf-sec\"><div class=\"opf-sec-label\">交火梳理报告</div><pre id=\"opf-char-report\" class=\"opf-box opf-char-report\">尚未梳理</pre></div><div class=\"opf-out\"><div class=\"opf-sec-label\">最终稿件（YAML 规范输出，可直接粘进世界书 DLC 条目）</div><div class=\"opf-dim\" id=\"opf-char-outnote\"></div><pre id=\"opf-char-out\" class=\"opf-box\">尚未封装</pre><div class=\"opf-char-copyrow\"><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-copy\">⧉ 复制最终稿件</button></div></div></div>";
+var CHAR_HTML = "<div class=\"opf-char-wrap\"><div class=\"opf-sec-label\">✦ 二创角色工坊 · 分段式生成（产出世界书 DLC 角色条目）</div><div class=\"opf-dim\">流程：① 分段初稿（6段串行）→ ② 交火梳理（先整体审查出报告，再逐段应用联动修订，防截断）→ ③ 逐段定点修改（只改你指定的段，其它段冻结）→ ④ 最终封装：按 YAML 规范输出纯 YAML 文档（不写面板、不预设对user态度，武器/装备/道具/技能只写 名称/品质/叙述）。<br>⚠ 本页是给角色<b>写设定</b>：技能品质受“学习/领悟所得≤自身层级”限制（第四层级＝史诗档）。要给已有角色单独补一件技能、或要更高的档位，请去 <b>⑧ 造物工坊</b> 选类型「技能」单独造——那里不受本页层级限制，但会核对品质／消耗／威力是否同档。</div><textarea id=\"opf-char-demand\" class=\"opf-char-input\" placeholder=\"写谁？给出大致设定与需求（例：一位出身瓦伦蒂亚贫民区、靠街头格斗活下来的少女，性格倔强护短……）\"></textarea><textarea id=\"opf-char-ref\" class=\"opf-char-input\" placeholder=\"（可选）参考文本：已有设定/原型描述/世界书片段，将作为参考注入\"></textarea><div class=\"opf-char-tools\"><button type=\"button\" class=\"opf-btn primary\" id=\"opf-char-run\">▶ 分段初稿</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-link\">⚔ 交火梳理</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-final\">🎁 最终封装</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-new\">🗑 新角色</button></div><div id=\"opf-char-steps\"></div><div class=\"opf-sec\"><div class=\"opf-sec-label\">交火梳理报告</div><pre id=\"opf-char-report\" class=\"opf-box opf-char-report\">尚未梳理</pre></div><div class=\"opf-out\"><div class=\"opf-sec-label\">最终稿件（YAML 规范输出，可直接粘进世界书 DLC 条目）</div><div class=\"opf-dim\" id=\"opf-char-outnote\"></div><pre id=\"opf-char-out\" class=\"opf-box\">尚未封装</pre><div class=\"opf-char-copyrow\"><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-copy\">⧉ 复制最终稿件</button></div></div></div>";
 
 function charInit(){ ST.char = ST.char || { demand: "", ref: "", segs: {}, status: {}, report: "", out: "", outNote: [], name: "", _inited: false }; ST.char.outNote = ST.char.outNote || []; ST.charEls = ST.charEls || {}; }
 function bindCharPage(){
@@ -7489,7 +7489,8 @@ var ATL_SPACE_DEFAULT = '未归档';
 var ATL_KINDS = [
   {
     id: 'skill', label: '技能', noun: '技能', book: '《技能之书》',
-    hint: '技能分攻击技（消耗[攻击]、造成即时伤害、必填威力）与动作技（消耗[动作]、禁止即时伤害与威力，用于治疗/控制/增益/减益/功能，可含 DoT）；核心功能「伤害」只有攻击技可用。',
+    hint: '技能分攻击技（消耗[攻击]、造成即时伤害、必填威力）与动作技（消耗[动作]、禁止即时伤害与威力，用于治疗/控制/增益/减益/功能，可含 DoT）；核心功能「伤害」只有攻击技可用。'
+      + '品质与消耗、威力三者必须同档：低耗小威力挂传说/神话是最常见的错（实测反馈「180MP 挂传说」），要求「终极技」必须从史诗及以上选品质，消耗同时落进该档区间。',
     yaml: [
       '名称: ',
       '品质: ',
@@ -7619,6 +7620,90 @@ var ATL_KINDS = [
 function atlKind(id) {
   return ATL_KINDS.filter(function (k) { return k.id === id; })[0] || ATL_KINDS[0];
 }
+// 技能专属：把「品质」和「消耗 / 威力」钉在一起。
+// 来源是实测反馈——玩家要"大量消耗的大招"，拿到的是"180MP/180SP 的传说级小消耗雷霆"，
+// 根因是品质被模型当成稀有度标签写，没有与消耗量级、威力挂钩。
+var ATL_SKILL_QUALITY_RULES = [
+  '【技能专属：品质 ↔ 消耗 ↔ 威力 必须同档（硬约束）】',
+  '1. 品质决定的是量级与规模，不只是稀有度：品质必须同时体现在「消耗」数值、效果规模、背景分量上，三者一致才算合规。',
+  '2. 消耗档位（主动技，MP/SP/二者合计，与《核心数值表》同量级；动作技同理但数值取下沿）：',
+  '   · 普通 5~30｜优良 20~60｜稀有 35~100｜史诗 80~200｜传说 150~400｜神话 300~1000｜唯一 按专规',
+  '3. 威力档位（仅攻击技；动作技禁用威力）：普通 ≤200｜优良 200~400｜稀有 350~700｜史诗 600~1200｜传说 1000~2000｜神话 1800+。',
+  '4. 词条上限：普通 1 / 优良 2 / 稀有 2 / 史诗 3 / 传说 3 / 神话 3（唯一按专规）；史诗及以上至少有一条与本档相称的机制（微弱的要素 / 权能 / 法则，或同规模的规则改动），不能只是倍率变大。',
+  '5. 硬性禁止：低消耗挂高品级、高消耗低威力、标签里的消耗数值与正文消耗互相矛盾、"大量消耗的大招"配"小消耗"；判定看三挡是否互相打架（对照例：威力 900 挂传说＝没撑起来，威力 1500 挂传说＝撑起来了）。',
+  '6. 当{{user}}提到「大招 / 终结技 / 底牌 / 全力一击」这类诉求时，应把品质定在史诗或以上，消耗定在该品质区间，并另写一条对应的代价或限制（充能、反噬、冷却、可被打断）。',
+  '7. 若{{user}}明确指定了品质，就遵守它并把消耗、威力、效果规模一起对齐；宁可写清「这品质配不上你要的规模」也不要三挡互相打架。'
+].join('\n');
+function atlKindRules(kindId) {
+  return atlKind(kindId).id === 'skill' ? ATL_SKILL_QUALITY_RULES : '';
+}
+// 品质 / 消耗 / 威力 三挡的机械核对（零 AI）：实测反馈就是从这里漏出去的
+var ATL_BAND = {
+  '普通': { cost: [5, 30], power: [0, 200] },
+  '优良': { cost: [20, 60], power: [200, 400] },
+  '稀有': { cost: [35, 100], power: [350, 700] },
+  '史诗': { cost: [80, 200], power: [600, 1200] },
+  '传说': { cost: [150, 400], power: [1000, 2000] },
+  '神话': { cost: [300, 1000], power: [1800, Infinity] }
+};
+function atlBandOf(q) { return ATL_BAND[String(q || '').trim()] || null; }
+function atlNumbersNear(text, headRe) {
+  var lines = String(text || '').split(/\r?\n/);
+  var out = [];
+  lines.forEach(function (l) {
+    if (!headRe.test(l)) return;
+    var nums = l.match(/\d{1,5}/g) || [];
+    nums.forEach(function (n) { out.push(Number(n)); });
+  });
+  return out;
+}
+// 只报"证据确凿"的矛盾：既有明确品质、又读得到消耗/威力数值，且明显不相称。
+// 读不到就什么都不说（宁可不报，也不要为猜错的东西报警）。
+function atlSkillQualityAudit(t) {
+  var body = String(t || '');
+  // 注意 [ \t]* 而不是 \s*：\s 会跨行吃掉换行，把下一行的值当成品质读进来
+  var qm = body.match(/品质[ \t]*[:：][ \t]*([\u4e00-\u9fa5]{2})/);
+  if (!qm) return [];
+  var q = qm[1];
+  var band = atlBandOf(q);
+  if (!band) return [];                       // 「唯一」按专规，不参与档位核对
+  var issues = [];
+  // MP 与 SP 同时写入时，取两者之和与该档下沿比较（双资源同投不算"小消耗"）
+  var mpVals = atlNumbersNear(body, /MP/i);
+  var spVals = atlNumbersNear(body, /SP/i);
+  var mpMax = mpVals.length ? Math.max.apply(null, mpVals) : 0;
+  var spMax = spVals.length ? Math.max.apply(null, spVals) : 0;
+  var cost = (mpMax && spMax) ? (mpMax + spMax) : Math.max(mpMax, spMax);
+  if (cost && cost < band.cost[0] * 0.6) {
+    issues.push({
+      level: 'warn',
+      msg: '品质「' + q + '」配的是消耗 ' + cost + '（本档参考 ' + band.cost[0] + '~' + band.cost[1]
+        + '）：低消耗挂高品级是最常见的错，请把消耗提进本档，或把品质降到与消耗相称的档位'
+    });
+  }
+  var powers = atlNumbersNear(body, /威力/);
+  if (powers.length) {
+    var maxPower = Math.max.apply(null, powers);
+    // 威力这一侧判得比消耗严：攻击技的威力是必填、可比的硬数字，
+    // 而消耗量级在《技能之书》口径里本身有浮动空间（双资源同投也常见）。
+    if (band.power[1] !== Infinity && maxPower > band.power[1] * 1.5) {
+      issues.push({ level: 'warn', msg: '威力 ' + maxPower + ' 超出品质「' + q + '」的参考上限（' + band.power[1] + '）：调低威力或提高品质' });
+    }
+    // 判据就是「低于本档下沿」：威力是硬数字，读得到就没必要给它留缓冲。
+    // 实测反馈「威力 900 挂传说」正落在这里（传说档下沿 1000）。
+    if (maxPower > 0 && maxPower < band.power[0]) {
+      issues.push({
+        level: 'warn',
+        msg: '威力 ' + maxPower + ' 撑不起品质「' + q + '」（本档参考 ' + band.power[0] + '~' + band.power[1]
+          + '）：这就是「挂了个高品级的空壳」，请把威力提进本档，或把品质降到与威力相称的档位'
+      });
+    }
+  }
+  if (/类型\s*[:：]\s*动作技/.test(body) && /威力\s*[:：]\s*\S/.test(body)) {
+    issues.push({ level: 'warn', msg: '动作技不允许写威力（世界口径：威力仅攻击技必填、动作技禁用）' });
+  }
+  return issues;
+}
 
 var ATL_CSS = '#opf-page-atelier{font-size:13px}'
   + '#opf-page-atelier .atl-space{border:1px solid rgba(255,122,138,.22);border-radius:10px;margin:7px 0;background:rgba(255,235,238,.03);overflow:hidden}'
@@ -7637,7 +7722,14 @@ var ATL_CSS = '#opf-page-atelier{font-size:13px}'
   + '#opf-page-atelier .atl-item-meta{font-size:10.5px;color:rgba(255,200,208,.5)}'
   + '#opf-page-atelier .atl-empty{font-size:11.5px;color:rgba(255,200,208,.45);padding:6px 9px}'
   + '#opf-page-atelier textarea.opf-char-input{width:100%}'
-  + '#opf-page-atelier .opf-box{white-space:pre-wrap;word-break:break-word}';
+  + '#opf-page-atelier .opf-box{white-space:pre-wrap;word-break:break-word}'
+  // 交火分析提示条：点按钮没反应时，原因要写在页面上、看得见（不只是飘一下就走的 toast）
+  + '#opf-page-atelier .atl-cross-note{font-size:11.5px;line-height:1.6;padding:6px 9px;border-radius:8px;border:1px solid transparent;color:rgba(255,205,212,.72);background:rgba(255,235,238,.04)}'
+  + '#opf-page-atelier .atl-cross-note.ok{color:#cdf2d4;border-color:rgba(90,200,130,.34);background:rgba(70,190,120,.08)}'
+  + '#opf-page-atelier .atl-cross-note.warn{color:#ffd0d6;border-color:rgba(255,122,138,.42);background:rgba(255,77,94,.10)}'
+  + '@keyframes atlBlink{0%,100%{outline-color:rgba(255,150,165,0)}50%{outline-color:rgba(255,150,165,.95)}}'
+  + '#opf-page-atelier .atl-item.flash{outline:2px solid rgba(255,150,165,0);outline-offset:-2px;animation:atlBlink 1.1s ease-out 2}'
+  + '#opf-page-atelier .opf-btn.atl-danger{background:rgba(255,77,94,.22);border-color:rgba(255,122,138,.6);color:#ffe3e7}';
 var ATL_HTML = '<div class="opf-char-wrap">'
   + '<div class="opf-sec-label">✦ 造物工坊 · 单件生成 + 长期工作区</div>'
   + '<div class="opf-dim">流程：写需求（可选参考格式）→ 选类型 → 🎨 生成 YAML → 🔎 自检 → 用改进框提要求让 AI 改（可撤回）→ 📥 存成条目。产出可以攒进「工作区」；<b>勾选的条目会在下一次生成/改进/交火分析时一起发给 AI</b>，没勾的一条都不会发出去。<br>'
@@ -7705,6 +7797,7 @@ var ATL_HTML = '<div class="opf-char-wrap">'
   + '<button type="button" class="opf-btn ghost" id="opf-atl-crosstodir">📋 报告填进改进框</button>'
   + '<button type="button" class="opf-btn ghost" id="opf-atl-crosscopy">⧉ 复制报告</button>'
   + '</div>'
+  + '<div id="opf-atl-crossnote" class="atl-cross-note">交火分析：先在工作区里勾上要对照的条目（至少 2 条），再点上面的按钮。过程中会显示已用时间，模型返回前页面看起来是静止的。</div>'
   + '<pre id="opf-atl-crossout" class="opf-box opf-char-report">尚未分析</pre>'
   + '</div>';
 
@@ -8078,6 +8171,10 @@ function atlYamlLint(text, kindId) {
   // 骨架字段缺失
   var missing = (kind.fields || []).filter(function (f) { return !new RegExp('^\\s*(?:-\\s*)?' + f + '\\s*:', 'm').test(t); });
   if (missing.length) issues.push({ level: 'warn', msg: '缺「' + kind.label + '」骨架字段：' + missing.join('、') + '（可以增补字段，但骨架字段不该少）' });
+  // 技能专属：品质 ↔ 消耗 ↔ 威力 三挡核对（实测反馈的漏点，见 ATL_SKILL_QUALITY_RULES）
+  if (kind.id === 'skill') {
+    atlSkillQualityAudit(t).forEach(function (x) { issues.push(x); });
+  }
   var errN = issues.filter(function (x) { return x.level === 'error'; }).length;
   return {
     stats: { lines: nonEmpty.length, chars: chars, fields: scan.topKeys.length, kind: kind.label, topKeys: scan.topKeys },
@@ -8119,6 +8216,8 @@ function atlSystem(kindId) {
     + (kind.hint ? '\n[本类型的要点] ' + kind.hint : ''));
   L.push('[字段骨架（字段名照抄，可以按需求增补字段，但骨架字段一个都不能少）]\n' + kind.yaml);
   L.push([ATL_OUTPUT_RULES, CHAR_STYLE_RULES].join('\n'));
+  var kr = atlKindRules(kindId);
+  if (kr) L.push(kr);
   if (atlWorldRules()) L.push('[世界口径（数值与品级一律遵守）]\n' + atlWorldRules());
   var ctx = atlCtxBlock();
   if (ctx) L.push(ctx);
@@ -8150,6 +8249,11 @@ function atlFixPrompt(dir) {
   var L = [];
   L.push('[任务] 按{{user}}的要求改进下面这一件' + kind.noun + '的 YAML。' + (atlWantsShort(dir) ? '' : '未提到的字段与内容逐字保留。'));
   L.push('[用户要求]\n' + String(dir || '').trim());
+  if (kind.id === 'skill') {
+    L.push('[联动提醒] 只要这条要求牵动品质、消耗或威力中的任意一项，就把另外两项一起改到同档——'
+      + '要求"变大招／更强"就同时把品质提到史诗或以上、消耗与威力提进该档区间并补一条代价；'
+      + '不许出现「低消耗挂高品级」或「提高了品级却留着原来的小消耗」。');
+  }
   L.push('[当前 YAML（共 ' + cur.length + ' 字符）——输出必须是改好的**完整** YAML，不是片段，不要写"其余不变"这类占位]\n' + cur);
   L.push('[完整性要求] 原始内容 ' + cur.length + ' 字符；除非用户明确要求精简，你的输出不应明显短于它。');
   L.push('[输出] 只输出一个 ' + fence() + 'yaml 代码块。');
@@ -8161,6 +8265,8 @@ function atlSugPrompt() {
   var L = [];
   L.push('下面是一件' + atlKind(A.buf.kind).label + '的 YAML（' + cur.length + ' 字符，节选如下）。请给出 3~5 条**具体可执行**的改进方向，每条一行、不超过 40 字，直接写怎么做（例如"把品质降到优良并补一条反噬代价"）。不要输出 YAML 本体，不要解释。');
   L.push(cur.slice(0, 2500));
+  var kr = atlKindRules(A.buf.kind);
+  if (kr) L.push(kr);
   var ctx = atlCtxBundle();
   if (ctx.count) L.push('[联动条目（仅供参考，让建议与它们相容）]\n' + ctx.text.slice(0, 1500));
   return macroFill(L.join('\n\n'));
@@ -8230,11 +8336,92 @@ function atlConfirm(msg, fallback) {
 function atlSetRunning(on) {
   ['opf-atl-gen', 'opf-atl-ping', 'opf-atl-kinds', 'opf-atl-check', 'opf-atl-copy', 'opf-atl-download', 'opf-atl-save',
     'opf-atl-fix', 'opf-atl-sug', 'opf-atl-newspace', 'opf-atl-regroup', 'opf-atl-all', 'opf-atl-none', 'opf-atl-export',
-    'opf-atl-wipe', 'opf-atl-cross', 'opf-atl-crosstodir', 'opf-atl-crosscopy', 'opf-atl-undo'].forEach(function (id) {
+    'opf-atl-wipe', 'opf-atl-crosstodir', 'opf-atl-crosscopy', 'opf-atl-undo'].forEach(function (id) {
       var b = atlEl(id); if (b) b.disabled = !!on;
     });
+  // 生成按钮跟着全局运行态走；交火按钮的文案由 atlProgress 自己写（运行中要显示已用时间），
+  // 所以这里只负责它的禁用态，并把结束后的文案复位。
   var g = atlEl('opf-atl-gen'); if (g) g.textContent = on ? '■ 运行中…' : '🎨 生成 YAML';
-  var x = atlEl('opf-atl-cross'); if (x) x.textContent = on ? '■ 运行中…' : '🔥 交火分析';
+  if (!on) {
+    var x = atlEl('opf-atl-cross');
+    if (x) { x.textContent = '🔥 交火分析'; atlCls(x, 'remove', 'atl-danger'); }
+  }
+}
+// 「点了没反应」的在途反馈：generateRaw 是非流式的（插件的流式只在 ⑤ 页自建传输里），
+// 所以这里给不出逐字回显；至少要给秒表和一句"还在等"，别让界面看起来像死了。
+function atlProgressStart(label) {
+  atlProgressStop();
+  var t0 = Date.now();
+  atlInit()._atlTick = setInterval(function () {
+    var s = Math.round((Date.now() - t0) / 1000);
+    var el = atlEl('opf-atl-cross');
+    if (el) { el.textContent = '■ 终止等待（已用 ' + s + 's）'; atlCls(el, 'add', 'atl-danger'); }
+    atlStat(label + '：等待模型返回，已用 ' + s + 's（非流式，返回前看不到中间内容）');
+  }, 1000);
+}
+function atlProgressStop() {
+  var A = atlInit();
+  if (A._atlTick) { clearInterval(A._atlTick); A._atlTick = null; }
+  var el = atlEl('opf-atl-cross');
+  if (el) { el.textContent = '🔥 交火分析'; atlCls(el, 'remove', 'atl-danger'); }
+}
+// 真正中止主 API 的等待：STscript 的 /abort（TavernHelper.triggerSlash 转斜杠命令）。
+// 拿不到 TavernHelper 时不能假装成功——如实说明只能等它返回。
+async function atlTerminateRun() {
+  var th = (typeof TavernHelper !== 'undefined' && TavernHelper && typeof TavernHelper.triggerSlash === 'function') ? TavernHelper : null;
+  if (!th) { toast('这个环境读不到 TavernHelper，无法中止：请等模型返回，或换用「直连 + 真流式」的页面', 'warning'); return; }
+  try {
+    await th.triggerSlash('/abort');
+    toast('已发送中止：等待会立刻结束，改用短需求或减少勾选再试', 'success');
+  } catch (e) {
+    toast('中止失败：' + atlDiag(e), 'error');
+  }
+}
+// DOM 桩 / 极简环境里没有 classList，操作一律走这条窄通道，别让 UI 反馈自己把流程炸掉
+function atlCls(el, act, name) {
+  try { if (el && el.classList && typeof el.classList[act] === 'function') el.classList[act](name); } catch (e) {}
+}
+// 交火分析的提示条：勾了几条、够不够、超出上限丢了谁，全写在 ⑤ 区里
+function atlRenderCrossNote(state) {
+  var b = atlCtxBundle();
+  var box = atlEl('opf-atl-crossnote'); if (!box) return;
+  var st = String(state || 'idle').replace(/^running\d*$/, 'running');
+  atlCls(box, 'remove', 'ok'); atlCls(box, 'remove', 'warn');
+  if (st === 'running') {
+    box.textContent = '分析中：已带 ' + b.count + ' 条 / ' + b.chars + ' 字符，正在等模型返回。'
+      + '交火分析是一次整体审查（条目多、更长，比生成单件慢很多）；这个按钮在这期间会显示已用时间，随时可以点它终止。';
+    atlCls(box, 'add', 'ok');
+    return;
+  }
+  if (b.count >= 2) {
+    box.textContent = '交火分析：已勾选 ' + b.count + ' 条（' + b.chars + ' 字符），可以点了。'
+      + '分析对象就是这些勾选项，没勾的一条都不会发出去。'
+      + (b.dropped.length ? '｜注意：因上下文上限已省略 ' + b.dropped.length + ' 条（' + b.dropped.join('、') + '），它们不会参与分析。' : '');
+    atlCls(box, 'add', 'ok');
+    return;
+  }
+  box.textContent = b.count === 1
+    ? '交火分析至少要比 2 条（拿一条跟谁对照？）：请到上面「④ 工作区」的条目前面再勾上至少一条——勾选框在工作区列表里，不在这一屏。'
+    : '交火分析需要先勾选条目：请到上面「④ 工作区」把要一起对照的条目勾上（至少 2 条），勾选框在每个条目的左端。'
+      + (b.total ? '' : '（工作区还是空的：先在 ① 里生成一件，点「📥 存成条目」存进工作区）');
+  atlCls(box, 'add', 'warn');
+}
+// 提示条 + 工作区整体闪一下，把视线拉回去（勾选框在页面别处，容易找不到）
+function atlFlashWorkspace() {
+  atlRenderCrossNote('idle');
+  atlRenderSpaces();
+  var box = atlEl('opf-atl-crossnote');
+  if (box) {
+    atlCls(box, 'remove', 'warn'); atlCls(box, 'add', 'warn');
+    if (typeof box.scrollIntoView === 'function') box.scrollIntoView({ block: 'center' });
+  }
+  var host = atlEl('opf-atl-spaces'); if (!host || typeof host.querySelectorAll !== 'function') return;
+  var rows = host.querySelectorAll('.atl-item');
+  [].slice.call(rows).slice(0, 6).forEach(function (r) {
+    atlCls(r, 'remove', 'flash');
+    atlCls(r, 'add', 'flash');
+    setTimeout(function () { atlCls(r, 'remove', 'flash'); }, 2600);
+  });
 }
 async function atlCall(msgs, label, opts) {
   var o = opts || {};
@@ -8329,7 +8516,7 @@ function atlRenderKindsBox() {
       toast('已插入「' + k.label + '」的字段骨架（把值填上，或直接让 AI 按需求生成）');
     });
     var pre = document.createElement('pre'); pre.className = 'opf-box opf-char-report'; pre.style.margin = '2px 0 8px';
-    pre.textContent = k.yaml + (k.hint ? '\n\n（要点：' + k.hint + '）' : '');
+    pre.textContent = k.yaml + (k.hint ? '\n\n（要点：' + k.hint + '）' : '') + (atlKindRules(k.id) ? '\n\n' + atlKindRules(k.id) : '');
     row.appendChild(t); row.appendChild(b); row.appendChild(ins);
     box.appendChild(row); box.appendChild(pre);
   });
@@ -8417,6 +8604,7 @@ function atlRender() {
   atlRenderSpaceSelect();
   atlRenderSpaces();
   atlRenderCtxNote();
+  atlRenderCrossNote('idle');
   atlSyncSaveButtons();
   atlLintRun();
 }
@@ -8711,30 +8899,48 @@ async function atlDoSug() {
       box.appendChild(b);
     });
   } catch (e) { toast('生成建议失败：' + atlDiag(e), 'error'); }
-  finally { ST.running = false; atlSetRunning(false); }
+  finally {
+    ST.running = false; atlSetRunning(false);
+    atlRenderCrossNote('idle');
+  }
 }
+// 交火分析：勾选数不够时把原因写在页面上（不只是飘一下就走的 toast），并闪一下工作区；
+// 跑起来之后按钮变成「终止等待」+ 秒表，让"没反应"变成看得见的进度。
 async function atlDoCross() {
-  if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
-  var b = atlCtxBundle();
-  if (b.count < 2) { toast('交火分析至少要勾 2 条（它是对照，一条没有意义）：在工作区里勾上要一起看的部件', 'warning'); return; }
+  if (ST.running) { await atlTerminateRun(); return; }
+  var b0 = atlCtxBundle();
+  if (b0.count < 2) {
+    atlFlashWorkspace();
+    toast(b0.count === 1
+      ? '交火分析至少要比 2 条：到「④ 工作区」再勾上一条（勾选框在条目前面）'
+      : '交火分析需要先在工作区勾选至少 2 条：勾选框在「④ 工作区」每个条目的左端', 'warning');
+    return;
+  }
   var useWb = !!(atlEl('opf-atl-usewb') && atlEl('opf-atl-usewb').checked);
   var A = atlInit();
   ST.running = true; atlSetRunning(true);
+  atlRenderCrossNote('running');
+  atlProgressStart('交火分析');
   var box = atlEl('opf-atl-crossout');
-  if (box) box.textContent = '分析中…（已带 ' + b.count + ' 条 / ' + b.chars + ' 字符' + (useWb && ST.worldInfo ? ' + 世界书 ' + ST.worldInfo.length + ' 字符' : '') + '）';
+  var t0 = Date.now();
   try {
     var msgs = [{ role: 'system', content: atlCrossSystem() }, { role: 'user', content: atlCrossPrompt(useWb) }];
     var raw = await atlCall(msgs, '交火分析');
+    var secs = Math.round((Date.now() - t0) / 1000);
     A.meta.report = String(raw || '');
     await atlSaveMeta();
     if (box) box.textContent = A.meta.report.trim() || '（模型返回空）';
-    atlStat('交火分析完成：' + A.meta.report.length + ' 字符（可「📋 报告填进改进框」再逐条改）');
-    toast('交火分析完成', 'success');
+    atlStat('交火分析完成：' + A.meta.report.length + ' 字符，用时 ' + secs + 's（可「📋 报告填进改进框」再逐条改）');
+    atlRenderCrossNote('idle');
+    toast('交火分析完成（' + secs + 's）', 'success');
   } catch (e) {
-    if (box) box.textContent = '分析失败：' + atlDiag(e);
-    atlStat('交火分析失败：' + atlDiag(e));
-    toast('交火分析失败：' + atlDiag(e), 'error');
-  } finally { ST.running = false; atlSetRunning(false); }
+    var d = atlDiag(e);
+    var aborted = /aborted|Cancelled|中止|取消/i.test(String(d) + String(e && e.message ? e.message : ''));
+    if (box) box.textContent = (aborted ? '本轮已中止：' : '分析失败：') + d;
+    atlStat(aborted ? '交火分析已中止（未产生报告，上次的报告若要保留请先「⧉ 复制报告」）' : '交火分析失败：' + d);
+    atlRenderCrossNote('idle');
+    toast((aborted ? '已中止：' : '交火分析失败：') + d, aborted ? 'warning' : 'error');
+  } finally { ST.running = false; atlSetRunning(false); atlProgressStop(); }
 }
 async function atlDoPing() {
   atlStat('连通性自检：调用模型中…');
