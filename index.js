@@ -7750,10 +7750,16 @@ var ATL_CSS = '#opf-page-atelier{font-size:13px}'
   + '#opf-page-atelier .atl-cross-note.warn{color:#ffd0d6;border-color:rgba(255,122,138,.42);background:rgba(255,77,94,.10)}'
   + '@keyframes atlBlink{0%,100%{outline-color:rgba(255,150,165,0)}50%{outline-color:rgba(255,150,165,.95)}}'
   + '#opf-page-atelier .atl-item.flash{outline:2px solid rgba(255,150,165,0);outline-offset:-2px;animation:atlBlink 1.1s ease-out 2}'
-  + '#opf-page-atelier .opf-btn.atl-danger{background:rgba(255,77,94,.22);border-color:rgba(255,122,138,.6);color:#ffe3e7}';
+  + '#opf-page-atelier .opf-btn.atl-danger{background:rgba(255,77,94,.22);border-color:rgba(255,122,138,.6);color:#ffe3e7}'
+  // 司书插话：始弦的台词，视觉上比机械提示更"有人味"，出现时机只限事后与空态
+  + '#opf-page-atelier #opf-atl-sx{border:1px solid rgba(255,180,120,.3);border-left:3px solid rgba(255,170,110,.75);'
+  + 'background:rgba(255,196,140,.07);color:#ffe6cf;font-size:12px;line-height:1.65;padding:7px 10px;border-radius:8px;margin:7px 0;white-space:pre-wrap;word-break:break-word}'
+  + '@keyframes atlSay{0%{opacity:0;transform:translateY(-3px)}100%{opacity:1;transform:none}}'
+  + '#opf-page-atelier #opf-atl-sx.open{animation:atlSay .25s ease-out}'
+  + '#opf-page-atelier .atl-cross-note .atl-sx-line{display:block;margin-top:3px;color:#ffe6cf}';
 var ATL_HTML = '<div class="opf-char-wrap">'
   + '<div class="opf-sec-label">✦ 造物工坊 · 单件生成 + 长期工作区</div>'
-  + '<div class="opf-dim">流程：写需求（可选参考格式）→ 选类型 → 🎨 生成 YAML → 🔎 自检 → 用改进框提要求让 AI 改（可撤回）→ 📥 存成条目。产出可以攒进「工作区」；<b>勾选的条目会在下一次生成/改进/交火分析时一起发给 AI</b>，没勾的一条都不会发出去。<br>'
+  + '<div class="opf-dim" id="opf-atl-hint">流程：写需求（可选参考格式）→ 选类型 → 🎨 生成 YAML → 🔎 自检 → 用改进框提要求让 AI 改（可撤回）→ 📥 存成条目。产出可以攒进「工作区」；<b>勾选的条目会在下一次生成/改进/交火分析时一起发给 AI</b>，没勾的一条都不会发出去。<br>'
   + '⚠ 保存分两种：<b>📥 存成条目</b>＝新建一条；<b>💾 更新「某条」</b>＝覆盖已打开/刚存的那条（按钮文字会写明要覆盖谁）。<b>要做下一件东西：点「🆕 开始下一个条目」清空编辑区，或直接改需求再点「🎨 生成 YAML」——生成会自动另起一条，绝不会覆盖上一条。</b></div>'
 
   + '<div class="opf-sec"><div class="opf-sec-label">① 需求与参考</div></div>'
@@ -7764,13 +7770,14 @@ var ATL_HTML = '<div class="opf-char-wrap">'
   + '<textarea id="opf-atl-req" class="opf-char-input" style="min-height:80px" placeholder="需求与想法（越具体越好）：例「给女主做一把冰系太刀，稀有品质，出手时能冻住对方一回合，代价是自身也吃一点寒意」"></textarea>'
   + '<textarea id="opf-atl-ref" class="opf-char-input" style="min-height:60px" placeholder="参考内容（可不填）：粘一段别处的格式/样例，模型只当格式参考，不会照抄内容"></textarea>'
   + '<div class="opf-char-tools">'
-  + '<button type="button" class="opf-btn primary" id="opf-atl-gen">🎨 生成 YAML</button>'
-  + '<button type="button" class="opf-btn ghost" id="opf-atl-new">🆕 开始下一个条目</button>'
-  + '<button type="button" class="opf-btn ghost" id="opf-atl-ping">🩺 连通性自检</button>'
-  + '<button type="button" class="opf-btn ghost" id="opf-atl-last">📄 上次返回</button>'
-  + '<button type="button" class="opf-btn ghost" id="opf-atl-kinds">📐 字段骨架速查</button>'
+  + '<button type="button" class="opf-btn primary" id="opf-atl-gen" title="按需求造一件新的：这一下不会覆盖工作区里已有的条目">🎨 生成 YAML</button>'
+  + '<button type="button" class="opf-btn ghost" id="opf-atl-new" title="清空编辑区、解除绑定，开始造下一件">🆕 开始下一个条目</button>'
+  + '<button type="button" class="opf-btn ghost" id="opf-atl-ping" title="先确认酒馆的主 API 通不通，再去翻书">🩺 连通性自检</button>'
+  + '<button type="button" class="opf-btn ghost" id="opf-atl-last" title="模型上一次原样返回的全文">📄 上次返回</button>'
+  + '<button type="button" class="opf-btn ghost" id="opf-atl-kinds" title="各类的字段骨架与世界书档位速查">📐 字段骨架速查</button>'
   + '</div>'
   + '<div class="opf-dim" id="opf-atl-status">就绪</div>'
+  + '<div id="opf-atl-sx" style="display:none">◇ 始弦：书库这边空着呢。写清要造什么、给谁用，我去把记载翻出来。</div>'
   + '<pre id="opf-atl-lastraw" class="opf-box opf-char-report" style="display:none">尚未调用</pre>'
   + '<pre id="opf-atl-kindsbox" class="opf-box opf-char-report" style="display:none">尚未展开</pre>'
 
@@ -7790,8 +7797,8 @@ var ATL_HTML = '<div class="opf-char-wrap">'
   + '<div class="opf-sec"><div class="opf-sec-label">③ 改进（提要求 → AI 改 → 可撤回）</div></div>'
   + '<textarea id="opf-atl-dir" class="opf-char-input" style="min-height:60px" placeholder="例：品质降到优良；补一条反噬代价；标签加上「冰」；把它改成像勾选的那两件同一体系"></textarea>'
   + '<div class="opf-char-tools">'
-  + '<button type="button" class="opf-btn primary" id="opf-atl-fix">✨ 按这条要求改进</button>'
-  + '<button type="button" class="opf-btn ghost" id="opf-atl-sug">💡 建议</button>'
+  + '<button type="button" class="opf-btn primary" id="opf-atl-fix" title="只改你写到的部分，其余的逐字保留">✨ 按这条要求改进</button>'
+  + '<button type="button" class="opf-btn ghost" id="opf-atl-sug" title="让始弦先给你几条可点的改进方向">💡 建议</button>'
   + '</div>'
   + '<div class="opf-step-ref" id="opf-atl-chips"></div>'
 
@@ -7814,7 +7821,7 @@ var ATL_HTML = '<div class="opf-char-wrap">'
   + '<div class="opf-sec"><div class="opf-sec-label">⑤ 交火分析（把勾选的条目放在一起查冲突）</div></div>'
   + '<div class="opf-step-ref-row">'
   + '<label class="opf-opt"><input type="checkbox" id="opf-atl-usewb"> 附世界书参考（② 页勾选）</label>'
-  + '<button type="button" class="opf-btn primary" id="opf-atl-cross">🔥 交火分析</button>'
+  + '<button type="button" class="opf-btn primary" id="opf-atl-cross" title="至少勾 2 条才能对照；跑起来后这个按钮变成「终止等待」">🔥 交火分析</button>'
   + '<button type="button" class="opf-btn ghost" id="opf-atl-crosstodir">📋 报告填进改进框</button>'
   + '<button type="button" class="opf-btn ghost" id="opf-atl-crosscopy">⧉ 复制报告</button>'
   + '</div>'
@@ -8228,10 +8235,90 @@ function atlCtxBlock() {
   return L.join('\n');
 }
 function atlWorldRules() { return (typeof WORLD_RULES === 'string' ? WORLD_RULES : ''); }
+// ============================================================================
+// 司书在台前：始弦的存在感统一放这里，别再散落各处硬写
+// 依据是 persona（大图书馆馆长兼司书、红发双马尾、有点小小的骄傲、把{{user}}当挚友）
+// 与 ⑥ 页的 SHX_PERSONA（语气直接克制、少堆形容词、可用吐槽但别堆网络梗）。
+// 分工写死，不许越界：
+//   · 写知识的是 AI，点评与播报是始弦——她的台词不得编造世界规则，只解释已有结论；
+//   · 机械提示（档位、条数、文件路径）保持事实口吻，她的语气只加在措辞层；
+//   · 她的台词只出现在「事后」与「空态」，流程按钮文案保持简洁，不抢戏。
+// 她的话以 ATL_NOTE_OPEN/CLOSE 包裹，产出框只取 yaml 代码块，所以她的话不会污染条目。
+// ============================================================================
+var ATL_NOTE_OPEN = '<<<SX';
+var ATL_NOTE_CLOSE = 'SX>>>';
+var ATL_SX_VOICE = '你是始弦，大图书馆的司书。你把{{user}}当作挚友，说话直接、不绕弯子，有点小小的骄傲但不自顾自输出观点；语气克制，少堆形容词，可以用吐槽但别堆网络梗。'
+  + '馆藏里有的按馆藏讲，属于你自己的推断要明说是推断，馆藏里没有就说没有——不要编造规则或数值。';
+var ATL_SX_SAY = {
+  bootEmpty: '书库这边空着呢。写清要造什么、给谁用，我去把记载翻出来。',
+  bootReady: '书库开着。勾上的条目我都会带上，没勾的一个字也不会给出去。',
+  gen: '换一件东西来造。要接着改上面那件，就去「③ 改进」写要求。',
+  poorPick: '挑一件东西出来。左边写需求、上面挑类型，别让我空手翻书。',
+  needReq: '连要造什么、给谁用都没说，我可没本事从空话里翻出东西。要么写清需求，要么把一件现成的打开进来。',
+  needDir: '改进要求呢？写一句具体的，比如「品质提到传说，消耗按本档补上」。',
+  beforeCall: '翻记载中…',
+  waiting: '馆藏里比对中',
+  needDirChip: '先从左边挑一条方向，再来找我改。',
+  crossShort: '就一条？那你让我跟谁对照。去「④ 工作区」再勾上一条。',
+  crossNone: '一条都没勾。交火分析是拿几条互相对照的，先去「④ 工作区」勾上要看的部件。',
+  crossWaiting: '把这几件摆一起比着呢',
+  noYaml: '这次翻出来的不是条目——多半是模型偷懒回了别的东西。去「📄 上次返回」看一眼原文。',
+  tooShort: '改完只剩这么点？这看着像只回了个片段。要么重新要一次，要么把原稿留着。',
+  lintOk: '这条没问题，世界书的档位都对得上。',
+  lintBad: '这条跟世界书对不上，我给你指出来了——别拿着去用。',
+  atelierIntro: '这里是造物工坊。单独造一件东西，造完可以攒起来互相对照。',
+  spaceEmpty: '这个工作区还空着。造一件东西存进来，才有得对照。'
+};
+// 生成/改进/建议/交火都要求她最后出来说一句（包裹在 ATL_NOTE_OPEN…CLOSE 里）
+function atlSxNoteAsk(what) {
+  return '[收尾] 最后另起一段，用始弦的口吻写 1~2 句，说明这次' + what
+    + '的档次与依据（例如数值落在哪一档、哪一项是推断）；不要复述条目内容，不要加任何 markdown 标题。'
+    + '整段用 ' + ATL_NOTE_OPEN + ' 与 ' + ATL_NOTE_CLOSE + ' 包起来，放在代码块之外。';
+}
+function atlSxNote(raw) {
+  var m = String(raw || '').match(/<<<SX([\s\S]*?)SX>>>/);
+  return m ? String(m[1]).trim() : '';
+}
+// ---------------- 空态台词：一次一句，按状态挑 ----------------
+// 页头那句司书招呼：ATL_HTML 是常量、司书台词在后面才定义，所以这里在启动时填进去
+function atlRenderHint() {
+  var h = atlEl('opf-atl-hint'); if (!h) return;
+  h.textContent = '◇ 始弦：' + ATL_SX_SAY.atelierIntro + ' 流程：写需求（可选参考格式）→ 选类型 → 🎨 生成 YAML → 🔎 自检 → 用改进框提要求让 AI 改（可撤回）→ 📥 存成条目。'
+    + '产出可以攒进「工作区」；勾选的条目会在下一次生成/改进/交火分析时一起发给 AI，没勾的一条都不会发出去。';
+}
+function atlRand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function atlSxBootNote() {
+  var A = atlInit();
+  var b = atlCtxBundle();
+  if (!A.items.length) return ATL_SX_SAY.bootEmpty;
+  if (!b.count) return '书库里有 ' + A.items.length + ' 条部件。要我把哪几件带上，就去「④ 工作区」勾一下。';
+  return '书库里有 ' + A.items.length + ' 条部件，这次带上 ' + b.count + ' 条。';
+}
+// ---------------- 自检点评：只用已有问题，不许她造规则 ----------------
+function atlLintHeader(r) {
+  if (!r) return '';
+  if (r.ok && !r.issues.length) return '◇ 始弦：' + ATL_SX_SAY.lintOk;
+  if (r.ok) return '◇ 始弦：' + ATL_SX_SAY.lintBad.slice(0, ATL_SX_SAY.lintBad.length - 1) + '，下面是 ' + r.issues.length + ' 条提醒。';
+  var n1 = r.issues.filter(function (x) { return x.level === 'error'; })[0];
+  return '◇ 始弦：这条我拦下了——' + (n1 ? n1.msg.split('：')[0] : '有硬错误') + '。先把下面标红的部分修掉再拿去用。';
+}
+function atlSxSay(title, body) {
+  var box = atlEl('opf-atl-sx'); if (!box) return;
+  box.textContent = '◇ 始弦：' + String(title || body || '').trim();
+  box.style.display = box.textContent.trim() ? 'block' : 'none';
+}
+function atlSxAsk(title) {
+  var box = atlEl('opf-atl-sx');
+  if (!box) return;
+  box.textContent = '◇ 始弦：' + String(title || '').trim();
+  box.style.display = 'block';
+  atlCls(box, 'remove', 'open'); atlCls(box, 'add', 'open');
+}
+function atlSxQuiet() { var box = atlEl('opf-atl-sx'); if (box) { box.textContent = ''; box.style.display = 'none'; } }
 function atlSystem(kindId) {
   var kind = atlKind(kindId);
   var L = [];
-  L.push('[角色] ' + macroFill('你是始弦，大图书馆的司书。你把{{user}}当作挚友，说话直接、不绕弯子；这一次你只负责把东西造出来，不写多余的解释。'));
+  L.push('[角色] ' + macroFill(ATL_SX_VOICE + ' 这一次你只负责把东西造出来：条目本体之外不写多余解释，只在最后按下面的收尾要求说一两句。'));
   L.push('[任务] 为{{user}}造一件' + kind.noun + '，并按【字段骨架】输出 YAML。'
     + (kind.book ? '格式照' + kind.book + '来。' : '')
     + (kind.hint ? '\n[本类型的要点] ' + kind.hint : ''));
@@ -8261,6 +8348,7 @@ function atlGenPrompt() {
   L.push('[本次要造的' + kind.noun + '] ' + (String(A.buf.req || '').trim() || '（需求为空：按世界口径造一件' + kind.label + '，稳妥、可用、不越级）'));
   if (String(A.buf.ref || '').trim()) L.push('[参考内容（只参考格式与详略，不要照抄内容）]\n' + String(A.buf.ref).trim());
   L.push('[输出] 直接给出 ' + fence() + 'yaml 代码块，不要寒暄、不要总结。');
+  L.push(atlSxNoteAsk('这件' + kind.noun));
   return macroFill(L.join('\n\n'));
 }
 function atlFixPrompt(dir) {
@@ -8278,6 +8366,7 @@ function atlFixPrompt(dir) {
   L.push('[当前 YAML（共 ' + cur.length + ' 字符）——输出必须是改好的**完整** YAML，不是片段，不要写"其余不变"这类占位]\n' + cur);
   L.push('[完整性要求] 原始内容 ' + cur.length + ' 字符；除非用户明确要求精简，你的输出不应明显短于它。');
   L.push('[输出] 只输出一个 ' + fence() + 'yaml 代码块。');
+  L.push(atlSxNoteAsk('改动'));
   return macroFill(L.join('\n\n'));
 }
 function atlSugPrompt() {
@@ -8290,6 +8379,8 @@ function atlSugPrompt() {
   if (kr) L.push(kr);
   var ctx = atlCtxBundle();
   if (ctx.count) L.push('[联动条目（仅供参考，让建议与它们相容）]\n' + ctx.text.slice(0, 1500));
+  L.push('[收尾] 建议列完之后，另起一段用始弦的口吻写 1 句，点出这条最该先动哪里；'
+    + '整段用 ' + ATL_NOTE_OPEN + ' 与 ' + ATL_NOTE_CLOSE + ' 包起来。');
   return macroFill(L.join('\n\n'));
 }
 function atlCrossPrompt(useWb) {
@@ -8300,6 +8391,8 @@ function atlCrossPrompt(useWb) {
   if (useWb && ST.worldInfo) L.push('[世界书参考（② 页勾选，共 ' + ST.worldInfo.length + ' 字符；只作口径核对，不是修改对象）]\n' + ST.worldInfo);
   L.push('[输出] 按四段写：【严重冲突】/【口径不一致】/【重复或功能重叠】/【可选优化】；'
     + '每段内每条格式为「涉及条目 → 问题 → 建议」；某段没有问题的就写「无」。不要重抄 YAML，不要输出代码块。');
+  L.push('[收尾] 报告之后再另起一段，用始弦的口吻写 1~2 句，点出这几件里最先该动哪一件、为什么；'
+    + '整段用 ' + ATL_NOTE_OPEN + ' 与 ' + ATL_NOTE_CLOSE + ' 包起来。');
   return macroFill(L.join('\n\n'));
 }
 var ATL_CROSS_RULES = [
@@ -8373,6 +8466,7 @@ function atlSetRunning(on) {
 function atlProgressStart(label) {
   atlProgressStop();
   var t0 = Date.now();
+  atlSxAsk(ATL_SX_SAY.waiting + '…');
   atlInit()._atlTick = setInterval(function () {
     var s = Math.round((Date.now() - t0) / 1000);
     var el = atlEl('opf-atl-cross');
@@ -8423,8 +8517,10 @@ function atlRenderCrossNote(state) {
   }
   box.textContent = b.count === 1
     ? '交火分析至少要比 2 条（拿一条跟谁对照？）：请到上面「④ 工作区」的条目前面再勾上至少一条——勾选框在工作区列表里，不在这一屏。'
+      + '\n◇ 始弦：' + ATL_SX_SAY.crossShort
     : '交火分析需要先勾选条目：请到上面「④ 工作区」把要一起对照的条目勾上（至少 2 条），勾选框在每个条目的左端。'
-      + (b.total ? '' : '（工作区还是空的：先在 ① 里生成一件，点「📥 存成条目」存进工作区）');
+      + (b.total ? '' : '（工作区还是空的：先在 ① 里生成一件，点「📥 存成条目」存进工作区）')
+      + '\n◇ 始弦：' + (b.total ? ATL_SX_SAY.crossNone : ATL_SX_SAY.bootEmpty);
   atlCls(box, 'add', 'warn');
 }
 // 提示条 + 工作区整体闪一下，把视线拉回去（勾选框在页面别处，容易找不到）
@@ -8446,7 +8542,7 @@ function atlFlashWorkspace() {
 }
 async function atlCall(msgs, label, opts) {
   var o = opts || {};
-  atlStat(label + '：调用模型中…');
+  atlStat(label + '：' + ATL_SX_SAY.beforeCall + '（' + label + '）');
   var t0 = Date.now();
   var resp = await callModel(msgs, o.extra);
   var A = atlInit();
@@ -8477,6 +8573,9 @@ function atlLintRun() {
   var warnN = r.issues.length - errN;
   L.push((errN ? '❌ ' : '✓ ') + '自检：' + r.stats.lines + ' 行 / ' + r.stats.chars + ' 字符 / 顶层字段 ' + r.stats.fields + ' 个（类型：' + r.stats.kind + '）'
     + (r.issues.length ? '｜错误 ' + errN + ' / 提醒 ' + warnN : '｜没有问题'));
+  // 司书对这份自检的看法（只解释已有问题，不新增规则）
+  var head = atlLintHeader(r);
+  if (head) L.push(head);
   if (r.stats.topKeys && r.stats.topKeys.length) L.push('顶层字段：' + r.stats.topKeys.join('、'));
   r.issues.forEach(function (x) { L.push((x.level === 'error' ? '❌ ' : '⚠ ') + x.msg); });
   box.textContent = L.join('\n');
@@ -8529,11 +8628,13 @@ function atlRenderKindsBox() {
     var t = document.createElement('span'); t.className = 'opf-ref-tag'; t.textContent = k.label;
     var b = document.createElement('span'); b.className = 'opf-dim'; b.textContent = '字段：' + (k.fields || []).join(' / ');
     var ins = document.createElement('button'); ins.type = 'button'; ins.className = 'opf-step-act'; ins.textContent = '插入';
+    ins.title = '把骨架填进产出框，值可以自己写，也可以让我按需求生成';
     ins.addEventListener('click', function () {
       var A = atlInit();
       atlPushHist('插入骨架');
       A.buf.kind = k.id; A.buf.yaml = k.yaml;
       atlRenderKindSelect(); atlSyncOut(); atlLintRun(); atlDraftSave();
+      atlSxSay('骨架给你摊开了，把值填上；懒得填就直接写需求让我来。');
       toast('已插入「' + k.label + '」的字段骨架（把值填上，或直接让 AI 按需求生成）');
     });
     var pre = document.createElement('pre'); pre.className = 'opf-box opf-char-report'; pre.style.margin = '2px 0 8px';
@@ -8546,7 +8647,7 @@ function atlRenderKindsBox() {
 function atlItemRow(it) {
   var row = document.createElement('div'); row.className = 'atl-item' + (it.sel ? ' sel' : '');
   var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!it.sel;
-  cb.title = '勾选的条目会随下一次生成/改进/交火分析一起发给 AI';
+  cb.title = '勾上我就把这条带上，一起发给 AI；没勾的一个字都不发';
   cb.setAttribute('aria-label', '把「' + (it.name || '未命名') + '」一起发给 AI');
   cb.addEventListener('change', function () { atlToggleSel(it.id, cb.checked); });
   var tag = document.createElement('span'); tag.className = 'opf-ref-tag'; tag.textContent = atlKind(it.kind).label;
@@ -8555,7 +8656,7 @@ function atlItemRow(it) {
   nm.setAttribute('aria-label', '条目名');
   nm.addEventListener('change', function () { atlRenameItem(it.id, this.value); });
   var open = document.createElement('button'); open.type = 'button'; open.className = 'opf-step-act atl-open'; open.textContent = '打开';
-  open.title = '载入到上方编辑区继续改';
+  open.title = '载到上面接着改；「💾 更新」覆盖的就是它';
   open.addEventListener('click', function () { atlOpenItem(it.id); });
   var bits = [];
   bits.push(String(it.yaml || '').length + ' 字符');
@@ -8585,7 +8686,7 @@ function atlRenderSpaces() {
   var box = atlEl('opf-atl-spaces'); if (!box) return;
   box.textContent = '';
   if (!A.spaces.length) {
-    var e0 = document.createElement('div'); e0.className = 'atl-empty'; e0.textContent = '（还没有工作区：点「＋ 新建工作区」，或直接把产出「📥 存成条目」）';
+    var e0 = document.createElement('div'); e0.className = 'atl-empty'; e0.textContent = '（还没有工作区：点「＋ 新建工作区」，或直接把产出「📥 存成条目」）◇ 始弦：书库一格都没开呢，先把东西造出来，我给你腾架子。';
     box.appendChild(e0); return;
   }
   A.spaces.forEach(function (sp) {
@@ -8610,7 +8711,7 @@ function atlRenderSpaces() {
     d.appendChild(sum);
     var body = document.createElement('div');
     if (!items.length) {
-      var e1 = document.createElement('div'); e1.className = 'atl-empty'; e1.textContent = '（这个工作区还没有条目）';
+      var e1 = document.createElement('div'); e1.className = 'atl-empty'; e1.textContent = '（这个工作区还没有条目）◇ 始弦：' + ATL_SX_SAY.spaceEmpty;
       body.appendChild(e1);
     }
     items.forEach(function (it) { body.appendChild(atlItemRow(it)); });
@@ -8817,7 +8918,7 @@ function atlSpacesByName() {
 async function atlDoGenerate() {
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
   var A = atlInit();
-  if (!String(A.buf.req || '').trim() && !String(A.buf.ref || '').trim()) { toast('先写一句需求（或粘一段参考），再生成', 'warning'); return; }
+  if (!String(A.buf.req || '').trim() && !String(A.buf.ref || '').trim()) { atlSxAsk(ATL_SX_SAY.needReq); toast('先写一句需求（或粘一段参考），再生成', 'warning'); return; }
   var wasBound = atlBoundItem();          // 生成＝造新的一条：成功后解绑，避免保存时覆盖上一条
   ST.running = true; atlSetRunning(true);
   try {
@@ -8825,6 +8926,7 @@ async function atlDoGenerate() {
     var raw = await atlCall(msgs, '生成');
     var yaml = atlExtractYaml(raw);
     if (!yaml.trim()) {
+      atlSxAsk(ATL_SX_SAY.noYaml);
       atlStat('生成：模型没返回可用的 YAML（点「📄 上次返回」看原文）');
       toast('模型没有返回可用的 YAML：点工具栏「📄 上次返回」看原文，或再试一次', 'warning');
       return;
@@ -8839,12 +8941,15 @@ async function atlDoGenerate() {
     var r = atlLintRun();
     atlSyncSaveButtons();
     atlDraftSave();
+    // 司书出来说一句：优先用模型按收尾要求写的解释，没有就退回自检点评
+    atlSxSay(atlSxNote(raw) || atlLintHeader(r).replace(/^◇ 始弦：/, ''));
     atlStat('生成完成：' + yaml.length + ' 字符｜未绑定条目（点「📥 存成条目」新建）'
       + (r && r.issues.length ? '｜自检发现 ' + r.issues.length + ' 条，见下方' : '｜自检通过'));
     toast('已生成（' + yaml.length + ' 字符）'
       + (wasBound ? '；这是**新的一条**，上一条「' + (wasBound.name || '未命名') + '」没有被改动（要改它请在工作区点「打开」）' : '')
       + (r && r.issues.length ? '，自检有 ' + r.issues.length + ' 条提醒' : ''), 'success');
   } catch (e) {
+    atlSxSay('这次没翻成。' + atlDiag(e));
     atlStat('生成失败：' + atlDiag(e));
     toast('生成失败：' + atlDiag(e), 'error');
   } finally { ST.running = false; atlSetRunning(false); }
@@ -8853,8 +8958,8 @@ async function atlDoFix() {
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
   var A = atlInit();
   var dir = String(A.buf.dir || '').trim() || String((atlEl('opf-atl-dir') || {}).value || '').trim();
-  if (!String(A.buf.yaml || '').trim()) { toast('还没有可改的产出：先生成一件，或把工作区里的条目「打开」进来', 'warning'); return; }
-  if (!dir) { toast('先写一句改进要求，例如「品质降到优良、补一条反噬代价」', 'warning'); return; }
+  if (!String(A.buf.yaml || '').trim()) { atlSxAsk(ATL_SX_SAY.needReq); toast('还没有可改的产出：先生成一件，或把工作区里的条目「打开」进来', 'warning'); return; }
+  if (!dir) { atlSxAsk(ATL_SX_SAY.needDir); toast('先写一句改进要求，例如「品质降到优良、补一条反噬代价」', 'warning'); return; }
   var before = String(A.buf.yaml);
   ST.running = true; atlSetRunning(true);
   try {
@@ -8862,6 +8967,7 @@ async function atlDoFix() {
     var raw = await atlCall(msgs, '改进');
     var yaml = atlExtractYaml(raw);
     if (!yaml.trim()) {
+      atlSxAsk(ATL_SX_SAY.noYaml);
       atlStat('改进：模型没返回可用的 YAML（点「📄 上次返回」看原文）');
       toast('模型没有返回可用的 YAML，原样保留', 'warning');
       return;
@@ -8870,6 +8976,7 @@ async function atlDoFix() {
       var ask = (typeof window !== 'undefined' && window.confirm) ? window.confirm : function () { return false; };
       if (!ask('改后只有 ' + yaml.length + ' 字符，原来是 ' + before.length + ' 字符（-'
         + Math.round((1 - yaml.length / Math.max(1, before.length)) * 100) + '%），像是只回了片段。\n\n要用这个偏短的结果替换吗？（取消＝保留原样）')) {
+        atlSxAsk(ATL_SX_SAY.tooShort);
         atlStat('改进：结果偏短，已保留原样（' + before.length + ' 字符）');
         return;
       }
@@ -8888,9 +8995,11 @@ async function atlDoFix() {
       synced = '，已同步到条目「' + (it.name || '未命名') + '」（行内「↩ 回退」可退）';
     }
     atlDraftSave();
+    atlSxSay(atlSxNote(raw) || atlLintHeader(r).replace(/^◇ 始弦：/, ''));
     atlStat('改进完成：' + before.length + ' → ' + yaml.length + ' 字符' + synced);
     toast('已改进（' + before.length + ' → ' + yaml.length + ' 字符）' + synced, 'success');
   } catch (e) {
+    atlSxSay('这次没改成。' + atlDiag(e));
     atlStat('改进失败：' + atlDiag(e));
     toast('改进失败：' + atlDiag(e), 'error');
   } finally { ST.running = false; atlSetRunning(false); }
@@ -8898,13 +9007,15 @@ async function atlDoFix() {
 async function atlDoSug() {
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
   var A = atlInit();
-  if (!String(A.buf.yaml || '').trim()) { toast('先生成一件，或打开工作区里的条目，再要建议', 'warning'); return; }
+  if (!String(A.buf.yaml || '').trim()) { atlSxAsk(ATL_SX_SAY.needReq); toast('先生成一件，或打开工作区里的条目，再要建议', 'warning'); return; }
   var box = atlEl('opf-atl-chips'); if (!box) return;
   ST.running = true; atlSetRunning(true);
   try {
     var raw = await atlCall([{ role: 'user', content: atlSugPrompt() }], '建议');
     var list = [];
     String(raw).split(/\r?\n/).forEach(function (ln) {
+      // 司书的收尾段包在 <<<SX…SX>>> 里，别把它也当成建议胶囊
+      if (ln.indexOf(ATL_NOTE_OPEN) >= 0 || ln.indexOf(ATL_NOTE_CLOSE) >= 0) return;
       var t = String(ln).replace(/^\s*(?:[-*•]|\d+[.、)])\s*/, '').trim();
       if (t && t.length >= 4 && t.length <= 60 && list.indexOf(t) < 0) list.push(t);
     });
@@ -8919,7 +9030,11 @@ async function atlDoSug() {
       });
       box.appendChild(b);
     });
-  } catch (e) { toast('生成建议失败：' + atlDiag(e), 'error'); }
+    atlSxSay(atlSxNote(raw) || '方向都在这儿了，挑一条我就动手。');
+  } catch (e) {
+    atlSxAsk('这次没想出方向。' + atlDiag(e));
+    toast('生成建议失败：' + atlDiag(e), 'error');
+  }
   finally {
     ST.running = false; atlSetRunning(false);
     atlRenderCrossNote('idle');
@@ -8932,6 +9047,7 @@ async function atlDoCross() {
   var b0 = atlCtxBundle();
   if (b0.count < 2) {
     atlFlashWorkspace();
+    atlSxAsk(b0.count === 1 ? ATL_SX_SAY.crossShort : ATL_SX_SAY.crossNone);
     toast(b0.count === 1
       ? '交火分析至少要比 2 条：到「④ 工作区」再勾上一条（勾选框在条目前面）'
       : '交火分析需要先在工作区勾选至少 2 条：勾选框在「④ 工作区」每个条目的左端', 'warning');
@@ -8948,16 +9064,20 @@ async function atlDoCross() {
     var msgs = [{ role: 'system', content: atlCrossSystem() }, { role: 'user', content: atlCrossPrompt(useWb) }];
     var raw = await atlCall(msgs, '交火分析');
     var secs = Math.round((Date.now() - t0) / 1000);
-    A.meta.report = String(raw || '');
+    var say = atlSxNote(raw);
+    var report = String(raw || '').replace(/<<<SX[\s\S]*?SX>>>/g, '').trim();
+    A.meta.report = report;
     await atlSaveMeta();
-    if (box) box.textContent = A.meta.report.trim() || '（模型返回空）';
-    atlStat('交火分析完成：' + A.meta.report.length + ' 字符，用时 ' + secs + 's（可「📋 报告填进改进框」再逐条改）');
+    if (box) box.textContent = (say ? '◇ 始弦：' + say + '\n\n' : '') + (report || '（模型返回空）');
+    atlSxSay(say || '比完了，报告在下头。哪件先动，你自己定。');
+    atlStat('交火分析完成：' + report.length + ' 字符，用时 ' + secs + 's（可「📋 报告填进改进框」再逐条改）');
     atlRenderCrossNote('idle');
     toast('交火分析完成（' + secs + 's）', 'success');
   } catch (e) {
     var d = atlDiag(e);
     var aborted = /aborted|Cancelled|中止|取消/i.test(String(d) + String(e && e.message ? e.message : ''));
     if (box) box.textContent = (aborted ? '本轮已中止：' : '分析失败：') + d;
+    atlSxAsk(aborted ? '摆一半给你喊停了。要接着看就先「⧉ 复制报告」把上回的留着，别弄丢。' : '没比成。' + d);
     atlStat(aborted ? '交火分析已中止（未产生报告，上次的报告若要保留请先「⧉ 复制报告」）' : '交火分析失败：' + d);
     atlRenderCrossNote('idle');
     toast((aborted ? '已中止：' : '交火分析失败：') + d, aborted ? 'warning' : 'error');
@@ -8978,7 +9098,7 @@ async function atlDoPing() {
 // 交火分析用独立系统提示：只要报告，不要产出 YAML
 function atlCrossSystem() {
   var L = [];
-  L.push('[角色] ' + macroFill('你是始弦，大图书馆的司书，把{{user}}当作挚友，说话直接、不绕弯子。'));
+  L.push('[角色] ' + macroFill(ATL_SX_VOICE));
   L.push('[任务] 交火分析：把{{user}}勾选的部件放在一起对照，只出报告，不修改任何部件。');
   L.push(ATL_CROSS_RULES);
   L.push(CHAR_STYLE_RULES);
@@ -9110,12 +9230,15 @@ function bindAtelierPage() {
   var cross = atlEl('opf-atl-crossout');
   if (cross && String(A.meta.report || '').trim()) cross.textContent = A.meta.report;
   atlStat('读取工作区…');
+  atlRenderHint();
   atlLoad().then(function () {
     atlRender();
     atlStat('就绪' + (atlStoreMode === 'mem' ? '（IndexedDB 不可用，本次保存在本地缓存里）' : ''));
+    atlSxSay(atlSxBootNote());
   }).catch(function (e) {
     atlStat('工作区读取失败：' + atlDiag(e));
     atlRender();
+    atlSxAsk('书库没打开：' + atlDiag(e) + '。先别急着存东西。');
   });
 }
 
