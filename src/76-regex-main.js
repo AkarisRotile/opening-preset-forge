@@ -530,6 +530,9 @@ async function rxAiRewrite(item, f, issues, dir, scope, phase) {
   if (j && typeof j.findRegex === 'string') jj.findRegex = j.findRegex;
   if (payload.kind === 'css') jj.css = payload.text; else jj.replaceString = payload.text;
   out.changed = rxApplyAiResult(item, jj, payload.loose ? raw : '', scope);
+  // EJS 完整性：替换体里可能嵌 EJS，标签数量对不上就在结果说明里点名
+  var ejsW = (typeof opfEjsWarn === 'function') ? opfEjsWarn(phase || '正则工坊') : '';
+  if (ejsW) out.note = (out.note ? out.note + '｜' : '') + ejsW;
   return out;
 }
 function rxRepairPrompt(item, f, issues, dir, scope, mode) {
@@ -902,9 +905,15 @@ function rxStreamCall(messages, onNote, opts) {
   var o = opts || {};
   if (rxForceSt || cfg.transport === 'st') {
     // 主 API：零配置，跟随酒馆当前模型与采样；用 responseLength 按段预算硬顶输出长度
+    // EJS 预处理/后处理已由 callModel 统一承担，这条分支不要再转一次（否则会双重转义）
     var ro = o.maxTokens ? { responseLength: Number(o.maxTokens) } : null;
     return callModel(messages, ro).then(function (t) { return { text: String(t), stalled: false }; });
   }
+  // 自建传输（经酒馆服务端转发 / 浏览器直连）不经过 callModel：EJS 要在这里自己护一遍，
+  // 否则提示词里嵌的 <% %> 会被上游或宿主管线吃掉，模型拿到的是残缺稿子。
+  var prep = opfEjsPrepareMessages(messages);
+  var ejsCount = prep.count;
+  messages = prep.msgs;
   var t0 = Date.now();
   var lastShown = 0;
   var onDelta = function (t, len) {
@@ -920,7 +929,11 @@ function rxStreamCall(messages, onNote, opts) {
     if (onNote) onNote('流式接收中… ' + lastShown + ' 字符（' + Math.round((Date.now() - t0) / 1000) + 's' + (o.phase ? '｜' + o.phase : '') + '，仍在等待…）');
   }, 5000);
   var p = (cfg.transport === 'server' ? rxServerStream(messages, onDelta, o) : rxDirectStream(messages, onDelta, o));
-  return p.then(function (res) { clearInterval(timer); return res; }, function (e) { clearInterval(timer); throw e; });
+  return p.then(function (res) {
+    clearInterval(timer);
+    if (res && typeof res.text === 'string') res.text = opfEjsRestore(res.text, { count: ejsCount, label: o.phase || '正则工坊' });
+    return res;
+  }, function (e) { clearInterval(timer); throw e; });
 }
 // 从酒馆自己的设置里读反代地址与代理密码（省得手打）
 // DOM id 依据 ST 1.18.0 public/scripts/openai.js L363/L372 与 public/index.html L2978/L2994：

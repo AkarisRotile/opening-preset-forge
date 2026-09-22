@@ -53,13 +53,12 @@ function escHtml(s) {
 }
 function fence() { return String.fromCharCode(96).repeat(3); }
 
-var CTX = null;
+var CTX = null, CTX_HOST = null;
+// 缓存宿主上下文，但**记住它来自哪个 SillyTavern 对象**：宿主热替换（或离线测试换 mock）时
+// 必须重新取一次，否则一直用旧上下文——这正是"换了环境却还走旧 API"的隐蔽来源。
 function getCtx() {
-  if (!CTX) {
-    if (typeof SillyTavern !== 'undefined' && SillyTavern && typeof SillyTavern.getContext === 'function') {
-      CTX = SillyTavern.getContext();
-    }
-  }
+  var host = (typeof SillyTavern !== 'undefined' && SillyTavern && typeof SillyTavern.getContext === 'function') ? SillyTavern : null;
+  if (host !== CTX_HOST) { CTX = host ? host.getContext() : null; CTX_HOST = host; }
   return CTX;
 }
 function toast(msg, type) {
@@ -306,16 +305,101 @@ function systemCtxBudgetOk(msgs) {
   return total < 90000;
 }
 
+// ============================================================================
+// EJS 安全层（v1.16.6）：所有出站提示词统一预处理、所有模型返回统一后处理
+//
+// 为什么必须在统一入口做：这一插件的提示词里会大段嵌入含 EJS 的稿子
+// （命定核心、副本替换体），而酒馆的提示词管线里装着 ST-Prompt-Template 这类扩展——
+// 它们会把提示词里的 <% … %> 当模板执行掉，于是模型拿到的是被掏空的稿子，
+// 改回来的内容自然残缺不全。只在某一页做转义必然漏（v1.14.1 只护了 ⑦ 页）。
+//
+// 预处理：<%! / <%- / <%= / <%_ / <%# / <%  →  &lt;% 变体；%> → %&gt;（只两条窄映射，
+//         不碰正文里本来就有的 &lt; 之类），并给模型一句"沿用同样写法"的告知。
+// 后处理：&lt;% → <% 还原（含模型自行二次转义的 &amp;lt;%）。
+// ============================================================================
+var OPF_EJS_OPTS_KEY = '__opfEjs';
+function opfEjsCountText(t) { return (String(t == null ? '' : t).match(/<%/g) || []).length; }
+function opfEjsPre(t) {
+  return String(t == null ? '' : t)
+    .replace(/<!%/g, '&lt;!%').replace(/<%/g, '&lt;%')
+    .replace(/%>/g, '%&gt;');
+}
+// 还原必须走"一次扫描 + 替换表"，绝不能串多个 .replace()：
+// 上一版串了三条，`&amp;lt;%` 先被替换成 `&lt;%`，紧接着又被第二条再替换一次，
+// 结果把 `%>` 拼成了 `%%>`（连标签都废了）。用回调一次吃干净，谁都不碰谁的产物。
+function opfEjsPost(t) {
+  return String(t == null ? '' : t).replace(/&amp;lt;%|&lt;%|%&amp;gt;|%&gt;/g, function (s) {
+    return (s === '&amp;lt;%' || s === '&lt;%') ? '<%' : '%>';
+  });
+}
+// 明确要求模型沿用转义写法（只对"输入里真有 EJS"的调用追加，避免污染普通页面）
+// 注意：这段说明本身绝不能出现裸 <% —— 否则等于往出站消息里又塞了一个可执行标签。
+function opfEjsNotice(t) {
+  var n = opfEjsCountText(t);
+  if (!n) return '';
+  return '（本文含 ' + n + ' 处 EJS 模板标签，为防被宿主引擎执行，已把左标签写成 &lt;% 的形式、'
+    + '右标签写成 %&gt; 的形式；你输出时要沿用同样的转义写法，插件会在收到后自动还原成真实标签，'
+    + '不要换成别的写法、也不要省略它们。）';
+}
+// 出站：给每条消息加上 EJS 告知 + 预转义
+function opfEjsPrepareMessages(msgs) {
+  var total = 0;
+  var out = (msgs || []).map(function (m) {
+    var c = String(m && m.content != null ? m.content : '');
+    var n = opfEjsCountText(c);
+    if (!n) return m;
+    total += n;
+    return { role: m.role, content: opfEjsPre(c) + '\n' + opfEjsNotice(c) };
+  });
+  return { msgs: out, count: total };
+}
+// 入站：还原 + 如实记录（模型把 EJS 全丢了就记下来，别让残缺内容静默落地）
+// 两个细节都踩过坑：① 键名直接用 mark 时会被 String() 成 "[object Object]"；
+// ② outCount 必须统计"还原之后"的文本，统计还原前的转义文本永远是 0。
+function opfEjsRestore(raw, mark) {
+  var txt = String(raw == null ? '' : raw);
+  var out = opfEjsPost(txt);
+  try {
+    var st = (ST.__opfEjsStat = ST.__opfEjsStat || {});
+    var key = String((mark && (mark.label || mark.tag)) || (typeof mark === 'string' ? mark : '') || '(未标记)');
+    var r = st[key] || (st[key] = { inCount: 0, outCount: 0, lastAt: 0 });
+    r.inCount = Number(mark && mark.count) || 0;
+    r.outCount = opfEjsCountText(out);
+    r.lastAt = Date.now();
+  } catch (e) {}
+  return out;
+}
+// 给 UI 读的最近一次统计（含"输入有 EJS、输出一个都没有"这种硬损失）
+function opfEjsLastStat(label) {
+  try {
+    var st = ST.__opfEjsStat || {};
+    if (st[label]) return st[label];
+    var keys = Object.keys(st);
+    return keys.length ? st[keys[keys.length - 1]] : { inCount: 0, outCount: 0, lastAt: 0 };
+  } catch (e) { return { inCount: 0, outCount: 0, lastAt: 0 }; }
+}
+function opfEjsWarn(label) {
+  var r = opfEjsLastStat(label);
+  if (!r.inCount) return '';
+  if (!r.outCount) return '⚠ 送进去的稿子里有 ' + r.inCount + ' 处 EJS 标签，但这次返回里一个都没有——很可能被宿主提示词管线执行掉了。'
+    + '建议：① 先在框里确认稿子本身是完整的；② 直接重试一次（插件已把 EJS 转义后再发送）；③ 若换了模型仍如此，把你用的提示词模板类扩展在这条链路上关掉。';
+  if (r.outCount < r.inCount) return '⚠ 输入的 EJS 标签 ' + r.inCount + ' 处，返回里只剩 ' + r.outCount + ' 处——请核对是不是有标签在往返途中丢失或被改动。';
+  return '';
+}
+
 async function callModel(msgs, extraOpts) {
   var c = getCtx();
   if (!c || typeof c.generateRaw !== 'function') {
     throw new Error('generateRaw 不可用（SillyTavern 版本过旧或未就绪）。请升级到支持 getContext().generateRaw 的版本。');
   }
-  var opts = { prompt: msgs };
+  // 出站统一预处理：含 EJS 的稿子先转义，别让宿主模板引擎把 <% %> 执行掉
+  var prep = opfEjsPrepareMessages(msgs);
+  var opts = { prompt: prep.msgs };
   if (extraOpts && typeof extraOpts === 'object') { for (var k in extraOpts) { if (extraOpts[k] !== undefined && extraOpts[k] !== null) opts[k] = extraOpts[k]; } }
   var out = await c.generateRaw(opts);
   if (out === null || out === undefined) throw new Error('主 API 返回为空（可能被中断或未连接）。');
-  return String(out);
+  // 入站统一后处理：还原成真实 EJS，并记录标签数量（少了就如实报警，不静默落地残缺内容）
+  return opfEjsRestore(out, { count: prep.count, label: '' });
 }
 
 async function runOne(phase) {

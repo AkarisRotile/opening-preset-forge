@@ -70,13 +70,12 @@ function escHtml(s) {
 }
 function fence() { return String.fromCharCode(96).repeat(3); }
 
-var CTX = null;
+var CTX = null, CTX_HOST = null;
+// 缓存宿主上下文，但**记住它来自哪个 SillyTavern 对象**：宿主热替换（或离线测试换 mock）时
+// 必须重新取一次，否则一直用旧上下文——这正是"换了环境却还走旧 API"的隐蔽来源。
 function getCtx() {
-  if (!CTX) {
-    if (typeof SillyTavern !== 'undefined' && SillyTavern && typeof SillyTavern.getContext === 'function') {
-      CTX = SillyTavern.getContext();
-    }
-  }
+  var host = (typeof SillyTavern !== 'undefined' && SillyTavern && typeof SillyTavern.getContext === 'function') ? SillyTavern : null;
+  if (host !== CTX_HOST) { CTX = host ? host.getContext() : null; CTX_HOST = host; }
   return CTX;
 }
 function toast(msg, type) {
@@ -323,16 +322,101 @@ function systemCtxBudgetOk(msgs) {
   return total < 90000;
 }
 
+// ============================================================================
+// EJS 安全层（v1.16.6）：所有出站提示词统一预处理、所有模型返回统一后处理
+//
+// 为什么必须在统一入口做：这一插件的提示词里会大段嵌入含 EJS 的稿子
+// （命定核心、副本替换体），而酒馆的提示词管线里装着 ST-Prompt-Template 这类扩展——
+// 它们会把提示词里的 <% … %> 当模板执行掉，于是模型拿到的是被掏空的稿子，
+// 改回来的内容自然残缺不全。只在某一页做转义必然漏（v1.14.1 只护了 ⑦ 页）。
+//
+// 预处理：<%! / <%- / <%= / <%_ / <%# / <%  →  &lt;% 变体；%> → %&gt;（只两条窄映射，
+//         不碰正文里本来就有的 &lt; 之类），并给模型一句"沿用同样写法"的告知。
+// 后处理：&lt;% → <% 还原（含模型自行二次转义的 &amp;lt;%）。
+// ============================================================================
+var OPF_EJS_OPTS_KEY = '__opfEjs';
+function opfEjsCountText(t) { return (String(t == null ? '' : t).match(/<%/g) || []).length; }
+function opfEjsPre(t) {
+  return String(t == null ? '' : t)
+    .replace(/<!%/g, '&lt;!%').replace(/<%/g, '&lt;%')
+    .replace(/%>/g, '%&gt;');
+}
+// 还原必须走"一次扫描 + 替换表"，绝不能串多个 .replace()：
+// 上一版串了三条，`&amp;lt;%` 先被替换成 `&lt;%`，紧接着又被第二条再替换一次，
+// 结果把 `%>` 拼成了 `%%>`（连标签都废了）。用回调一次吃干净，谁都不碰谁的产物。
+function opfEjsPost(t) {
+  return String(t == null ? '' : t).replace(/&amp;lt;%|&lt;%|%&amp;gt;|%&gt;/g, function (s) {
+    return (s === '&amp;lt;%' || s === '&lt;%') ? '<%' : '%>';
+  });
+}
+// 明确要求模型沿用转义写法（只对"输入里真有 EJS"的调用追加，避免污染普通页面）
+// 注意：这段说明本身绝不能出现裸 <% —— 否则等于往出站消息里又塞了一个可执行标签。
+function opfEjsNotice(t) {
+  var n = opfEjsCountText(t);
+  if (!n) return '';
+  return '（本文含 ' + n + ' 处 EJS 模板标签，为防被宿主引擎执行，已把左标签写成 &lt;% 的形式、'
+    + '右标签写成 %&gt; 的形式；你输出时要沿用同样的转义写法，插件会在收到后自动还原成真实标签，'
+    + '不要换成别的写法、也不要省略它们。）';
+}
+// 出站：给每条消息加上 EJS 告知 + 预转义
+function opfEjsPrepareMessages(msgs) {
+  var total = 0;
+  var out = (msgs || []).map(function (m) {
+    var c = String(m && m.content != null ? m.content : '');
+    var n = opfEjsCountText(c);
+    if (!n) return m;
+    total += n;
+    return { role: m.role, content: opfEjsPre(c) + '\n' + opfEjsNotice(c) };
+  });
+  return { msgs: out, count: total };
+}
+// 入站：还原 + 如实记录（模型把 EJS 全丢了就记下来，别让残缺内容静默落地）
+// 两个细节都踩过坑：① 键名直接用 mark 时会被 String() 成 "[object Object]"；
+// ② outCount 必须统计"还原之后"的文本，统计还原前的转义文本永远是 0。
+function opfEjsRestore(raw, mark) {
+  var txt = String(raw == null ? '' : raw);
+  var out = opfEjsPost(txt);
+  try {
+    var st = (ST.__opfEjsStat = ST.__opfEjsStat || {});
+    var key = String((mark && (mark.label || mark.tag)) || (typeof mark === 'string' ? mark : '') || '(未标记)');
+    var r = st[key] || (st[key] = { inCount: 0, outCount: 0, lastAt: 0 });
+    r.inCount = Number(mark && mark.count) || 0;
+    r.outCount = opfEjsCountText(out);
+    r.lastAt = Date.now();
+  } catch (e) {}
+  return out;
+}
+// 给 UI 读的最近一次统计（含"输入有 EJS、输出一个都没有"这种硬损失）
+function opfEjsLastStat(label) {
+  try {
+    var st = ST.__opfEjsStat || {};
+    if (st[label]) return st[label];
+    var keys = Object.keys(st);
+    return keys.length ? st[keys[keys.length - 1]] : { inCount: 0, outCount: 0, lastAt: 0 };
+  } catch (e) { return { inCount: 0, outCount: 0, lastAt: 0 }; }
+}
+function opfEjsWarn(label) {
+  var r = opfEjsLastStat(label);
+  if (!r.inCount) return '';
+  if (!r.outCount) return '⚠ 送进去的稿子里有 ' + r.inCount + ' 处 EJS 标签，但这次返回里一个都没有——很可能被宿主提示词管线执行掉了。'
+    + '建议：① 先在框里确认稿子本身是完整的；② 直接重试一次（插件已把 EJS 转义后再发送）；③ 若换了模型仍如此，把你用的提示词模板类扩展在这条链路上关掉。';
+  if (r.outCount < r.inCount) return '⚠ 输入的 EJS 标签 ' + r.inCount + ' 处，返回里只剩 ' + r.outCount + ' 处——请核对是不是有标签在往返途中丢失或被改动。';
+  return '';
+}
+
 async function callModel(msgs, extraOpts) {
   var c = getCtx();
   if (!c || typeof c.generateRaw !== 'function') {
     throw new Error('generateRaw 不可用（SillyTavern 版本过旧或未就绪）。请升级到支持 getContext().generateRaw 的版本。');
   }
-  var opts = { prompt: msgs };
+  // 出站统一预处理：含 EJS 的稿子先转义，别让宿主模板引擎把 <% %> 执行掉
+  var prep = opfEjsPrepareMessages(msgs);
+  var opts = { prompt: prep.msgs };
   if (extraOpts && typeof extraOpts === 'object') { for (var k in extraOpts) { if (extraOpts[k] !== undefined && extraOpts[k] !== null) opts[k] = extraOpts[k]; } }
   var out = await c.generateRaw(opts);
   if (out === null || out === undefined) throw new Error('主 API 返回为空（可能被中断或未连接）。');
-  return String(out);
+  // 入站统一后处理：还原成真实 EJS，并记录标签数量（少了就如实报警，不静默落地残缺内容）
+  return opfEjsRestore(out, { count: prep.count, label: '' });
 }
 
 async function runOne(phase) {
@@ -4125,10 +4209,12 @@ function refineSrcDiag(){
 // 只做这两条窄映射，避免误伤正文里本来就有的 &lt; 之类。
 // ============================================================================
 function refineForPrompt(t){
-  return String(t == null ? '' : t).replace(/<%!/g, '&lt;%!').replace(/<%/g, '&lt;%').replace(/%>/g, '%&gt;');
+  // 已并入统一的 EJS 安全层（10-base）：所有出站提示词都在 callModel / rxStreamCall 里过一遍。
+  // 这里保留同名函数是为了兼容既有调用点与离线测试；opfEjsPre 是幂等的，不会被二次转义。
+  return (typeof opfEjsPre === 'function') ? opfEjsPre(t) : String(t == null ? '' : t).replace(/<%!/g, '&lt;%!').replace(/<%/g, '&lt;%').replace(/%>/g, '%&gt;');
 }
 function refineFromPrompt(t){
-  return String(t == null ? '' : t).replace(/&lt;%/g, '<%').replace(/%&gt;/g, '%>');
+  return (typeof opfEjsPost === 'function') ? opfEjsPost(t) : String(t == null ? '' : t).replace(/&lt;%/g, '<%').replace(/%&gt;/g, '%>');
 }
 function refineEjsEscNote(t){
   var n = (String(t || '').match(/<%/g) || []).length;
@@ -5750,6 +5836,9 @@ async function refineApply(mode){
       lines.push('  对策：点「📍 只重跑定位」或「↻ 重新生成这一步」，会带上最近似的原文让它照抄锚点再删一次。');
     }
     if (res.degraded) lines.push('\n⚠ 有 ' + res.degraded + ' 处是**近似定位**（锚点与原文有空白差异，或退化为按行定位）——请重点看下面的差异预览确认位置对不对。');
+    // EJS 完整性：送进去几处标签、这次回来几处，少了就点名（EJS 被管线吃掉是这一页最隐蔽的坑）
+    var ejsWarn = (typeof opfEjsWarn === 'function') ? opfEjsWarn('') : '';
+    if (ejsWarn) lines.push('\n' + ejsWarn);
     if (ST.refine.taintWarn && ST.refine.taintWarn.length) lines.push('\n⚠ 材料隔离：本次有 ' + ST.refine.taintWarn.length + ' 段新内容疑似来自世界设定参考（你选择了仍然落地）——请核对它们是否本该属于这个核心。');
     else if (pool.length) lines.push('\n✓ 材料隔离核对通过：新内容里没有出现"只在世界参考里才有"的内容（参考池 ' + pool.length + ' 段）。');
     if (parsed.tail) lines.push('\n模型附注：' + parsed.tail);
@@ -6346,6 +6435,9 @@ async function rxAiRewrite(item, f, issues, dir, scope, phase) {
   if (j && typeof j.findRegex === 'string') jj.findRegex = j.findRegex;
   if (payload.kind === 'css') jj.css = payload.text; else jj.replaceString = payload.text;
   out.changed = rxApplyAiResult(item, jj, payload.loose ? raw : '', scope);
+  // EJS 完整性：替换体里可能嵌 EJS，标签数量对不上就在结果说明里点名
+  var ejsW = (typeof opfEjsWarn === 'function') ? opfEjsWarn(phase || '正则工坊') : '';
+  if (ejsW) out.note = (out.note ? out.note + '｜' : '') + ejsW;
   return out;
 }
 function rxRepairPrompt(item, f, issues, dir, scope, mode) {
@@ -6718,9 +6810,15 @@ function rxStreamCall(messages, onNote, opts) {
   var o = opts || {};
   if (rxForceSt || cfg.transport === 'st') {
     // 主 API：零配置，跟随酒馆当前模型与采样；用 responseLength 按段预算硬顶输出长度
+    // EJS 预处理/后处理已由 callModel 统一承担，这条分支不要再转一次（否则会双重转义）
     var ro = o.maxTokens ? { responseLength: Number(o.maxTokens) } : null;
     return callModel(messages, ro).then(function (t) { return { text: String(t), stalled: false }; });
   }
+  // 自建传输（经酒馆服务端转发 / 浏览器直连）不经过 callModel：EJS 要在这里自己护一遍，
+  // 否则提示词里嵌的 <% %> 会被上游或宿主管线吃掉，模型拿到的是残缺稿子。
+  var prep = opfEjsPrepareMessages(messages);
+  var ejsCount = prep.count;
+  messages = prep.msgs;
   var t0 = Date.now();
   var lastShown = 0;
   var onDelta = function (t, len) {
@@ -6736,7 +6834,11 @@ function rxStreamCall(messages, onNote, opts) {
     if (onNote) onNote('流式接收中… ' + lastShown + ' 字符（' + Math.round((Date.now() - t0) / 1000) + 's' + (o.phase ? '｜' + o.phase : '') + '，仍在等待…）');
   }, 5000);
   var p = (cfg.transport === 'server' ? rxServerStream(messages, onDelta, o) : rxDirectStream(messages, onDelta, o));
-  return p.then(function (res) { clearInterval(timer); return res; }, function (e) { clearInterval(timer); throw e; });
+  return p.then(function (res) {
+    clearInterval(timer);
+    if (res && typeof res.text === 'string') res.text = opfEjsRestore(res.text, { count: ejsCount, label: o.phase || '正则工坊' });
+    return res;
+  }, function (e) { clearInterval(timer); throw e; });
 }
 // 从酒馆自己的设置里读反代地址与代理密码（省得手打）
 // DOM id 依据 ST 1.18.0 public/scripts/openai.js L363/L372 与 public/index.html L2978/L2994：
@@ -9048,6 +9150,9 @@ async function atlDoGenerate() {
     atlDraftSave();
     // 司书出来说一句：优先用模型按收尾要求写的解释，没有就退回自检点评
     atlSxSay(atlSxNote(raw) || atlLintHeader(r).replace(/^◇ 始弦：/, ''));
+    // EJS 完整性：这一页也可能造带 EJS 的条目，标签数量对不上就如实说（别让残缺内容静默落地）
+    var ejsW = (typeof opfEjsWarn === 'function') ? opfEjsWarn('生成') : '';
+    if (ejsW) atlSxAsk(ejsW);
     atlStat('生成完成：' + yaml.length + ' 字符｜未绑定条目（点「📥 存成条目」新建）'
       + (r && r.issues.length ? '｜自检发现 ' + r.issues.length + ' 条，见下方' : '｜自检通过'));
     toast('已生成（' + yaml.length + ' 字符）'
@@ -9104,6 +9209,8 @@ async function atlDoFix() {
     }
     atlDraftSave();
     atlSxSay(atlSxNote(raw) || atlLintHeader(r).replace(/^◇ 始弦：/, ''));
+    var ejsWF = (typeof opfEjsWarn === 'function') ? opfEjsWarn('生成') : '';
+    if (ejsWF) atlSxAsk(ejsWF);
     atlStat('改进完成：' + before.length + ' → ' + yaml.length + ' 字符' + synced);
     toast('已改进（' + before.length + ' → ' + yaml.length + ' 字符）' + synced, 'success');
   } catch (e) {

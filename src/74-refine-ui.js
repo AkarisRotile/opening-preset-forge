@@ -619,6 +619,9 @@ async function refineApply(mode){
       lines.push('  对策：点「📍 只重跑定位」或「↻ 重新生成这一步」，会带上最近似的原文让它照抄锚点再删一次。');
     }
     if (res.degraded) lines.push('\n⚠ 有 ' + res.degraded + ' 处是**近似定位**（锚点与原文有空白差异，或退化为按行定位）——请重点看下面的差异预览确认位置对不对。');
+    // EJS 完整性：送进去几处标签、这次回来几处，少了就点名（EJS 被管线吃掉是这一页最隐蔽的坑）
+    var ejsWarn = (typeof opfEjsWarn === 'function') ? opfEjsWarn('') : '';
+    if (ejsWarn) lines.push('\n' + ejsWarn);
     if (ST.refine.taintWarn && ST.refine.taintWarn.length) lines.push('\n⚠ 材料隔离：本次有 ' + ST.refine.taintWarn.length + ' 段新内容疑似来自世界设定参考（你选择了仍然落地）——请核对它们是否本该属于这个核心。');
     else if (pool.length) lines.push('\n✓ 材料隔离核对通过：新内容里没有出现"只在世界参考里才有"的内容（参考池 ' + pool.length + ' 段）。');
     if (parsed.tail) lines.push('\n模型附注：' + parsed.tail);

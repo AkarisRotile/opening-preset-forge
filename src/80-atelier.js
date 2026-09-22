@@ -1484,6 +1484,9 @@ async function atlDoGenerate() {
     atlDraftSave();
     // 司书出来说一句：优先用模型按收尾要求写的解释，没有就退回自检点评
     atlSxSay(atlSxNote(raw) || atlLintHeader(r).replace(/^◇ 始弦：/, ''));
+    // EJS 完整性：这一页也可能造带 EJS 的条目，标签数量对不上就如实说（别让残缺内容静默落地）
+    var ejsW = (typeof opfEjsWarn === 'function') ? opfEjsWarn('生成') : '';
+    if (ejsW) atlSxAsk(ejsW);
     atlStat('生成完成：' + yaml.length + ' 字符｜未绑定条目（点「📥 存成条目」新建）'
       + (r && r.issues.length ? '｜自检发现 ' + r.issues.length + ' 条，见下方' : '｜自检通过'));
     toast('已生成（' + yaml.length + ' 字符）'
@@ -1540,6 +1543,8 @@ async function atlDoFix() {
     }
     atlDraftSave();
     atlSxSay(atlSxNote(raw) || atlLintHeader(r).replace(/^◇ 始弦：/, ''));
+    var ejsWF = (typeof opfEjsWarn === 'function') ? opfEjsWarn('生成') : '';
+    if (ejsWF) atlSxAsk(ejsWF);
     atlStat('改进完成：' + before.length + ' → ' + yaml.length + ' 字符' + synced);
     toast('已改进（' + before.length + ' → ' + yaml.length + ' 字符）' + synced, 'success');
   } catch (e) {

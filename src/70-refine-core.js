@@ -862,10 +862,12 @@ function refineSrcDiag(){
 // 只做这两条窄映射，避免误伤正文里本来就有的 &lt; 之类。
 // ============================================================================
 function refineForPrompt(t){
-  return String(t == null ? '' : t).replace(/<%!/g, '&lt;%!').replace(/<%/g, '&lt;%').replace(/%>/g, '%&gt;');
+  // 已并入统一的 EJS 安全层（10-base）：所有出站提示词都在 callModel / rxStreamCall 里过一遍。
+  // 这里保留同名函数是为了兼容既有调用点与离线测试；opfEjsPre 是幂等的，不会被二次转义。
+  return (typeof opfEjsPre === 'function') ? opfEjsPre(t) : String(t == null ? '' : t).replace(/<%!/g, '&lt;%!').replace(/<%/g, '&lt;%').replace(/%>/g, '%&gt;');
 }
 function refineFromPrompt(t){
-  return String(t == null ? '' : t).replace(/&lt;%/g, '<%').replace(/%&gt;/g, '%>');
+  return (typeof opfEjsPost === 'function') ? opfEjsPost(t) : String(t == null ? '' : t).replace(/&lt;%/g, '<%').replace(/%&gt;/g, '%>');
 }
 function refineEjsEscNote(t){
   var n = (String(t || '').match(/<%/g) || []).length;
