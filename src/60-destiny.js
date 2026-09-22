@@ -607,7 +607,7 @@ async function runDestLinkage(){
       destSetSeg(seg.id, 'run');
       var frozen = '';
       destSegs().forEach(function (s2) { if (s2.id !== seg.id && ST.dest.segs[s2.id]) frozen += '\n\n【' + s2.title + '】\n' + String(ST.dest.segs[s2.id]).slice(0, 1200); });
-      var applyMsg = '【交火梳理·第二步：逐段应用修订——只改「' + seg.title + '」这一段】\n\n[梳理报告与改动清单]\n' + ST.dest.report + '\n\n[本段现行内容]\n' + ST.dest.segs[seg.id] + '\n\n[冻结区块（其它分段，原样保留，一个字都不许改）]\n' + frozen + '\n\n[修订规则]\n' + DEST_RULES + '\n1. 只输出【' + seg.title + '】的修订后全文；若按报告本段无需改动，只回复“无改动”。\n2. 只做报告指出的联动性修改；不得推翻设定、不得扩写或新增内容。\n3. 不生成任何角色卡或开局预设内容。';
+      var applyMsg = '【交火梳理·第二步：逐段应用修订——只改「' + seg.title + '」这一段】\n\n[梳理报告与改动清单]\n' + ST.dest.report + '\n\n[本段现行内容]\n' + ST.dest.segs[seg.id] + '\n\n[冻结区块（其它分段，原样保留，一个字都不许改）]\n' + frozen + '\n\n[修订规则]\n' + DEST_RULES + '\n1. 只输出【' + seg.title + '】的修订后全文；若按报告本段无需改动，只回复“无改动”。\n2. 只做报告指出的联动性修改；不得推翻设定。报告“改动清单”里点名的矛盾/重复/写错的内容，**必须真的删掉或改掉**——旧内容不许留在原地与新内容并排（叠加＝没改）。\n3. 报告点名要删的就删，删完比原来短是正常的；除报告点名的部分外，不许删别的内容，也不许扩写新增。\n4. 不生成任何角色卡或开局预设内容。';
       var m2 = [{ role: 'system', content: destSystemContent() }, { role: 'user', content: applyMsg }];
       var resp2 = await callModel(m2);
       var txt = String(resp2 || '').trim();

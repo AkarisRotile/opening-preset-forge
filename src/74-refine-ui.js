@@ -551,10 +551,20 @@ async function refineApply(mode){
     } else ST.refine.taintWarn = null;
     var res = refineApplyPatch(ST.refine.working, usable);
     var lines = [];
-    if (!res.ok) {
+    // 删除失败不该连累整份补丁（v1.16.5）。删除类锚点常常因为"模型凭记忆抄"而找不到，
+    // 但同批的替换/插入都是好的——原来整份放弃，用户看到的就是"它又没删掉，还什么都没变"。
+    // 现在：只有"非删除类"失败时才整份放弃；删除类失败则放行其余改动，并把这处标出来重试。
+    var delFailed = res.failed.filter(function (f) { return refineIsDeleteType(String(f.ch && f.ch['类型'] || '')) || String(f.ch && f.ch['新内容'] || '').indexOf(REFINE_DEL_MARK) >= 0; });
+    var hardFailed = res.failed.filter(function (f) { return delFailed.indexOf(f) < 0; });
+    if (!res.ok && hardFailed.length) {
       // all-or-nothing：任何一处锚点不唯一/找不到，就整份放弃，绝不留半份改动
       ST.refine.lastFailed = res.failed.map(function (f) { return { anchor: String(f.ch && (f.ch['锚点'] || '')), why: f.why, hint: f.hint || '' }; });
       lines.push('❌ ' + stepLabel + ' 的补丁未通过校验，已整体放弃（工作稿未被改动）：');
+      // 同一批里的删除失败也一并说清，否则用户会以为"删除被悄悄吞了"
+      delFailed.forEach(function (f) {
+        lines.push('  · 第 ' + (f.i + 1) + ' 处（删除）：' + f.why);
+        lines.push('    ↳ 本条要删的内容与上面的失败一起被搁置了，重试时会重新尝试。');
+      });
       res.failed.forEach(function (f) {
         lines.push('  · 第 ' + (f.i + 1) + ' 处：' + f.why);
         lines.push('    锚点：' + String(f.ch && (f.ch['锚点'] || '')).slice(0, 160).replace(/\n/g, '⏎'));
@@ -594,8 +604,20 @@ async function refineApply(mode){
     res.applied.forEach(function (a, i) {
       lines.push('  ' + (i + 1) + '. [' + a.type + '] ' + (a.why || ''));
       lines.push('     锚点：' + a.anchor.slice(0, 100).replace(/\n/g, '⏎') + '　（定位方式：' + a.how + (a.degraded ? ' ⚠ 近似' : '') + '）');
-      lines.push('     新内容：' + a.next.slice(0, 200).replace(/\n/g, '⏎') + (a.next.length > 200 ? ' …' : ''));
+      // 删除要能看到"删掉了什么"，否则用户没法核对是不是删对了（绝不静默删除）
+      if (a.delLines) lines.push('     − 已删除 ' + a.delLines + ' 行：' + String(a.delText || '').slice(0, 200).replace(/\n/g, '⏎') + (String(a.delText || '').length > 200 ? ' …' : ''));
+      else lines.push('     新内容：' + a.next.slice(0, 200).replace(/\n/g, '⏎') + (a.next.length > 200 ? ' …' : ''));
     });
+    if (delFailed.length) {
+      lines.push('');
+      lines.push('⚠ 有 ' + delFailed.length + ' 处**删除没能定位**（原内容保留，未删成）：');
+      delFailed.forEach(function (f) {
+        lines.push('  · 第 ' + (f.i + 1) + ' 处：' + f.why);
+        lines.push('    锚点：' + String(f.ch && (f.ch['锚点'] || '')).slice(0, 160).replace(/\n/g, '⏎'));
+        if (f.hint) lines.push('    ↳ 原文里最接近的一段是：' + String(f.hint).split(/\r?\n/)[0].slice(0, 120) + '（其余见下方差异预览）');
+      });
+      lines.push('  对策：点「📍 只重跑定位」或「↻ 重新生成这一步」，会带上最近似的原文让它照抄锚点再删一次。');
+    }
     if (res.degraded) lines.push('\n⚠ 有 ' + res.degraded + ' 处是**近似定位**（锚点与原文有空白差异，或退化为按行定位）——请重点看下面的差异预览确认位置对不对。');
     if (ST.refine.taintWarn && ST.refine.taintWarn.length) lines.push('\n⚠ 材料隔离：本次有 ' + ST.refine.taintWarn.length + ' 段新内容疑似来自世界设定参考（你选择了仍然落地）——请核对它们是否本该属于这个核心。');
     else if (pool.length) lines.push('\n✓ 材料隔离核对通过：新内容里没有出现"只在世界参考里才有"的内容（参考池 ' + pool.length + ' 段）。');

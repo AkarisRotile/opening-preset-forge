@@ -339,7 +339,7 @@ async function refinePhase(pid, direction){
       }
     }
     var nl = String.fromCharCode(10);
-    var refineMsg = phasePrompt(phase) + nl + nl + "【本步精修指令】" + nl + "方向：" + dir + nl + nl + "[世界规则·创作限制]" + nl + WORLD_RULES + nl + nl + "要求：只输出【" + phase.title + "】这一栏的修订内容（沿用本步的书条目格式与数量，可增删但要有理由），不要改动其它栏目，也不要输出整份 JSON。若确实无需修改，原样输出“无”。";
+    var refineMsg = phasePrompt(phase) + nl + nl + "【本步精修指令】" + nl + "方向：" + dir + nl + nl + "[世界规则·创作限制]" + nl + WORLD_RULES + nl + nl + "要求：只输出【" + phase.title + "】这一栏的修订内容（沿用本步的书条目格式与数量，可增删但要有理由），不要改动其它栏目，也不要输出整份 JSON。**方向里点名要改或要删的条目/字段必须真的改掉、删掉**——不许把旧条目留在原位而把新条目接在后面（叠加＝没改）；除本次方向点名的部分外，其余保持原样。若确实无需修改，原样输出“无”。";
     msgs.push({ role: "user", content: refineMsg });
     var resp = await callModel(msgs);
     ST.results[pid] = resp;

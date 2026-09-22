@@ -380,29 +380,34 @@ function rxCssRules(css) {
 function rxCssNormSel(p) {
   return String(p || '').replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
 }
-// 把补丁里同选择器的规则覆盖进原 CSS，新选择器追加到末尾；未提到的部分逐字不动
+// 把补丁里同选择器的规则覆盖进原 CSS，新选择器追加到末尾；未提到的部分逐字不动。
+// v1.16.5：补上删除——用户实测"AI 改完只会叠加"。规则体写成空块或含 /* 删除 */ 时，
+// 把同选择器的现有规则整条删掉（这是补丁层唯一能表达删除的语法，必须显式，避免误删）。
+var RX_DEL_RE = /\/\*\s*(?:删除|delete|remove)\s*\*\//i;
 function rxCssMerge(orig, patch) {
   var base = String(orig || '');
   var rules = rxCssRules(base), adds = rxCssRules(patch);
-  var replaced = [], added = [], skipped = [], append = [];
+  var replaced = [], added = [], skipped = [], deleted = [], append = [];
   adds.forEach(function (r) {
     if (r.at) { skipped.push(r.prelude); return; }
     if (!r.prelude) return;
     var key = rxCssNormSel(r.prelude);
     var hit = null;
     for (var t = 0; t < rules.length; t++) { if (!rules[t].at && rxCssNormSel(rules[t].prelude) === key) { hit = rules[t]; break; } }
-    if (hit) { hit.newRaw = r.raw; replaced.push(r.prelude); }
-    else { added.push(r.prelude); append.push(r.raw); }
+    if (!hit) { added.push(r.prelude); append.push(r.raw); return; }
+    var bodyOnly = String(r.raw).replace(/^[^{]*\{/, '').replace(/\}\s*$/, '').trim();
+    if (RX_DEL_RE.test(r.raw) || bodyOnly === '') { hit.deleted = true; deleted.push(r.prelude); }
+    else { hit.newRaw = r.raw; replaced.push(r.prelude); }
   });
   var out = '', cursor = 0;
   rules.forEach(function (x) {
     out += base.slice(cursor, x.start);
-    out += (x.newRaw != null) ? x.newRaw : x.raw;
+    if (!x.deleted) out += (x.newRaw != null) ? x.newRaw : x.raw;
     cursor = x.end;
   });
   out += base.slice(cursor);
   if (append.length) out = out.replace(/\s*$/, '') + '\n\n/* 修改追加 */\n' + append.join('\n') + '\n';
-  return { css: out, replaced: replaced, added: added, skipped: skipped };
+  return { css: out, replaced: replaced, added: added, skipped: skipped, deleted: deleted };
 }
 // 模型没听劝、整段回了一套 CSS 时：按整段处理（走缩水保护），别再当补丁合并
 function rxLooksLikeFullCss(patchCss, curCss) {
@@ -607,12 +612,14 @@ function rxPatchPrompt(item, f, dir) {
   var cur = rxItemCss(item);
   var frame = rxFrameOf(item);
   var L = [];
-  L.push('[任务] 修改一条「对话美化正则」的样式层。**你只输出需要新增或替换的 CSS 规则**——未改动的规则一律不要重复输出：插件会把你的规则按选择器合并进现有 CSS，没提到的部分逐字保留。');
+  L.push('[任务] 修改一条「对话美化正则」的样式层。**你只输出需要新增、替换或删除的 CSS 规则**——未改动的规则一律不要重复输出：插件会把你的规则按选择器合并进现有 CSS，没提到的部分逐字保留。');
   L.push('[用户要求]\n' + String(dir));
   L.push('[当前完整 CSS（共 ' + cur.length + ' 字符）——只供你确认选择器、变量与既有写法，不要原样重抄]\n' + cur);
   L.push('[骨架（HTML 结构由插件生成并锁定，绝不能改动）· 初始框架「' + frame.label + '」]\n' + rxSkeleton(item, f));
   if (f.params && f.params.length) f.params.forEach(function (p) { if (p.values && p.values.length) L.push('[参数 ' + p.name + ' 的枚举值] ' + p.values.join('、')); });
-  L.push('[合并规则]\n1. 改已有规则：输出**同选择器**的完整规则块（选择器写法与现有一致，大小写与空白会被规范化后匹配）；\n2. 新增规则：用新选择器，插件会追加到末尾；\n3. 一条规则必须整体写出（选择器 + 完整花括号内容），不要只写半截声明；\n4. 不要输出 @media / @keyframes / @font-face / @import 等 @ 块——需要改这类整块时提示改用「整段重写」档；\n5. 一次最多输出 12 条规则，只覆盖用户要求涉及的部分。');
+  L.push('[合并规则]\n1. 改已有规则：输出**同选择器**的完整规则块（选择器写法与现有一致，大小写与空白会被规范化后匹配）；\n2. 新增规则：用新选择器，插件会追加到末尾；\n3. 一条规则必须整体写出（选择器 + 完整花括号内容），不要只写半截声明；\n4. 不要输出 @media / @keyframes / @font-face / @import 等 @ 块——需要改这类整块时提示改用「整段重写」档；\n5. 一次最多输出 12 条规则，只覆盖用户要求涉及的部分；\n'
+    + '6. **删掉一条规则**：写出该选择器，规则体里只放注释 /* 删除 */（形如 `.前缀-box { /* 删除 */ }`）——插件会把它整条移除。'
+    + '要删就删，不要用「注释掉旧规则 + 另写一条新的」代替删除（那是叠加，会让样式表越来越长）。');
   L.push(RX_REFINE_RULES_PATCH);
   L.push('[输出] 一个 ' + fence() + 'css 代码块，里面**只有要合并的规则**；不要 JSON、不要解释、不要重抄整份 CSS。');
   return macroFill(L.join('\n\n'));
@@ -637,17 +644,19 @@ async function rxRefinePatch(item, dir) {
     return out;
   }
   var mg = rxCssMerge(cur, patchCss);
-  if (!mg.replaced.length && !mg.added.length) {
+  if (!mg.replaced.length && !mg.added.length && !mg.deleted.length) {
     out.note = '没能从返回里解析出可合并的规则' + (mg.skipped.length ? '（只收到 @ 块：' + mg.skipped.join('、') + '，请改用「整段重写」档）' : '');
     return out;
   }
   rxSnapshot(item);
   rxSetItemCss(item, mg.css);
   item.issues = rxLint(item, ST.rx.parsed);
-  out.replaced = mg.replaced.length; out.added = mg.added.length; out.skipped = mg.skipped.length;
+  out.replaced = mg.replaced.length; out.added = mg.added.length; out.skipped = mg.skipped.length; out.deleted = mg.deleted.length;
   out.after = mg.css.length;
   out.changed = ['样式补丁'];
-  out.note = '替换 ' + mg.replaced.length + ' 条 / 新增 ' + mg.added.length + ' 条规则' + (mg.skipped.length ? '（跳过 ' + mg.skipped.length + ' 个 @ 块）' : '');
+  out.note = '替换 ' + mg.replaced.length + ' 条 / 新增 ' + mg.added.length + ' 条'
+    + (mg.deleted.length ? ' / **删除 ' + mg.deleted.length + ' 条**（' + mg.deleted.slice(0, 3).join('、') + (mg.deleted.length > 3 ? ' 等' : '') + '）' : '')
+    + (mg.skipped.length ? '（跳过 ' + mg.skipped.length + ' 个 @ 块）' : '');
   return out;
 }
 async function rxRefineItem(item, dir, scope) {

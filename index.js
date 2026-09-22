@@ -934,7 +934,7 @@ async function refinePhase(pid, direction){
       }
     }
     var nl = String.fromCharCode(10);
-    var refineMsg = phasePrompt(phase) + nl + nl + "【本步精修指令】" + nl + "方向：" + dir + nl + nl + "[世界规则·创作限制]" + nl + WORLD_RULES + nl + nl + "要求：只输出【" + phase.title + "】这一栏的修订内容（沿用本步的书条目格式与数量，可增删但要有理由），不要改动其它栏目，也不要输出整份 JSON。若确实无需修改，原样输出“无”。";
+    var refineMsg = phasePrompt(phase) + nl + nl + "【本步精修指令】" + nl + "方向：" + dir + nl + nl + "[世界规则·创作限制]" + nl + WORLD_RULES + nl + nl + "要求：只输出【" + phase.title + "】这一栏的修订内容（沿用本步的书条目格式与数量，可增删但要有理由），不要改动其它栏目，也不要输出整份 JSON。**方向里点名要改或要删的条目/字段必须真的改掉、删掉**——不许把旧条目留在原位而把新条目接在后面（叠加＝没改）；除本次方向点名的部分外，其余保持原样。若确实无需修改，原样输出“无”。";
     msgs.push({ role: "user", content: refineMsg });
     var resp = await callModel(msgs);
     ST.results[pid] = resp;
@@ -2301,7 +2301,7 @@ async function runCharLinkage(){
       charSetSeg(seg.id, "run");
       var frozen = "";
       CHAR_SEGS.forEach(function (s2) { if (s2.id !== seg.id && ST.char.segs[s2.id]) frozen += "\n\n【" + s2.title + "】\n" + String(ST.char.segs[s2.id]).slice(0, 1200); });
-      var applyMsg = "【交火梳理·第二步：逐段应用修订——只改「" + seg.title + "」这一段】\n\n[梳理报告与改动清单]\n" + ST.char.report + "\n\n[本段现行内容]\n" + ST.char.segs[seg.id] + "\n\n[冻结区块（其它分段，原样保留，一个字都不许改）]\n" + frozen + "\n\n[修订规则]\n" + CHAR_RULES + "\n1. 只输出【" + seg.title + "】的修订后全文；若按报告本段无需改动，只回复“无改动”。\n2. 只做报告指出的联动性修改；不得推翻设定、不得扩写或新增内容。\n3. 武器/装备/道具/技能保持 名称/品质(中文)/叙述 三段式：禁止补回或新增 类型/消耗/标签 字段。\n4. 不生成任何开局预设内容（开局剧情/面板/伙伴/资产等）。";
+      var applyMsg = "【交火梳理·第二步：逐段应用修订——只改「" + seg.title + "」这一段】\n\n[梳理报告与改动清单]\n" + ST.char.report + "\n\n[本段现行内容]\n" + ST.char.segs[seg.id] + "\n\n[冻结区块（其它分段，原样保留，一个字都不许改）]\n" + frozen + "\n\n[修订规则]\n" + CHAR_RULES + "\n1. 只输出【" + seg.title + "】的修订后全文；若按报告本段无需改动，只回复“无改动”。\n2. 只做报告指出的联动性修改；不得推翻设定。报告“改动清单”里点名的矛盾/重复/写错的内容，**必须真的删掉或改掉**——旧内容不许留在原地与新内容并排（叠加＝没改）。\n3. 报告点名要删的就删，删完比原来短是正常的；除报告点名的部分外，不许删别的内容，也不许扩写新增。\n4. 武器/装备/道具/技能保持 名称/品质(中文)/叙述 三段式：禁止补回或新增 类型/消耗/标签 字段。\n5. 不生成任何开局预设内容（开局剧情/面板/伙伴/资产等）。";
       var m2 = [{ role: "system", content: charSystemContent() }, { role: "user", content: applyMsg }];
       var resp2 = await callModel(m2);
       var txt = String(resp2 || "").trim();
@@ -3011,7 +3011,7 @@ async function runDestLinkage(){
       destSetSeg(seg.id, 'run');
       var frozen = '';
       destSegs().forEach(function (s2) { if (s2.id !== seg.id && ST.dest.segs[s2.id]) frozen += '\n\n【' + s2.title + '】\n' + String(ST.dest.segs[s2.id]).slice(0, 1200); });
-      var applyMsg = '【交火梳理·第二步：逐段应用修订——只改「' + seg.title + '」这一段】\n\n[梳理报告与改动清单]\n' + ST.dest.report + '\n\n[本段现行内容]\n' + ST.dest.segs[seg.id] + '\n\n[冻结区块（其它分段，原样保留，一个字都不许改）]\n' + frozen + '\n\n[修订规则]\n' + DEST_RULES + '\n1. 只输出【' + seg.title + '】的修订后全文；若按报告本段无需改动，只回复“无改动”。\n2. 只做报告指出的联动性修改；不得推翻设定、不得扩写或新增内容。\n3. 不生成任何角色卡或开局预设内容。';
+      var applyMsg = '【交火梳理·第二步：逐段应用修订——只改「' + seg.title + '」这一段】\n\n[梳理报告与改动清单]\n' + ST.dest.report + '\n\n[本段现行内容]\n' + ST.dest.segs[seg.id] + '\n\n[冻结区块（其它分段，原样保留，一个字都不许改）]\n' + frozen + '\n\n[修订规则]\n' + DEST_RULES + '\n1. 只输出【' + seg.title + '】的修订后全文；若按报告本段无需改动，只回复“无改动”。\n2. 只做报告指出的联动性修改；不得推翻设定。报告“改动清单”里点名的矛盾/重复/写错的内容，**必须真的删掉或改掉**——旧内容不许留在原地与新内容并排（叠加＝没改）。\n3. 报告点名要删的就删，删完比原来短是正常的；除报告点名的部分外，不许删别的内容，也不许扩写新增。\n4. 不生成任何角色卡或开局预设内容。';
       var m2 = [{ role: 'system', content: destSystemContent() }, { role: 'user', content: applyMsg }];
       var resp2 = await callModel(m2);
       var txt = String(resp2 || '').trim();
@@ -3711,6 +3711,19 @@ function destDraftRestore(){
   try { renderDestSteps(); renderDestinyPage(); } catch (e) { opfErr('destDraftRestore render', e); }
 }
 
+// 补丁三类型 + 删除标记。用户实测问题（v1.16.5 修）：
+// "防破坏性更新"让模型只会叠加——它想删掉写错的那段，但补丁里根本没有"删除"这个动作，
+// 于是只能把新内容接在旧内容后面。这里把删除变成一等操作，并要求显式标记。
+// 注意：这几个常量必须定义在 REFINE_PATCH_SPEC / REFINE_GEN_SPEC 之前——
+// var 初始化按顺序执行，写在后面会让提示词拼进 undefined（第一次就是这么踩的）。
+var REFINE_DEL_MARK = '<<<删除>>>';
+var REFINE_DEL_MARK_ALT = '<<<DELETE>>>';
+function refineIsDeleteType(type) { return /删除|移除|删掉|去掉|remove|delete/i.test(String(type || '')); }
+function refineIsExplicitDelete(next, type) {
+  var t = String(next == null ? '' : next);
+  return refineIsDeleteType(type) || t.indexOf(REFINE_DEL_MARK) >= 0 || t.indexOf(REFINE_DEL_MARK_ALT) >= 0;
+}
+
 // ============================================================================
 // v1.12.0 ⑦ 命定核心精修：改动既有核心（外科手术式）
 // 四步闸门：① 整体分析 → ② 用户提意见 → ③ 模型分析并给出改法 → ④ 确认后置入
@@ -3719,10 +3732,13 @@ function destDraftRestore(){
 //   · 补丁由插件按"逐字唯一命中"应用到原文，任何一处锚点不唯一/找不到 → 整体放弃；
 //   · 应用后跑脚本保真校验（行级 diff、包裹标签、十槽、人设字段、EJS 配对、
 //     既有口令短语与变量路径是否消失），未变动部分逐字不动是"物理事实"而非承诺。
+//   · v1.16.5 补：删除是一等操作（类型＝删除 / 新内容写删除标记），
+//     否则模型想删也删不掉，只能叠加——这正是用户实测到的"改完变成叠起来"。
 // ============================================================================
 var REFINE_RULES = [
   '【绝对保持·铁律】',
-  '1. 除「变更」清单明确列出的部分外，原文必须逐字不变：字符、空格、缩进、标点、换行、注释、变量路径、EJS 标签、口令词，一个都不许动。',
+  '1. 除「变更」清单明确列出的部分外，原文必须逐字不变：字符、空格、缩进、标点、换行、注释、变量路径、EJS 标签、口令词，一个都不许动。'
+    + '反过来同样成立：**被点名要改或要删的部分必须真的改掉、真的删掉**——旧内容一旦被新写法取代，就必须从原文里消失，不许让它和新内容并存（叠加＝违规）。',
   '2. 禁止输出整份文件、禁止重排、禁止顺手润色、禁止统一格式。你只输出锚点与新内容。',
   '3. 锚点必须是原文里**逐字存在且唯一**的片段：长度 20~80 字符，带足够上下文以保证唯一；'
     + '不要用行号、不要用省略号、不要凭记忆改写锚点、不要跨越你打算修改的范围。',
@@ -3792,20 +3808,22 @@ var REFINE_PATCH_SPEC = [
   '【置入任务】用户已确认改法。现在**只做当前这一步**，输出**补丁**（不是全文，不是新版本文件）。',
   '输出格式（优先用这个分块格式，它对"输出被截断"最友好；不要用 json 包裹整份补丁）：',
   '###变更1',
-  '类型: 替换|后插|前插',
+  '类型: 替换|后插|前插|删除',
   '锚点:',
   '<<<',
   '（原文里逐字存在且唯一的片段，原样抄写，不要改一个字）',
   '>>>',
   '新内容:',
   '<<<',
-  '（要替换/插入的内容；可以是纯文本，也可以是 EJS 代码）',
+  '（要替换/插入的内容；可以是纯文本，也可以是 EJS 代码。要删除时本行写 ' + REFINE_DEL_MARK + '）',
   '>>>',
   '理由: 一句话',
   '',
   '###变更2 …（需要多处改动就重复这个块）',
   '',
-  '类型语义：替换=用新内容替换锚点整段；后插=在锚点之后另起一行插入新内容；前插=在锚点之前另起一行插入新内容。',
+  '类型语义：替换=用新内容替换锚点整段（新内容可以比锚点短，也可以只留一部分）；后插=在锚点之后另起一行插入新内容；前插=在锚点之前另起一行插入新内容；删除=把锚点整段移除。',
+  '【删掉旧内容怎么表达】要取消/删掉某一段（例如上一轮叠加出来的重复说明、写错的规则），用「删除」类型并在新内容里写 ' + REFINE_DEL_MARK + '。'
+    + '**禁止**把新内容接在旧内容后面凑成一段——那是在叠加，不是修改；也禁止用注释掉旧内容代替删除。',
   '【本步的输出上限】新内容合计**不要超过 1200 字符**。如果这一步的内容更多，就只输出前半部分，把剩下的写进「后续」一行（例如 `后续: 还需插入 else 分支与收尾`），下一轮会继续做。宁可多分几轮，也不要一口气输出到被截断。',
   '【自检（输出前逐条核对）】① 每个锚点都能在原文里精确找到且只有一处；② 新内容里没有误抄进来的周边原文；③ 除变更清单外没有别的差异；④ 没有动到 setvar 槽位、EJS 标签、变量路径与既有口令；⑤ 每处改动单独看都是完整的（不留半截代码、不留未闭合标签）。',
   '若某条改动实在无法用唯一锚点表达，就不要放进变更块，写进末尾的「冲突:」一行并说明。'
@@ -3877,7 +3895,8 @@ function refineParseGenBlocks(raw){
       if (n1 >= 0 && n2 >= 0) content = body.slice(n1 + 3, n2).replace(/^\n/, '').replace(/\n$/, '');
       else if (n1 >= 0) { truncated++; continue; }
     }
-    if (!content.trim()) { truncated++; continue; }
+    // 删除类允许内容为空（要删掉一段时本来就没什么可写的）；其它类型空内容仍算失败
+    if (!content.trim() && !refineIsDeleteType(type)) { truncated++; continue; }
     units.push({ '类型': String(type).trim(), '意图': String(intent).trim(), '内容': refineFromPrompt(content) });   // 还原 &lt;% → <%
   }
   var tailM = t.match(/^[ \t]*(后续|冲突)[ \t]*[:：][ \t]*(.+)$/gm);
@@ -4325,9 +4344,12 @@ function refineRenderDiff(before, after, diff){
   if (hunks >= 20) out.push('…（变更块过多已截断显示）');
   return out.join('\n');
 }
-// ---------- 锚点定位：先逐字，再归一化空白，最后（仅插入类）退化为按行定位 ----------
+// ---------- 锚点定位：先逐字，再归一化空白，最后退化为按行定位 ----------
 // 模型写锚点时最常见的问题是"凭记忆抄"：缩进差几格、行尾多了空格、把两行并成一行。
 // 这里做三级匹配，并对"近似定位"如实标注，绝不假装是逐字命中。
+// v1.16.5：第③级原来只给"插入类"用，导致替换/删除的锚点一写歪就整份失败——
+// 表现就是用户说的"AI 改不动，只能往上叠"。现在替换与删除类也能退化，但加了护栏：
+// 删除类只有在锚点是单行时才允许按最长行定位（多行锚点退化＝可能连带删掉邻行，宁可不做）。
 function refineNormIndex(s) {
   var map = [], buf = '';
   for (var i = 0; i < s.length; i++) {
@@ -4358,8 +4380,11 @@ function refineFindAnchor(text, anchor, type) {
       return { ok: true, start: st2, end: en2, how: '空白归一（缩进/空格差异）', degraded: true };
     }
   }
-  // ③ 仅对"插入类"退化：用锚点里最长的一行去定位（替换类绝不做，避免误删原文）
-  if (/前插|后插|insert/i.test(String(type))) {
+  // ③ 按锚点里最长的一行近似定位。插入类没有误删风险，替换类只改被点到的范围，
+  //    删除类要求单行锚点（删错范围的风险最高，所以只给这一种情况放行）。
+  var isDel = refineIsDeleteType(type) || /删除|移除|删掉/.test(String(type || ''));
+  if (/前插|后插|insert/i.test(String(type)) || isDel) {
+    if (isDel && a.indexOf('\n') >= 0) return { ok: false, why: '删除的锚点是多行：为避免连带删掉邻行，多行锚点必须逐字命中（请从原文复制粘贴整段）' };
     var lines = a.split(/\r?\n/).map(function (x) { return x.trim(); }).filter(function (x) { return x.length >= 6; });
     lines.sort(function (x, y) { return y.length - x.length; });
     for (var k = 0; k < lines.length && k < 3; k++) {
@@ -4402,31 +4427,71 @@ function refineAnchorHint(text, anchor) {
   if (best < 0 || bestScore < 0.5) return '';
   return lines.slice(best, best + 3).join('\n');
 }
+function refineSpanForDelete(text, start, end) {
+  var s = String(text || '');
+  var ls = s.lastIndexOf('\n', start - 1) + 1;
+  var le = s.indexOf('\n', end);
+  var lineEnd = le >= 0 ? le + 1 : s.length;
+  var head = s.slice(ls, start);
+  var tail = s.slice(end, le >= 0 ? le : s.length);
+  if (head.trim() === '' && tail.trim() === '') return { start: ls, end: lineEnd };
+  return { start: start, end: end };
+}
+function refineApplyOne(out, ch){
+  var type = String(ch['类型'] || ch['type'] || '替换');
+  var anchor = refineFromPrompt(String(ch['锚点'] || ch['anchor'] || ''));
+  var next = refineFromPrompt(ch['新内容'] != null ? String(ch['新内容']) : (ch['content'] != null ? String(ch['content']) : ''));
+  var why = String(ch['理由'] || '');
+  var del = refineIsExplicitDelete(next, type);
+  if (del) {
+    next = next.replace(/<<<删除>>>|<<<DELETE>>>/g, '').trim();
+    type = '删除';
+  }
+  if (!anchor) return { ok: false, why: '锚点为空' };
+  if (!del && !next.trim()) return { ok: false, why: '新内容为空（要删除请把类型写成「删除」或在新内容里写 ' + REFINE_DEL_MARK + '）' };
+  var hit = refineFindAnchor(out, anchor, type);
+  if (!hit.ok) return { ok: false, why: hit.why, hint: refineAnchorHint(out, anchor) };
+  var rep, delLines = 0, delText = '';
+  if (del) {
+    var span = refineSpanForDelete(out, hit.start, hit.end);
+    delText = out.slice(span.start, span.end);
+    delLines = delText.split(/\r?\n/).filter(function (x) { return x.trim(); }).length;
+    rep = '';
+    hit = { start: span.start, end: span.end, how: hit.how, degraded: hit.degraded };
+  } else if (/前插/.test(type)) rep = next + '\n' + out.slice(hit.start, hit.end);
+  else if (/后插/.test(type)) rep = out.slice(hit.start, hit.end) + '\n' + next;
+  else rep = next;
+  out = out.slice(0, hit.start) + rep + out.slice(hit.end);
+  return { ok: true, out: out, rec: { type: type, why: why, anchor: anchor, next: next, how: hit.how, degraded: !!hit.degraded, delLines: delLines, delText: delText } };
+}
+// 应用顺序：先做插入，再做替换，最后做删除。
+// 删除放最后的原因很实际——删除会让文本变短，先删可能让后面锚点的上下文一起没了；
+// 而替换里若删掉了句子，也可能带走插入要用的锚点。
+function refinePatchOrder(changes){
+  var rank = function (x) {
+    var t = String(x['类型'] || x['type'] || '替换');
+    if (refineIsExplicitDelete(x['新内容'], t)) return 2;
+    if (/前插|后插|insert/i.test(t)) return 0;
+    return 1;
+  };
+  return (changes || []).map(function (ch, i) { return { ch: ch, i: i, r: rank(ch) }; })
+    .sort(function (a, b) { return a.r - b.r || a.i - b.i; })
+    .map(function (x) { return x; });
+}
 // 把补丁落到文本上；三级锚点匹配 + all-or-nothing
 function refineApplyPatch(src, changes, opts){
-  var out = String(src), applied = [], failed = [];
+  var out = String(src), applied = [], failed = [], delTotal = 0;
   var o = opts || {};
-  (changes || []).forEach(function (ch, i) {
-    var type = String(ch['类型'] || ch['type'] || '替换');
-    var anchor = refineFromPrompt(String(ch['锚点'] || ch['anchor'] || ''));
-    var next = refineFromPrompt(ch['新内容'] != null ? String(ch['新内容']) : (ch['content'] != null ? String(ch['content']) : ''));
-    var why = String(ch['理由'] || '');
-    if (!anchor) { failed.push({ i: i, why: '锚点为空', ch: ch }); return; }
-    if (!next.trim()) { failed.push({ i: i, why: '新内容为空', ch: ch }); return; }
-    var hit = refineFindAnchor(out, anchor, type);
-    if (!hit.ok) {
-      failed.push({ i: i, why: hit.why, ch: ch, hint: refineAnchorHint(out, anchor) });
-      return;
-    }
-    var rep;
-    if (/前插/.test(type)) rep = next + '\n' + out.slice(hit.start, hit.end);
-    else if (/后插/.test(type)) rep = out.slice(hit.start, hit.end) + '\n' + next;
-    else rep = next;
-    out = out.slice(0, hit.start) + rep + out.slice(hit.end);
-    applied.push({ i: i, type: type, why: why, anchor: anchor, next: next, how: hit.how, degraded: !!hit.degraded });
+  refinePatchOrder(changes).forEach(function (w) {
+    var i = w.i, ch = w.ch;
+    var r = refineApplyOne(out, ch);
+    if (!r.ok) { failed.push({ i: i, why: r.why, ch: ch, hint: r.hint }); return; }
+    out = r.out;
+    delTotal += r.rec.delLines || 0;
+    applied.push({ i: i, type: r.rec.type, why: r.rec.why, anchor: r.rec.anchor, next: r.rec.next, how: r.rec.how, degraded: r.rec.degraded, delLines: r.rec.delLines, delText: r.rec.delText });
   });
   var deg = applied.filter(function (x) { return x.degraded; }).length;
-  return { ok: failed.length === 0, text: out, applied: applied, failed: failed, degraded: deg };
+  return { ok: failed.length === 0, text: out, applied: applied, failed: failed, degraded: deg, deleted: delTotal };
 }
 
 //@module 72-regex-parse — ⑤ 正则工坊：语言格式解析 + 自检 + 硬约束
@@ -5617,10 +5682,20 @@ async function refineApply(mode){
     } else ST.refine.taintWarn = null;
     var res = refineApplyPatch(ST.refine.working, usable);
     var lines = [];
-    if (!res.ok) {
+    // 删除失败不该连累整份补丁（v1.16.5）。删除类锚点常常因为"模型凭记忆抄"而找不到，
+    // 但同批的替换/插入都是好的——原来整份放弃，用户看到的就是"它又没删掉，还什么都没变"。
+    // 现在：只有"非删除类"失败时才整份放弃；删除类失败则放行其余改动，并把这处标出来重试。
+    var delFailed = res.failed.filter(function (f) { return refineIsDeleteType(String(f.ch && f.ch['类型'] || '')) || String(f.ch && f.ch['新内容'] || '').indexOf(REFINE_DEL_MARK) >= 0; });
+    var hardFailed = res.failed.filter(function (f) { return delFailed.indexOf(f) < 0; });
+    if (!res.ok && hardFailed.length) {
       // all-or-nothing：任何一处锚点不唯一/找不到，就整份放弃，绝不留半份改动
       ST.refine.lastFailed = res.failed.map(function (f) { return { anchor: String(f.ch && (f.ch['锚点'] || '')), why: f.why, hint: f.hint || '' }; });
       lines.push('❌ ' + stepLabel + ' 的补丁未通过校验，已整体放弃（工作稿未被改动）：');
+      // 同一批里的删除失败也一并说清，否则用户会以为"删除被悄悄吞了"
+      delFailed.forEach(function (f) {
+        lines.push('  · 第 ' + (f.i + 1) + ' 处（删除）：' + f.why);
+        lines.push('    ↳ 本条要删的内容与上面的失败一起被搁置了，重试时会重新尝试。');
+      });
       res.failed.forEach(function (f) {
         lines.push('  · 第 ' + (f.i + 1) + ' 处：' + f.why);
         lines.push('    锚点：' + String(f.ch && (f.ch['锚点'] || '')).slice(0, 160).replace(/\n/g, '⏎'));
@@ -5660,8 +5735,20 @@ async function refineApply(mode){
     res.applied.forEach(function (a, i) {
       lines.push('  ' + (i + 1) + '. [' + a.type + '] ' + (a.why || ''));
       lines.push('     锚点：' + a.anchor.slice(0, 100).replace(/\n/g, '⏎') + '　（定位方式：' + a.how + (a.degraded ? ' ⚠ 近似' : '') + '）');
-      lines.push('     新内容：' + a.next.slice(0, 200).replace(/\n/g, '⏎') + (a.next.length > 200 ? ' …' : ''));
+      // 删除要能看到"删掉了什么"，否则用户没法核对是不是删对了（绝不静默删除）
+      if (a.delLines) lines.push('     − 已删除 ' + a.delLines + ' 行：' + String(a.delText || '').slice(0, 200).replace(/\n/g, '⏎') + (String(a.delText || '').length > 200 ? ' …' : ''));
+      else lines.push('     新内容：' + a.next.slice(0, 200).replace(/\n/g, '⏎') + (a.next.length > 200 ? ' …' : ''));
     });
+    if (delFailed.length) {
+      lines.push('');
+      lines.push('⚠ 有 ' + delFailed.length + ' 处**删除没能定位**（原内容保留，未删成）：');
+      delFailed.forEach(function (f) {
+        lines.push('  · 第 ' + (f.i + 1) + ' 处：' + f.why);
+        lines.push('    锚点：' + String(f.ch && (f.ch['锚点'] || '')).slice(0, 160).replace(/\n/g, '⏎'));
+        if (f.hint) lines.push('    ↳ 原文里最接近的一段是：' + String(f.hint).split(/\r?\n/)[0].slice(0, 120) + '（其余见下方差异预览）');
+      });
+      lines.push('  对策：点「📍 只重跑定位」或「↻ 重新生成这一步」，会带上最近似的原文让它照抄锚点再删一次。');
+    }
     if (res.degraded) lines.push('\n⚠ 有 ' + res.degraded + ' 处是**近似定位**（锚点与原文有空白差异，或退化为按行定位）——请重点看下面的差异预览确认位置对不对。');
     if (ST.refine.taintWarn && ST.refine.taintWarn.length) lines.push('\n⚠ 材料隔离：本次有 ' + ST.refine.taintWarn.length + ' 段新内容疑似来自世界设定参考（你选择了仍然落地）——请核对它们是否本该属于这个核心。');
     else if (pool.length) lines.push('\n✓ 材料隔离核对通过：新内容里没有出现"只在世界参考里才有"的内容（参考池 ' + pool.length + ' 段）。');
@@ -6109,29 +6196,34 @@ function rxCssRules(css) {
 function rxCssNormSel(p) {
   return String(p || '').replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
 }
-// 把补丁里同选择器的规则覆盖进原 CSS，新选择器追加到末尾；未提到的部分逐字不动
+// 把补丁里同选择器的规则覆盖进原 CSS，新选择器追加到末尾；未提到的部分逐字不动。
+// v1.16.5：补上删除——用户实测"AI 改完只会叠加"。规则体写成空块或含 /* 删除 */ 时，
+// 把同选择器的现有规则整条删掉（这是补丁层唯一能表达删除的语法，必须显式，避免误删）。
+var RX_DEL_RE = /\/\*\s*(?:删除|delete|remove)\s*\*\//i;
 function rxCssMerge(orig, patch) {
   var base = String(orig || '');
   var rules = rxCssRules(base), adds = rxCssRules(patch);
-  var replaced = [], added = [], skipped = [], append = [];
+  var replaced = [], added = [], skipped = [], deleted = [], append = [];
   adds.forEach(function (r) {
     if (r.at) { skipped.push(r.prelude); return; }
     if (!r.prelude) return;
     var key = rxCssNormSel(r.prelude);
     var hit = null;
     for (var t = 0; t < rules.length; t++) { if (!rules[t].at && rxCssNormSel(rules[t].prelude) === key) { hit = rules[t]; break; } }
-    if (hit) { hit.newRaw = r.raw; replaced.push(r.prelude); }
-    else { added.push(r.prelude); append.push(r.raw); }
+    if (!hit) { added.push(r.prelude); append.push(r.raw); return; }
+    var bodyOnly = String(r.raw).replace(/^[^{]*\{/, '').replace(/\}\s*$/, '').trim();
+    if (RX_DEL_RE.test(r.raw) || bodyOnly === '') { hit.deleted = true; deleted.push(r.prelude); }
+    else { hit.newRaw = r.raw; replaced.push(r.prelude); }
   });
   var out = '', cursor = 0;
   rules.forEach(function (x) {
     out += base.slice(cursor, x.start);
-    out += (x.newRaw != null) ? x.newRaw : x.raw;
+    if (!x.deleted) out += (x.newRaw != null) ? x.newRaw : x.raw;
     cursor = x.end;
   });
   out += base.slice(cursor);
   if (append.length) out = out.replace(/\s*$/, '') + '\n\n/* 修改追加 */\n' + append.join('\n') + '\n';
-  return { css: out, replaced: replaced, added: added, skipped: skipped };
+  return { css: out, replaced: replaced, added: added, skipped: skipped, deleted: deleted };
 }
 // 模型没听劝、整段回了一套 CSS 时：按整段处理（走缩水保护），别再当补丁合并
 function rxLooksLikeFullCss(patchCss, curCss) {
@@ -6336,12 +6428,14 @@ function rxPatchPrompt(item, f, dir) {
   var cur = rxItemCss(item);
   var frame = rxFrameOf(item);
   var L = [];
-  L.push('[任务] 修改一条「对话美化正则」的样式层。**你只输出需要新增或替换的 CSS 规则**——未改动的规则一律不要重复输出：插件会把你的规则按选择器合并进现有 CSS，没提到的部分逐字保留。');
+  L.push('[任务] 修改一条「对话美化正则」的样式层。**你只输出需要新增、替换或删除的 CSS 规则**——未改动的规则一律不要重复输出：插件会把你的规则按选择器合并进现有 CSS，没提到的部分逐字保留。');
   L.push('[用户要求]\n' + String(dir));
   L.push('[当前完整 CSS（共 ' + cur.length + ' 字符）——只供你确认选择器、变量与既有写法，不要原样重抄]\n' + cur);
   L.push('[骨架（HTML 结构由插件生成并锁定，绝不能改动）· 初始框架「' + frame.label + '」]\n' + rxSkeleton(item, f));
   if (f.params && f.params.length) f.params.forEach(function (p) { if (p.values && p.values.length) L.push('[参数 ' + p.name + ' 的枚举值] ' + p.values.join('、')); });
-  L.push('[合并规则]\n1. 改已有规则：输出**同选择器**的完整规则块（选择器写法与现有一致，大小写与空白会被规范化后匹配）；\n2. 新增规则：用新选择器，插件会追加到末尾；\n3. 一条规则必须整体写出（选择器 + 完整花括号内容），不要只写半截声明；\n4. 不要输出 @media / @keyframes / @font-face / @import 等 @ 块——需要改这类整块时提示改用「整段重写」档；\n5. 一次最多输出 12 条规则，只覆盖用户要求涉及的部分。');
+  L.push('[合并规则]\n1. 改已有规则：输出**同选择器**的完整规则块（选择器写法与现有一致，大小写与空白会被规范化后匹配）；\n2. 新增规则：用新选择器，插件会追加到末尾；\n3. 一条规则必须整体写出（选择器 + 完整花括号内容），不要只写半截声明；\n4. 不要输出 @media / @keyframes / @font-face / @import 等 @ 块——需要改这类整块时提示改用「整段重写」档；\n5. 一次最多输出 12 条规则，只覆盖用户要求涉及的部分；\n'
+    + '6. **删掉一条规则**：写出该选择器，规则体里只放注释 /* 删除 */（形如 `.前缀-box { /* 删除 */ }`）——插件会把它整条移除。'
+    + '要删就删，不要用「注释掉旧规则 + 另写一条新的」代替删除（那是叠加，会让样式表越来越长）。');
   L.push(RX_REFINE_RULES_PATCH);
   L.push('[输出] 一个 ' + fence() + 'css 代码块，里面**只有要合并的规则**；不要 JSON、不要解释、不要重抄整份 CSS。');
   return macroFill(L.join('\n\n'));
@@ -6366,17 +6460,19 @@ async function rxRefinePatch(item, dir) {
     return out;
   }
   var mg = rxCssMerge(cur, patchCss);
-  if (!mg.replaced.length && !mg.added.length) {
+  if (!mg.replaced.length && !mg.added.length && !mg.deleted.length) {
     out.note = '没能从返回里解析出可合并的规则' + (mg.skipped.length ? '（只收到 @ 块：' + mg.skipped.join('、') + '，请改用「整段重写」档）' : '');
     return out;
   }
   rxSnapshot(item);
   rxSetItemCss(item, mg.css);
   item.issues = rxLint(item, ST.rx.parsed);
-  out.replaced = mg.replaced.length; out.added = mg.added.length; out.skipped = mg.skipped.length;
+  out.replaced = mg.replaced.length; out.added = mg.added.length; out.skipped = mg.skipped.length; out.deleted = mg.deleted.length;
   out.after = mg.css.length;
   out.changed = ['样式补丁'];
-  out.note = '替换 ' + mg.replaced.length + ' 条 / 新增 ' + mg.added.length + ' 条规则' + (mg.skipped.length ? '（跳过 ' + mg.skipped.length + ' 个 @ 块）' : '');
+  out.note = '替换 ' + mg.replaced.length + ' 条 / 新增 ' + mg.added.length + ' 条'
+    + (mg.deleted.length ? ' / **删除 ' + mg.deleted.length + ' 条**（' + mg.deleted.slice(0, 3).join('、') + (mg.deleted.length > 3 ? ' 等' : '') + '）' : '')
+    + (mg.skipped.length ? '（跳过 ' + mg.skipped.length + ' 个 @ 块）' : '');
   return out;
 }
 async function rxRefineItem(item, dir, scope) {
@@ -8356,8 +8452,13 @@ function atlFixPrompt(dir) {
   var cur = String(A.buf.yaml || '').trim();
   var kind = atlKind(A.buf.kind);
   var L = [];
-  L.push('[任务] 按{{user}}的要求改进下面这一件' + kind.noun + '的 YAML。' + (atlWantsShort(dir) ? '' : '未提到的字段与内容逐字保留。'));
+  L.push('[任务] 按{{user}}的要求改进下面这一件' + kind.noun + '的 YAML。'
+    + (atlWantsShort(dir) ? '这条要求本身就是要删 / 要简化：该删的请真的删掉，改完比原文短是正常的。' : '未提到的字段与内容逐字保留。'));
   L.push('[用户要求]\n' + String(dir || '').trim());
+  L.push('[删改规则（重要）] 被要求改掉或删掉的内容必须从结果里彻底消失：'
+    + '不许把旧内容留在原地再把新内容接在后面（那是叠加，不是修改）；'
+    + '不许用注释、\"（原：…）\"、\"保留备用\" 这类写法留着已经被取代的旧内容；'
+    + '用户说\"删掉某一段\"，结果里就不该再有那一段。');
   if (kind.id === 'skill') {
     L.push('[联动提醒] 只要这条要求牵动品质、消耗、威力或词条中的任意一项，就把其余各项一起改到同档：'
       + '把品质提到某一档，消耗与威力必须落进那一档的《核心数值总表》区间（如提到传说＝消耗 2400~10000、威力 2000~4000，并补「微弱权能」词条）；'
@@ -8405,7 +8506,11 @@ var ATL_CROSS_RULES = [
 ].join('\n');
 
 // ---------- 通用小工具 ----------
-function atlWantsShort(dir) { return /精简|简化|缩短|短一点|更短|压缩|删|去掉|去除|移除|减少|瘦身|太长/.test(String(dir || '')); }
+// 判定"这条要求本身就是要删 / 要缩"：命中时缩水保护放宽——否则模型乖乖删了反而会被拦下，
+// 用户看到的是"它又没删掉"。词表里必须包含"删掉/去掉/取消/不要"这类口语说法。
+function atlWantsShort(dir) {
+  return /精简|简化|缩短|短一点|更短|压缩|删|去掉|去除|移除|减少|瘦身|太长|删除|删掉|删去|取消|不要|别要|合并重复|去掉重复|清掉|砍掉/.test(String(dir || ''));
+}
 function atlShrinkSuspect(before, after, dir) {
   var b = Number(before) || 0;
   return b >= 200 && (Number(after) || 0) < b * (atlWantsShort(dir) ? 0.45 : 0.7);
@@ -8975,7 +9080,10 @@ async function atlDoFix() {
     if (atlShrinkSuspect(before.length, yaml.length, dir)) {
       var ask = (typeof window !== 'undefined' && window.confirm) ? window.confirm : function () { return false; };
       if (!ask('改后只有 ' + yaml.length + ' 字符，原来是 ' + before.length + ' 字符（-'
-        + Math.round((1 - yaml.length / Math.max(1, before.length)) * 100) + '%），像是只回了片段。\n\n要用这个偏短的结果替换吗？（取消＝保留原样）')) {
+        + Math.round((1 - yaml.length / Math.max(1, before.length)) * 100) + '%），像是只回了片段。\n\n'
+        + '要用这个偏短的结果替换吗？（取消＝保留原样）\n'
+        + '· 若你的要求里本来就包含"删掉/去掉/精简"，那这次变短可能就是删对了 —— 确认即可；\n'
+        + '· 取消的话，原内容会原样留着（被要求删掉的那些旧内容也会一起留下）。')) {
         atlSxAsk(ATL_SX_SAY.tooShort);
         atlStat('改进：结果偏短，已保留原样（' + before.length + ' 字符）');
         return;

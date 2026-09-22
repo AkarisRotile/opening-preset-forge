@@ -888,8 +888,13 @@ function atlFixPrompt(dir) {
   var cur = String(A.buf.yaml || '').trim();
   var kind = atlKind(A.buf.kind);
   var L = [];
-  L.push('[任务] 按{{user}}的要求改进下面这一件' + kind.noun + '的 YAML。' + (atlWantsShort(dir) ? '' : '未提到的字段与内容逐字保留。'));
+  L.push('[任务] 按{{user}}的要求改进下面这一件' + kind.noun + '的 YAML。'
+    + (atlWantsShort(dir) ? '这条要求本身就是要删 / 要简化：该删的请真的删掉，改完比原文短是正常的。' : '未提到的字段与内容逐字保留。'));
   L.push('[用户要求]\n' + String(dir || '').trim());
+  L.push('[删改规则（重要）] 被要求改掉或删掉的内容必须从结果里彻底消失：'
+    + '不许把旧内容留在原地再把新内容接在后面（那是叠加，不是修改）；'
+    + '不许用注释、\"（原：…）\"、\"保留备用\" 这类写法留着已经被取代的旧内容；'
+    + '用户说\"删掉某一段\"，结果里就不该再有那一段。');
   if (kind.id === 'skill') {
     L.push('[联动提醒] 只要这条要求牵动品质、消耗、威力或词条中的任意一项，就把其余各项一起改到同档：'
       + '把品质提到某一档，消耗与威力必须落进那一档的《核心数值总表》区间（如提到传说＝消耗 2400~10000、威力 2000~4000，并补「微弱权能」词条）；'
@@ -937,7 +942,11 @@ var ATL_CROSS_RULES = [
 ].join('\n');
 
 // ---------- 通用小工具 ----------
-function atlWantsShort(dir) { return /精简|简化|缩短|短一点|更短|压缩|删|去掉|去除|移除|减少|瘦身|太长/.test(String(dir || '')); }
+// 判定"这条要求本身就是要删 / 要缩"：命中时缩水保护放宽——否则模型乖乖删了反而会被拦下，
+// 用户看到的是"它又没删掉"。词表里必须包含"删掉/去掉/取消/不要"这类口语说法。
+function atlWantsShort(dir) {
+  return /精简|简化|缩短|短一点|更短|压缩|删|去掉|去除|移除|减少|瘦身|太长|删除|删掉|删去|取消|不要|别要|合并重复|去掉重复|清掉|砍掉/.test(String(dir || ''));
+}
 function atlShrinkSuspect(before, after, dir) {
   var b = Number(before) || 0;
   return b >= 200 && (Number(after) || 0) < b * (atlWantsShort(dir) ? 0.45 : 0.7);
@@ -1507,7 +1516,10 @@ async function atlDoFix() {
     if (atlShrinkSuspect(before.length, yaml.length, dir)) {
       var ask = (typeof window !== 'undefined' && window.confirm) ? window.confirm : function () { return false; };
       if (!ask('改后只有 ' + yaml.length + ' 字符，原来是 ' + before.length + ' 字符（-'
-        + Math.round((1 - yaml.length / Math.max(1, before.length)) * 100) + '%），像是只回了片段。\n\n要用这个偏短的结果替换吗？（取消＝保留原样）')) {
+        + Math.round((1 - yaml.length / Math.max(1, before.length)) * 100) + '%），像是只回了片段。\n\n'
+        + '要用这个偏短的结果替换吗？（取消＝保留原样）\n'
+        + '· 若你的要求里本来就包含"删掉/去掉/精简"，那这次变短可能就是删对了 —— 确认即可；\n'
+        + '· 取消的话，原内容会原样留着（被要求删掉的那些旧内容也会一起留下）。')) {
         atlSxAsk(ATL_SX_SAY.tooShort);
         atlStat('改进：结果偏短，已保留原样（' + before.length + ' 字符）');
         return;
