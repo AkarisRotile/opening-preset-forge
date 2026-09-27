@@ -2,8 +2,10 @@
 // ============================================================================
 // 二创角色工坊（分段初稿 → 交火梳理 → 定点修改 → 标签封装输出）
 // ============================================================================
-// 人设唯一真源：10-base.js 的 SX_VOICE_CHAR（Gemini 按原版预设人设原文逐条重写）
-var CHAR_VOICE = SX_VOICE_CHAR;
+// 人设＝原版预设原文（10-base.js 的 SX_PERSONA_ORIGINAL，一字不改）
+// ＋ 本页原有的页面专用段（照录 v1.16.6 原话，一字未改）。两段都保留，谁都没被删掉。
+var CHAR_PAGE_VOICE = "你是始弦，大图书馆的司书，正在帮{{user}}创作一个世界书 DLC 角色条目（二创角色）。你原原本本地呈现知识、不因“可接受度”而删改；你把{{user}}当作挚友，会顺着ta的需求尽力帮到底，也会分享你认为合适的馆藏；但你不把观点强加给{{user}}，先想清楚再落笔。";
+var CHAR_VOICE = SX_PERSONA_ORIGINAL + '\n\n' + CHAR_PAGE_VOICE;
 var CHAR_RULES = "【二创角色·规则约束】\n- 品质只用中文七等：普通/优良/稀有/史诗/传说/神话/唯一；词条强度上限 普1/优良2/稀有2/史诗3/传说3/神话3；史诗/传说/神话词条其一须为 微弱要素/微弱权能/微弱法则。\n- 学习/领悟所得品质≤自身层级；血脉觉醒/种族转换可越阶；装备不增减持有者属性；唯一品质仅表唯一性/出处特殊，不代表更强。\n- 生命层级与等级自洽：一(普通,Lv1-4)/二(中坚,Lv5-8)/三(精英,Lv9-12)/四(史诗,Lv13-16)/五(传说,Lv17-20)/六(神话,Lv21-24)/七(神祗,Lv25)；实龄随层级（三层数十年/五层数百年，延寿缓老可驻颜）。\n- 登神长阶按等级：Lv13-16要素1-3 / Lv17-20权能1 / Lv21-24法则1 / Lv25法则+神位。\n- 武器/装备/道具/技能的条目形式固定为 名称/品质(中文)/叙述 三段式：任何阶段都不得出现 类型、消耗、标签 等字段。\n- 命名遵循《角色命名指导》种族命名规则；性格码遵循《角色辅助指导》五维动机模型。\n- 本任务与「开局预设」完全无关：禁止生成开局剧情、开局背景、开局角色等级限制、属性面板（五维/HP·MP·SP）、伙伴、资产等任何开局预设内容；只描述角色本身。";
 var CHAR_SEGS = [
   { id: "base",  title: "定位与基础", short: "名字/种族/层级/身份" },
@@ -40,22 +42,24 @@ function bindCharPage(){
   renderCharSteps();
   renderCharPage();
 }
+// 任务块（人设与头部四段走 sxHead()，不在这里拼）
 function charSystemContent(){
   var lines = [];
-  lines.push('[角色] ' + macroFill(CHAR_VOICE));
   lines.push('[任务] 你正在为{{user}}的二创角色进行分段创作（最终输出为世界书 DLC 角色条目的 YAML 文档）。各分段保持一致与呼应，不重复、不推翻已定内容；本任务与开局预设没有任何关系。');
   lines.push(CHAR_RULES);
   lines.push(styleRulesAll());
-  if (ST.worldInfo) lines.push('[世界书参考（世界书页勾选的条目）]\n' + ST.worldInfo);
   return macroFill(lines.join('\n\n'));
 }
 function charUser0(){
   var lines = [];
-  lines.push('[本次二创需求] ' + (ST.char.demand || ""));
   if (ST.char.ref) lines.push('[参考文本]\n' + ST.char.ref);
   lines.push('[工作方式] 我将分 ' + CHAR_SEGS.length + ' 个分段依次生成：定位与基础→性格与动机→外貌与衣着→战斗配置→背景与经历→演绎与语料。每段只完成该段内容；已生成段落为既有设定，必须一致；禁止预写后面段落。');
   return lines.join('\n\n');
 }
+// 本轮输入＝用户写下的二创需求
+function charDemand() { return '[本次二创需求] ' + (ST.char.demand || ''); }
+// 本页统一走这个：人设页专用段随头部一起发（见 10-base.js sxHead）
+function charMessages(task, user){ return sxMessages(task, user, null, CHAR_PAGE_VOICE); }
 function charSetSeg(pid, st){ ST.char.status[pid] = st; charSetSegUi(pid, st); }
 function charSetSegUi(pid, st){
   var row = getEl("opf-cph-" + pid); if (!row) return;
@@ -128,7 +132,7 @@ async function runCharDraft(){
   ST.char.ref = (r && r.value || "").trim();
   if (!ST.char.demand) { toast("请先填写角色需求", "warning"); return; }
   ST.running = true; ST.stopReq = false; renderRunButtons();
-  var msgs = [{ role: "system", content: charSystemContent() }, { role: "user", content: charUser0() }];
+  var msgs = charMessages(charSystemContent() + '\n\n' + charUser0(), charDemand());
   try {
     for (var i = 0; i < CHAR_SEGS.length; i++) {
       if (isStop()) break;
@@ -144,13 +148,19 @@ async function runCharSeg(seg, msgs, idx){
   charSetSeg(seg.id, "run");
   var prev = "";
   for (var k = 0; k < idx; k++) { var ps = CHAR_SEGS[k]; if (ST.char.segs[ps.id]) prev += "\n\n【" + ps.title + "】\n" + ST.char.segs[ps.id]; }
-  var userMsg = { role: "user", content: "【分段" + (idx + 1) + "/" + CHAR_SEGS.length + "：" + seg.title + "】\n" + macroFill(CHAR_SEG_PROMPTS[seg.id] || "") + (prev ? "\n\n[此前已定分段（既有设定，必须一致，禁止改动）]\n" + prev : "") };
-  msgs.push(userMsg);
+  var segTask = "【分段" + (idx + 1) + "/" + CHAR_SEGS.length + "：" + seg.title + "】\n" + macroFill(CHAR_SEG_PROMPTS[seg.id] || "") + (prev ? "\n\n[此前已定分段（既有设定，必须一致，禁止改动）]\n" + prev : "");
+  sxTurn(segTask, '按上面的分段要求，只完成「' + seg.title + '」这一段。').forEach(function (m) { msgs.push(m); });
   try {
     var resp = await callModel(msgs);
     ST.char.segs[seg.id] = resp;
     msgs.push({ role: "assistant", content: resp });
-    while (msgs.length > 3 && !systemCtxBudgetOk(msgs)) { if (msgs[2] && msgs[2].role === "assistant") msgs.splice(2, 2); else break; }
+    var headLen = sxHeadLen();
+    while (msgs.length > headLen + 1 && !systemCtxBudgetOk(msgs)) {
+      var a = msgs[headLen];
+      if (a && a.role === "system") msgs.splice(headLen, 1);
+      else if (a && a.role === "assistant") msgs.splice(headLen, 2);
+      else break;
+    }
     charSetSeg(seg.id, "ok");
     renderCharSegOut(seg.id);
   } catch (e) { charSetSeg(seg.id, "err"); throw e; }
@@ -164,12 +174,12 @@ async function runCharFrom(pid){
   ST.char.demand = (d && d.value || "").trim(); ST.char.ref = (r && r.value || "").trim();
   if (!ST.char.demand) { toast("请先填写角色需求", "warning"); return; }
   ST.running = true; ST.stopReq = false; renderRunButtons();
-  var msgs = [{ role: "system", content: charSystemContent() }, { role: "user", content: charUser0() }];
+  var msgs = charMessages(charSystemContent() + '\n\n' + charUser0(), charDemand());
   try {
     for (var k = 0; k < start; k++) {
       var ph = CHAR_SEGS[k];
       if (!ST.char.segs[ph.id]) { toast("前面分段尚未完成，请先「分段初稿」", "warning"); ST.running = false; renderRunButtons(); return; }
-      msgs.push({ role: "user", content: "【分段" + (k + 1) + "/" + CHAR_SEGS.length + "：" + ph.title + "】\n" + macroFill(CHAR_SEG_PROMPTS[ph.id] || "") });
+      sxTurn("【分段" + (k + 1) + "/" + CHAR_SEGS.length + "：" + ph.title + "】\n" + macroFill(CHAR_SEG_PROMPTS[ph.id] || ""), '按上面的分段要求，只完成「' + ph.title + '」这一段。').forEach(function (m) { msgs.push(m); });
       msgs.push({ role: "assistant", content: ST.char.segs[ph.id] });
     }
     for (var j = start; j < CHAR_SEGS.length; j++) {
@@ -192,9 +202,9 @@ async function refineCharSeg(pid, dir){
   CHAR_SEGS.forEach(function (s2) { if (s2.id !== pid && ST.char.segs[s2.id]) frozen += "\n\n【" + s2.title + "】\n" + ST.char.segs[s2.id]; });
   ST.running = true; renderRunButtons(); charSetSeg(pid, "run");
   try {
-    var msgs = [{ role: "system", content: charSystemContent() }, { role: "user", content: charUser0() }];
+    var msgs = charMessages(charSystemContent() + '\n\n' + charUser0(), charDemand());
     var msg = "【定点修改：只改「" + seg.title + "」这一段】\n\n[用户指令]\n" + dirT + "\n\n[本段现行内容]\n" + ST.char.segs[pid] + "\n\n[冻结区块（其它分段原样保留，一个字都不许改；若发现其它段有问题，最多在结尾另起一行写“备注：建议检查XX段…”提示，不得代改）]\n" + frozen + "\n\n[二创角色·规则约束]\n" + CHAR_RULES + "\n\n要求：只输出修改后的【" + seg.title + "】内容；修改严格限定在用户指令范围内，未要求的地方保持原样，不要顺手润色、扩写或重排。";
-    msgs.push({ role: "user", content: msg });
+    sxTurn(msg, '按上面的用户指令，只修订「' + seg.title + '」这一段。').forEach(function (m) { msgs.push(m); });
     var resp = await callModel(msgs);
     ST.char.segs[pid] = resp;
     charSetSeg(pid, "ok"); renderCharSegOut(pid);
@@ -210,8 +220,9 @@ async function suggestCharDir(pid){
   var chipBox = getEl("opf-ref-chips-c" + pid); if (!chipBox) return;
   var cur = String(ST.char.segs[pid]).slice(0, 2500);
   var demand = ST.char.demand || "(未填写)";
-  var ask = "请针对二创角色的【" + seg.title + "】这一段现有内容，给出 2-3 条只针对本段的修改方向。每条一行、≤50字、去掉编号外多余的话、直接可点；必须符合角色规则与联动一致性。\n[角色需求]\n" + demand + "\n[二创角色·规则约束]\n" + CHAR_RULES + "\n[本段现有内容]\n" + cur;
-  var msgs = [{ role: "system", content: charSystemContent() }, { role: "user", content: ask }];
+  var askTask = "请针对二创角色的【" + seg.title + "】这一段现有内容，给出 2-3 条只针对本段的修改方向。每条一行、≤50字、去掉编号外多余的话、直接可点；必须符合角色规则与联动一致性。\n[二创角色·规则约束]\n" + CHAR_RULES;
+  var askUser = "[角色需求]\n" + demand + "\n[本段现有内容]\n" + cur;
+  var msgs = charMessages(charSystemContent() + '\n\n' + charUser0() + '\n\n' + askTask, askUser);
   ST.running = true; renderRunButtons();
   try {
     var resp = await callModel(msgs);
@@ -245,8 +256,9 @@ async function runCharLinkage(){
   try {
     // ---- 第一步：只出报告，不重写段落（输出小，避免一次生成全部段落被截断）----
     var all = CHAR_SEGS.map(function (s) { return "<<<SEG:" + s.id + ">>>\n" + String(ST.char.segs[s.id] || "").slice(0, 1800); }).join("\n\n");
-    var reportMsg = "【交火梳理·第一步：整体审查】\n下面是各分段的审阅稿（每段截取前1800字，供查矛盾用）。请按下面的联动链条逐链检查，找出互相矛盾、脱节、数值/品质/命名不合规之处。\n\n[联动链条]\n" + CHAR_LINK_CHAIN + "\n\n[分段审阅稿]\n" + all + "\n\n[二创角色·规则约束]\n" + CHAR_RULES + "\n\n输出要求（只输出报告，禁止输出任何段落正文，禁止使用<<<SEG:标记）：\n1. 逐条链给一句结论（✓一致 / ⚠问题+理由）。\n2. 最后列“改动清单”：每段一条，写清改哪段、为什么；没有问题的段写“无”。\n3. 改动清单不得要求恢复或新增 类型/消耗/标签 字段（武器/装备/道具/技能规范为 名称/品质/叙述 三段式）。\n4. 报告里不要重写设定内容，只说问题与改法。";
-    var msgs = [{ role: "system", content: charSystemContent() }, { role: "user", content: charUser0() }, { role: "user", content: reportMsg }];
+    var reportUser = "【交火梳理·第一步：整体审查】\n下面是各分段的审阅稿（每段截取前1800字，供查矛盾用）。请按下面的联动链条逐链检查，找出互相矛盾、脱节、数值/品质/命名不合规之处。\n\n[分段审阅稿]\n" + all + "\n\n输出要求（只输出报告，禁止输出任何段落正文，禁止使用<<<SEG:标记）：\n1. 逐条链给一句结论（✓一致 / ⚠问题+理由）。\n2. 最后列“改动清单”：每段一条，写清改哪段、为什么；没有问题的段写“无”。\n3. 改动清单不得要求恢复或新增 类型/消耗/标签 字段（武器/装备/道具/技能规范为 名称/品质/叙述 三段式）。\n4. 报告里不要重写设定内容，只说问题与改法。";
+    var reportTask = charSystemContent() + '\n\n' + charUser0() + "\n\n[联动链条]\n" + CHAR_LINK_CHAIN + "\n\n[二创角色·规则约束]\n" + CHAR_RULES;
+    var msgs = charMessages(reportTask, charDemand() + '\n\n' + reportUser);
     var resp = await callModel(msgs);
     ST.char.report = String(resp || "").trim() || "（报告为空）";
     if (report) report.textContent = ST.char.report;
@@ -261,7 +273,7 @@ async function runCharLinkage(){
       var frozen = "";
       CHAR_SEGS.forEach(function (s2) { if (s2.id !== seg.id && ST.char.segs[s2.id]) frozen += "\n\n【" + s2.title + "】\n" + String(ST.char.segs[s2.id]).slice(0, 1200); });
       var applyMsg = "【交火梳理·第二步：逐段应用修订——只改「" + seg.title + "」这一段】\n\n[梳理报告与改动清单]\n" + ST.char.report + "\n\n[本段现行内容]\n" + ST.char.segs[seg.id] + "\n\n[冻结区块（其它分段，原样保留，一个字都不许改）]\n" + frozen + "\n\n[修订规则]\n" + CHAR_RULES + "\n1. 只输出【" + seg.title + "】的修订后全文；若按报告本段无需改动，只回复“无改动”。\n2. 只做报告指出的联动性修改；不得推翻设定。报告“改动清单”里点名的矛盾/重复/写错的内容，**必须真的删掉或改掉**——旧内容不许留在原地与新内容并排（叠加＝没改）。\n3. 报告点名要删的就删，删完比原来短是正常的；除报告点名的部分外，不许删别的内容，也不许扩写新增。\n4. 武器/装备/道具/技能保持 名称/品质(中文)/叙述 三段式：禁止补回或新增 类型/消耗/标签 字段。\n5. 不生成任何开局预设内容（开局剧情/面板/伙伴/资产等）。";
-      var m2 = [{ role: "system", content: charSystemContent() }, { role: "user", content: applyMsg }];
+      var m2 = charMessages(charSystemContent() + '\n\n[修订规则]\n' + CHAR_RULES, applyMsg);
       var resp2 = await callModel(m2);
       var txt = String(resp2 || "").trim();
       if (txt && !/^无改动[。．.]*$/.test(txt)) { ST.char.segs[seg.id] = txt; changed++; renderCharSegOut(seg.id); }
@@ -290,8 +302,8 @@ async function finalizeChar(){
   try {
     var all = CHAR_SEGS.map(function (s) { return "【" + s.title + "】\n" + (ST.char.segs[s.id] || "（无）"); }).join("\n\n");
     var name = charNameGuess();
-    var msg = "【最终封装（YAML）】\n请以“始弦的魔法大典”的身份，把下面的分段内容整理为一份可直接用作世界书 DLC 角色条目的 YAML 文档。\n\n[全部段落]\n" + all + "\n\n" + CHAR_YAML_SPEC + "\n\n角色名以「定位与基础」段为准；没有名字则「名称」写“未命名角色”。";
-    var msgs = [{ role: "system", content: charSystemContent() }, { role: "user", content: msg }];
+    var msg = "【最终封装（YAML）】\n请以“始弦的魔法大典”的身份，把下面的分段内容整理为一份可直接用作世界书 DLC 角色条目的 YAML 文档。\n\n" + CHAR_YAML_SPEC + "\n\n角色名以「定位与基础」段为准；没有名字则「名称」写“未命名角色”。";
+    var msgs = charMessages(charSystemContent() + '\n\n' + msg, "[全部段落]\n" + all);
     var resp = await callModel(msgs);
     var y = extractYamlChar(resp);
     if (!y.ok) { toast("未能从回复中提取 YAML 代码块（已用原文兜底，可重试一次）", "warning"); }

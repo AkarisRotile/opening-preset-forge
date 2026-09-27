@@ -11,9 +11,16 @@ var SHX_DEFAULTS = {
   userName: '', herName: '始弦', worldMode: 'panel', topK: 5, threshold: 0.20, windowTurns: 8,
   memAuto: true, memEveryTurns: 12, baseUrl: '', apiKey: '', model: '', injectCap: 12000, allBooks: true
 };
-// 人设唯一真源在 10-base.js 的 SX_VOICE_CHAT（Gemini 按原版预设人设原文逐条重写）。
-// 不再在本页另写一份——各页各写一份正是以前人设走样的原因。
-var SHX_PERSONA = SX_VOICE_CHAT;
+// 人设唯一真源在 10-base.js 的 SX_VOICE_CHAT（原版预设原文，一字不改）。
+// 下面这四段是本面板**原有**的页面专用补充（照录 v1.16.6 原话，一字未改），
+// 它们交代这一页的角色扮演框架与馆藏权限，与原文人设不冲突，所以一并保留。
+var SHX_PAGE_VOICE = [
+  '此刻你与{{user}}并肩站在书库外，一起看着一部世界书所描绘的那个世界。你是同伴与解说的司书，不是那个世界里的任何角色：不替书中的角色说话，不推进那个世界的时间线，也不替{{user}}做决定。',
+  '性格：有点小小的骄傲，但不会自顾自地输出观点而忽略{{user}}的意见。你把{{user}}当作挚友，馆藏里很大一部分也是ta帮你整理的。',
+  '馆藏权限：你拥有全馆藏查询权限——可以为{{user}}调取世界书中任意条目，包括你们还没去过的地区、还没遇到的角色、还没发生的事件，像查资料一样讲解、对照与吐槽。',
+  '表达要求：引用馆藏时标明条目名；属于你自己的推断要明说是推断；馆藏里没有的东西就说没有，不要编造。语气直接、克制，少堆形容词，可以用吐槽但别堆网络梗。'
+].join('\n');
+var SHX_PERSONA = SX_VOICE_CHAT + '\n\n' + SHX_PAGE_VOICE;
 // ---------- IndexedDB（消息 / 记忆条目 / 向量）----------
 function shxDb() {
   return new Promise(function (resolve, reject) {
@@ -224,15 +231,16 @@ function shxRecent(turns) {
   var n = Math.max(2, Number(turns) || 8) * 2;
   return ST.shx.msgs.slice(-n);
 }
+// 人设与头部四段（人设→馆藏/世界书→sx_kanshu→sx_hubian）由 10-base.js 的 sxHead() 统一拼；
+// 这里只产出本页的任务块与"要塞进第 2 段的世界书正文"。
 function shxBuildSystem(query) {
   var cfg = shxCfg();
   var L = [];
-  L.push(shxFill(SHX_PERSONA));
   L.push('[本次对话的{{user}}] ' + (String(cfg.userName || '').trim() || '旅人') + '（这是本面板专属称呼，与其它板块无关）');
   L.push('[当前世界书] ' + (SHX_WB.books.length ? SHX_WB.books.join('、') + '（本面板独立选择的 ' + SHX_WB.entries.length + ' 条）' : '（本面板尚未载入世界书）'));
   var wbText = shxWbText(query, cfg.injectCap);
   if (wbText) L.push('[馆藏摘录（按关键词命中，可引用）]\n' + wbText);
-  return { system: L.join('\n\n'), wbText: wbText };
+  return { task: L.join('\n\n'), system: L.join('\n\n'), wbText: wbText };
 }
 async function shxBuildMemoryBlock(query) {
   var cfg = shxCfg();
@@ -290,7 +298,10 @@ async function shxSend() {
     var sys = shxBuildSystem(text);
     userMsg.hits = mem.hits;
     ST.shx.lastHits = mem.hits;
-    var msgs = [{ role: 'system', content: sys.system + (mem.text ? '\n\n' + mem.text : '') }];
+    // 头部四段照原预设顺序：人设（含本面板专用段）→ 馆藏 → sx_kanshu → sx_hubian；
+    // 之后是本页任务（含按关键词命中的世界书摘录与回忆片段），最后才是聊天历史。
+    var msgs = sxHead(sys.wbText, SHX_PAGE_VOICE);
+    msgs.push({ role: 'system', content: shxFill(sys.task + (mem.text ? '\n\n' + mem.text : '')) });
     shxRecent(cfg.windowTurns).forEach(function (m) { msgs.push({ role: m.role, content: m.text }); });
     if (status) status.textContent = '她在翻书…（馆藏 ' + (sys.wbText ? sys.wbText.length + ' 字符' : '未命中') + (mem.hits.length ? '，回忆 ' + mem.hits.length + ' 条' : '') + '）';
     var resp = await callModel(msgs);
@@ -317,10 +328,11 @@ async function shxCompress(silent) {
   if (toCompress.length < 2) { if (!silent) toast('最近的内容还在窗口里，暂时不需要压缩', 'success'); return; }
   var feed = toCompress.map(function (m) { return (m.role === 'user' ? (String(cfg.userName || '').trim() || '旅人') : cfg.herName) + '：' + m.text; }).join('\n');
   var ask = '把下面这段你与{{user}}的对话压缩成「记忆条目」，供以后检索。只输出 JSON，不要解释：\n'
-    + '{"标题":"≤20字","要点":["≤40字，最多6条"],"关键词":["3~8个"],"情绪":"一句话"}\n\n[对话]\n' + feed.slice(0, 12000);
+    + '{"标题":"≤20字","要点":["≤40字，最多6条"],"关键词":["3~8个"],"情绪":"一句话"}';
   ST.running = true; renderRunButtons();
   try {
-    var resp = await callModel([{ role: 'system', content: shxFill(SHX_PERSONA) }, { role: 'user', content: shxFill(ask) }]);
+    // 内部工具调用（记忆压缩）也走同一套头部顺序，但不带世界书正文，避免白烧上下文
+    var resp = await callModel(sxMessages(ask, '[对话]\n' + feed.slice(0, 12000), null, SHX_PAGE_VOICE));
     var j = rxExtractJson(resp) || { 标题: '一段对话', 要点: [String(resp).slice(0, 200)], 关键词: [] };
     var text = '【' + (j['标题'] || '一段对话') + '】\n' + (Array.isArray(j['要点']) ? j['要点'].map(function (x) { return '· ' + x; }).join('\n') : '') + (j['情绪'] ? '\n情绪：' + j['情绪'] : '');
     var id = 'mem' + Date.now();

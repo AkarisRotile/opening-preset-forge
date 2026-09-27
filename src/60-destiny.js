@@ -15,8 +15,10 @@ var DEST_FORMAT_RULES = [
   '- 禁止 --- / *** 分隔线（会与 YAML 文档分隔符冲突）、markdown 表格（| a | b |）、代码围栏（除最终交付要求的那个代码块）。',
   '- 禁止在正文里写「优点/缺点」「总结」「注意事项」这类 markdown 文档式小节；命定系统的结构是固定的四节 + 十条 setvar。'
 ].join('\n');
-// 人设唯一真源：10-base.js 的 SX_VOICE_DESTINY（Gemini 按原版预设人设原文逐条重写）
-var DEST_VOICE = SX_VOICE_DESTINY;
+// 人设＝原版预设原文（10-base.js 的 SX_VOICE_DESTINY，一字不改）
+// ＋ 本页原有的页面专用段（照录 v1.16.6 原话，一字未改）
+var DEST_PAGE_VOICE = '你是始弦，大图书馆的司书，正在帮{{user}}创作一个世界书投稿用的「命定系统」核心条目。你把{{user}}当作挚友，原原本本地呈现知识、不因“可接受度”删改，但会先把规则想清楚再落笔：你写的是要在正文里长期生效的系统，不是一段设定散文。';
+var DEST_VOICE = SX_PERSONA_ORIGINAL + '\n\n' + DEST_PAGE_VOICE;
 var DEST_RULES = [
   '【命定系统·规则约束】',
   '- 本次任务是写世界书条目「[本体][命定系统]<系统核心>(<署名>)」，它不是角色卡、不是开局预设：禁止输出生命层级/等级/属性面板/关系锚点等角色卡字段，禁止输出开局剧情、开局等级、伙伴、资产。',
@@ -358,25 +360,27 @@ function toggleDestEjsStandard(){
   box.textContent = open ? '尚未展开' : DEST_EJS_STANDARD;
   box.style.display = open ? 'none' : 'block';
 }
+// 任务块（人设与头部四段走 sxHead()，不在这里拼）
 function destSystemContent(){
   var lines = [];
-  lines.push('[角色] ' + macroFill(DEST_VOICE));
   lines.push('[任务] 你正在为{{user}}的《命定之诗与黄昏之歌》世界书创作一个「命定系统」核心条目（二创核心）。各分段保持一致与呼应，不重复、不推翻已定内容；本任务与开局预设、二创角色均无关系。');
   lines.push(DEST_RULES);
   lines.push(DEST_STANDARD);
   lines.push(DEST_FORMAT_RULES);
   if (destEjsOn()) lines.push(DEST_EJS_STANDARD);
   lines.push(styleRulesAll());
-  if (ST.worldInfo) lines.push('[世界书参考（世界书页勾选的条目）]\n' + ST.worldInfo);
   return macroFill(lines.join('\n\n'));
 }
 function destUser0(){
   var lines = [];
-  lines.push('[本次命定系统需求] ' + (ST.dest.demand || ''));
   if (ST.dest.ref) lines.push('[参考文本]\n' + ST.dest.ref);
   lines.push('[工作方式] 我将分 ' + destSegs().length + ' 个分段依次生成：' + destSegs().map(function (s) { return s.title; }).join('→') + '。每段只完成该段内容；已生成段落为既有设定，必须一致；禁止预写后面段落。');
   return lines.join('\n\n');
 }
+// 本轮输入＝用户写下的命定系统需求
+function destDemand() { return '[本次命定系统需求] ' + (ST.dest.demand || ''); }
+// 头部＋任务＋需求，一件套
+function destMessages(task, user){ return sxMessages(task === undefined ? (destSystemContent() + '\n\n' + destUser0()) : task, user === undefined ? destDemand() : user, null, DEST_PAGE_VOICE); }
 function destSetSeg(pid, st){ ST.dest.status[pid] = st; destSetSegUi(pid, st); }
 function destSetSegUi(pid, st){
   var row = getEl('opf-dph-' + pid); if (!row || !ST.dest) return;
@@ -478,7 +482,7 @@ async function runDestDraft(){
   ST.dest.ref = (r && r.value || '').trim();
   if (!ST.dest.demand) { toast('请先填写命定系统需求', 'warning'); return; }
   ST.running = true; ST.stopReq = false; renderRunButtons();
-  var msgs = [{ role: 'system', content: destSystemContent() }, { role: 'user', content: destUser0() }];
+  var msgs = destMessages();
   try {
     for (var i = 0; i < destSegs().length; i++) {
       if (isStop()) break;
@@ -494,13 +498,19 @@ async function runDestSeg(seg, msgs, idx){
   destSetSeg(seg.id, 'run');
   var prev = '';
   for (var k = 0; k < idx; k++) { var ps = destSegs()[k]; if (ST.dest.segs[ps.id]) prev += '\n\n【' + ps.title + '】\n' + ST.dest.segs[ps.id]; }
-  var userMsg = { role: 'user', content: '【分段' + (idx + 1) + '/' + destSegs().length + '：' + seg.title + '】\n' + macroFill(destSegPrompt(seg.id)) + (prev ? '\n\n[此前已定分段（既有设定，必须一致，禁止改动）]\n' + prev : '') };
-  msgs.push(userMsg);
+  var segTask = '【分段' + (idx + 1) + '/' + destSegs().length + '：' + seg.title + '】\n' + macroFill(destSegPrompt(seg.id)) + (prev ? '\n\n[此前已定分段（既有设定，必须一致，禁止改动）]\n' + prev : '');
+  sxTurn(segTask, '按上面的分段要求，只完成「' + seg.title + '」这一段。').forEach(function (m) { msgs.push(m); });
   try {
     var resp = await callModel(msgs);
     ST.dest.segs[seg.id] = resp;
     msgs.push({ role: 'assistant', content: resp });
-    while (msgs.length > 3 && !systemCtxBudgetOk(msgs)) { if (msgs[2] && msgs[2].role === 'assistant') msgs.splice(2, 2); else break; }
+    var headLen = sxHeadLen();
+    while (msgs.length > headLen + 1 && !systemCtxBudgetOk(msgs)) {
+      var a = msgs[headLen];
+      if (a && a.role === 'system') msgs.splice(headLen, 1);
+      else if (a && a.role === 'assistant') msgs.splice(headLen, 2);
+      else break;
+    }
     destSetSeg(seg.id, 'ok');
     renderDestSegOut(seg.id);
   } catch (e) { destSetSeg(seg.id, 'err'); throw e; }
@@ -514,7 +524,7 @@ async function runDestFrom(pid){
   ST.dest.demand = (d && d.value || '').trim(); ST.dest.ref = (r && r.value || '').trim();
   if (!ST.dest.demand) { toast('请先填写命定系统需求', 'warning'); return; }
   ST.running = true; ST.stopReq = false; renderRunButtons();
-  var msgs = [{ role: 'system', content: destSystemContent() }, { role: 'user', content: destUser0() }];
+  var msgs = destMessages();
   try {
     for (var k = 0; k < start; k++) {
       var ph = destSegs()[k];
@@ -542,7 +552,7 @@ async function refineDestSeg(pid, dir){
   destSegs().forEach(function (s2) { if (s2.id !== pid && ST.dest.segs[s2.id]) frozen += '\n\n【' + s2.title + '】\n' + ST.dest.segs[s2.id]; });
   ST.running = true; renderRunButtons(); destSetSeg(pid, 'run');
   try {
-    var msgs = [{ role: 'system', content: destSystemContent() }, { role: 'user', content: destUser0() }];
+    var msgs = destMessages();
     var msg = '【定点修改：只改「' + seg.title + '」这一段】\n\n[用户指令]\n' + dirT + '\n\n[本段现行内容]\n' + ST.dest.segs[pid] + '\n\n[冻结区块（其它分段原样保留，一个字都不许改；若发现其它段有问题，最多在结尾另起一行写“备注：建议检查XX段…”提示，不得代改）]\n' + frozen + '\n\n[命定系统·规则约束]\n' + DEST_RULES + '\n\n要求：只输出修改后的【' + seg.title + '】内容；修改严格限定在用户指令范围内，未要求的地方保持原样，不要顺手润色、扩写或重排。';
     msgs.push({ role: 'user', content: msg });
     var resp = await callModel(msgs);
@@ -560,8 +570,9 @@ async function suggestDestDir(pid){
   if (!seg || !ST.dest.segs[pid]) { toast('该段还没有内容', 'warning'); return; }
   var chipBox = getEl('opf-ref-chips-d' + pid); if (!chipBox) return;
   var cur = String(ST.dest.segs[pid]).slice(0, 2500);
-  var ask = '请针对命定系统的【' + seg.title + '】这一段现有内容，给出 2-3 条只针对本段的修改方向。每条一行、≤50字、去掉编号外多余的话、直接可点；必须符合命定系统规则与联动一致性。\n[需求]\n' + (ST.dest.demand || '(未填写)') + '\n[命定系统·规则约束]\n' + DEST_RULES + '\n[本段现有内容]\n' + cur;
-  var msgs = [{ role: 'system', content: destSystemContent() }, { role: 'user', content: ask }];
+  var askTask = '请针对命定系统的【' + seg.title + '】这一段现有内容，给出 2-3 条只针对本段的修改方向。每条一行、≤50字、去掉编号外多余的话、直接可点；必须符合命定系统规则与联动一致性。\n[命定系统·规则约束]\n' + DEST_RULES;
+  var askUser = '[需求]\n' + (ST.dest.demand || '(未填写)') + '\n[本段现有内容]\n' + cur;
+  var msgs = destMessages(destSystemContent() + '\n\n' + destUser0() + '\n\n' + askTask, askUser);
   ST.running = true; renderRunButtons();
   try {
     var resp = await callModel(msgs);
@@ -595,7 +606,7 @@ async function runDestLinkage(){
   try {
     var all = destSegs().map(function (s) { return '<<<SEG:' + s.id + '>>>\n' + String(ST.dest.segs[s.id] || '').slice(0, 1800); }).join('\n\n');
     var reportMsg = '【交火梳理·第一步：整体审查】\n下面是各分段的审阅稿（每段截取前1800字，供查矛盾用）。请按下面的联动链条逐链检查，找出互相矛盾、脱节、数值/命名不合规之处。\n\n[联动链条]\n' + DEST_LINK_CHAIN + '\n\n[分段审阅稿]\n' + all + '\n\n[命定系统·规则约束]\n' + DEST_RULES + '\n\n输出要求（只输出报告，禁止输出任何段落正文，禁止使用<<<SEG:标记）：\n1. 逐条链给一句结论（✓一致 / ⚠问题+理由）。\n2. 最后列“改动清单”：每段一条，写清改哪段、为什么；没有问题的段写“无”。\n3. 报告里不要重写设定内容，只说问题与改法。\n4. 重点核对：包裹标签名与「系统名」是否一致、十条 setvar 是否齐全且顺序正确、缔结消耗七档是否齐全、核心名与语言标签是否与现有核心撞车、复活机制是否保留禁止机械降神的约束句。';
-    var msgs = [{ role: 'system', content: destSystemContent() }, { role: 'user', content: destUser0() }, { role: 'user', content: reportMsg }];
+    var msgs = destMessages(destSystemContent() + '\n\n' + destUser0() + '\n\n[联动链条]\n' + DEST_LINK_CHAIN + '\n\n[命定系统·规则约束]\n' + DEST_RULES, destDemand() + '\n\n' + reportMsg);
     var resp = await callModel(msgs);
     ST.dest.report = String(resp || '').trim() || '（报告为空）';
     if (report) report.textContent = ST.dest.report;
@@ -609,7 +620,7 @@ async function runDestLinkage(){
       var frozen = '';
       destSegs().forEach(function (s2) { if (s2.id !== seg.id && ST.dest.segs[s2.id]) frozen += '\n\n【' + s2.title + '】\n' + String(ST.dest.segs[s2.id]).slice(0, 1200); });
       var applyMsg = '【交火梳理·第二步：逐段应用修订——只改「' + seg.title + '」这一段】\n\n[梳理报告与改动清单]\n' + ST.dest.report + '\n\n[本段现行内容]\n' + ST.dest.segs[seg.id] + '\n\n[冻结区块（其它分段，原样保留，一个字都不许改）]\n' + frozen + '\n\n[修订规则]\n' + DEST_RULES + '\n1. 只输出【' + seg.title + '】的修订后全文；若按报告本段无需改动，只回复“无改动”。\n2. 只做报告指出的联动性修改；不得推翻设定。报告“改动清单”里点名的矛盾/重复/写错的内容，**必须真的删掉或改掉**——旧内容不许留在原地与新内容并排（叠加＝没改）。\n3. 报告点名要删的就删，删完比原来短是正常的；除报告点名的部分外，不许删别的内容，也不许扩写新增。\n4. 不生成任何角色卡或开局预设内容。';
-      var m2 = [{ role: 'system', content: destSystemContent() }, { role: 'user', content: applyMsg }];
+      var m2 = destMessages(destSystemContent() + '\n\n[修订规则]\n' + DEST_RULES, applyMsg);
       var resp2 = await callModel(m2);
       var txt = String(resp2 || '').trim();
       if (txt && !/^无改动[。．.]*$/.test(txt)) { ST.dest.segs[seg.id] = txt; changed++; renderDestSegOut(seg.id); }
@@ -659,7 +670,7 @@ async function destAiReview(){
     L.push('[各分段标题（用于定位"改哪一段"）]\n' + destSegs().map(function (s) { return s.id + ' = ' + s.title; }).join('\n'));
     L.push('[正在审校的成品正文（脚本拼装）]\n' + String(ST.dest.body || '').slice(0, 24000));
     L.push('[输出] 只输出一个 ' + fence() + 'json 代码块，结构如下，不要任何其它文字：\n{"总评":"一两句","问题":[{"级别":"高|中|低","段":"pact","位置":"问题出现在正文的哪一句/哪个字段","问题":"具体是什么问题","建议":"怎么改"}]}\n最多 12 条，按严重程度排序；没有问题时 "问题":[]。');
-    var resp = await callModel([{ role: 'system', content: destSystemContent() }, { role: 'user', content: macroFill(L.join('\n\n')) }]);
+    var resp = await callModel(destMessages(destSystemContent(), L.join('\n\n')));
     var j = rxExtractJson(resp);
     var issues = (j && Array.isArray(j['问题'])) ? j['问题'] : null;
     if (!issues) {
@@ -739,7 +750,7 @@ async function finalizeDest(){
     var msg = '【最终封装（世界书条目正文）】\n请以“始弦的魔法大典”的身份，把下面的分段内容整理成一份可直接粘进世界书「命定系统」条目的正文。\n\n[全部分段]\n' + all + '\n\n' + DEST_SPEC + (destEjsOn()
       ? '\n\n[EJS 保留要求·最高优先级]\n本核心是 EJS 重型核心，各分段里的 `<%_ … _%>`、`<% … %>`、`<%- … %>` 标签、if/for 的 `{ _%>` 与 `} _%>` 配对、以及全部变量名必须「原样保留」：不得为了排版整洁而改写、合并、重排或删除任何 EJS 标签；只在标签之间做正文的整合与去重。整合后必须复核：块开始与块结束数量相等、每个分支里 `<{{getvar::系统名}}>` 都完整闭合。'
       : '') + '\n\n系统核心名以「骨架与命名」段为准；没写清楚就按内容拟一个。';
-    var msgs = [{ role: 'system', content: destSystemContent() }, { role: 'user', content: msg }];
+    var msgs = destMessages(destSystemContent(), msg);
     var resp = await callModel(msgs);
     var ex = extractDestEntry(resp);
     if (!ex.ok) toast('未能从回复中提取 ' + fence() + 'text 代码块（已用原文兜底，可重试一次）', 'warning');

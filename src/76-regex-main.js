@@ -489,7 +489,7 @@ function rxAiPayload(j, rawText, mode) {
 }
 function rxAiPromptOf(item, f, issues, dir, scope, mode) { return rxRepairPrompt(item, f, issues, dir, scope, mode)[0]; }
 async function rxCallRepair(prompt, phase) {
-  var resp = await rxStreamCall([{ role: 'system', content: rxSlimSystemContent(ST.rx.parsed && ST.rx.parsed.section || '', 6000) }, { role: 'user', content: prompt }], null, { phase: phase, idleMs: 20000, maxMs: 220000, maxTokens: 16000 });
+  var resp = await rxStreamCall(sxMessages(rxSlimSystemContent(ST.rx.parsed && ST.rx.parsed.section || '', 6000), prompt, null, RX_PAGE_VOICE_CSS), null, { phase: phase, idleMs: 20000, maxMs: 220000, maxTokens: 16000 });
   ST.rx.lastRaw = String(resp.text || '');
   ST.rx.lastStalled = !!resp.stalled;
   return resp.text || '';
@@ -701,7 +701,7 @@ async function rxSuggestItem(item, idx) {
   ST.running = true; renderRunButtons();
   try {
     var ask = '下面是一个「对话美化正则」当前的 CSS 与骨架。请给出 2~3 条**只针对样式**的具体修改方向（每条一行、≤30字、直接可执行，例如"边框换成暗金色渐变"）。不要输出 CSS 本身。\n\n[当前 CSS]\n' + rxItemCss(item).slice(0, 2000) + '\n\n[骨架]\n' + rxSkeleton(item, rxItemFormat(item));
-    var resp = await rxStreamCall([{ role: 'user', content: ask }], null, { phase: '建议', idleMs: 20000, maxMs: 90000, maxTokens: 1500 });
+    var resp = await rxStreamCall(sxMessages(null, ask, null, RX_PAGE_VOICE_CSS), null, { phase: '建议', idleMs: 20000, maxMs: 90000, maxTokens: 1500 });
     var list = [];
     String(resp.text).split(/\r?\n/).forEach(function (ln) {
       var t = String(ln).replace(/^\s*(?:[-*•]|\d+[.、)])\s*/, '').trim();
@@ -1345,7 +1345,7 @@ async function rxGenCssPart(item, f, part, prevCss, onNote, brief) {
     attempt++;
     var ask = rxCssPartPrompt(item, f, part, prevCss + css, brief);
     if (css) ask += '\n\n[续写要求] 你上一次输出在中途被截断了，已保留的部分结尾是：\n' + css.slice(-500) + '\n只输出**剩余**部分，不要重复已写过的内容，不要重新开头。';
-    var msgs = [{ role: 'system', content: rxSlimSystemContent(part.colorRef, part.budget) }, { role: 'user', content: macroFill(ask) }];
+    var msgs = sxMessages(rxSlimSystemContent(part.colorRef, part.budget), ask, null, RX_PAGE_VOICE_CSS);
     var t0 = Date.now();
     try {
       var resp = await rxStreamCall(msgs, onNote, opts);
@@ -1624,9 +1624,9 @@ var RX_PARSE_SCHEMA = [
   '  "疑点": ["写法含糊、无法确定的地方，逐条列出，不要猜"]',
   '}'
 ].join('\n');
+var RX_PARSE_PAGE_VOICE = '你是始弦，大图书馆的司书，正在把一份角色卡文本里的「语言格式」节解析成结构化数据。';
 function rxParseSystemContent() {
   var lines = [];
-  lines.push('[角色] ' + SX_VOICE_PARSE);
   lines.push('[任务] 这是一次纯粹的抽取工作：只把原文已有的结构读出来，不做任何创作、改写、补全或翻译。');
   lines.push([
     '【抽取规则】',
@@ -1752,7 +1752,7 @@ async function rxParseByAi(txt) {
   var ctxIdx = sec ? txt.indexOf(sec) : 0;
   var head = txt.slice(Math.max(0, ctxIdx - 400), ctxIdx);
   var msg = '[核心条目文本]\n' + head + '\n' + payload + '\n\n请按 schema 输出 JSON。';
-  var msgs = [{ role: 'system', content: rxParseSystemContent() }, { role: 'user', content: msg }];
+  var msgs = sxMessages(rxParseSystemContent(), msg, null, RX_PARSE_PAGE_VOICE);
   var resp = await callModel(msgs);
   var ai = rxExtractJson(resp);
   if (!ai) return null;

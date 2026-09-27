@@ -261,7 +261,7 @@ async function refineAnalyze(){
     var msg = '[待修改的二创核心（唯一的分析对象；下面的【世界设定参考】不是它的一部分）]\n'
       + '<<<二创核心原文\n' + refineForPrompt(src.slice(0, 60000)) + '\n二创核心原文结束>>>' + refineEjsEscNote(src)
       + '\n\n' + REFINE_ANALYZE_SPEC;
-    var resp = await callModel([{ role: 'system', content: refineSystem() }, { role: 'user', content: macroFill(msg) }]);
+    var resp = await callModel(refineMessages(refineSystem(), msg));
     var j = rxExtractJson(resp);
     ST.refine.analysisObj = j || null;
     // 材料隔离核对：模型报的字段里若出现"只在世界参考里才有"的整段内容 → 判为串台
@@ -314,12 +314,15 @@ var REFINE_ISOLATION = [
   'R5. 引用时标明来源：说某条内容时写清是"核心原文"还是"世界参考"；报告里不要把两者混在一段里。',
   'R6. 修改范围只在核心原文之内：新增内容必须是为了满足用户这次的要求，而不是把参考里的东西搬进来。'
 ].join('\n');
+// 本页原有的页面专用人设段（照录 v1.16.6 原话，一字未改），随头部的人设一起发
+var REFINE_PAGE_VOICE = '你是「始弦的魔法大典」的司书，正在帮{{user}}修改一份**已经存在的**命定系统核心。'
+  + '你的第一职责是「不弄坏它」：这份核心正在被使用，任何未要求的变化都会破坏玩家的存档与叙事。';
 function refineSystem(){
-  return macroFill(SX_VOICE_WORK + ' 你正在帮{{user}}修改一份**已经存在的**命定系统核心。'
-    + '你的第一职责是「不弄坏它」：这份核心正在被使用，任何未要求的变化都会破坏玩家的存档与叙事。'
-    + REFINE_RULES + '\n\n' + REFINE_ISOLATION
+  return macroFill(REFINE_RULES + '\n\n' + REFINE_ISOLATION
     + (ST.worldInfo ? '\n\n[世界设定参考·不可修改｜不是修改对象，只是核对口径用]\n' + ST.worldInfo : '\n\n（本轮没有附带世界设定参考）'));
 }
+// 本页统一走这个：头部四段（人设含页面专用段） + 任务 + 本轮输入
+function refineMessages(task, user){ return sxMessages(task, user, null, REFINE_PAGE_VOICE); }
 async function refinePlan(){
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
   var src = refineReadSrc();
@@ -332,7 +335,7 @@ async function refinePlan(){
     var msg = '[待修改的二创核心（唯一会被改动的对象）]\n<<<二创核心原文\n' + refineForPrompt(src.slice(0, 60000)) + '\n二创核心原文结束>>>' + refineEjsEscNote(src)
       + '\n\n[已完成的整体分析]\n' + (ST.refine.analysis || '（无，可先点①）')
       + '\n\n[用户的修改意见]\n' + req + '\n\n' + REFINE_PLAN_SPEC;
-    var resp = await callModel([{ role: 'system', content: refineSystem() }, { role: 'user', content: macroFill(msg) }]);
+    var resp = await callModel(refineMessages(refineSystem(), msg));
     var j = rxExtractJson(resp);
     ST.refine.planObj = j || null;
     ST.refine.plan = j ? refineFormatPlan(j) : ('（没能解析成 JSON，原文如下）\n\n' + String(resp || '').slice(0, 6000));
@@ -394,7 +397,7 @@ async function refineSuggest(){
   try {
     var msg = '[待修改的二创核心（只针对它提方向；不要提世界参考里的规则）]\n<<<二创核心原文\n' + refineForPrompt(src.slice(0, 60000)) + '\n二创核心原文结束>>>' + refineEjsEscNote(src)
       + '\n\n请给出 3~5 条**不破坏现有设计**的优化方向（每条一行、≤40字、具体可执行），例如补齐缺口、让某条规则更自洽、增加与既有功能的联动。不要输出正文，不要提"重写/重构"，也不要建议"补上世界规则里的某某"（那是参考资料，不属于这个核心）。';
-    var resp = await callModel([{ role: 'system', content: refineSystem() }, { role: 'user', content: macroFill(msg) }]);
+    var resp = await callModel(refineMessages(refineSystem(), msg));
     var list = [];
     String(resp || '').split(/\r?\n/).forEach(function (ln) {
       var t = ln.replace(/^\s*(?:[-*•]|\d+[.、)])\s*/, '').trim();
@@ -452,7 +455,7 @@ async function refineApply(mode){
       + '\n\n[本步内容上限]合计不超过 ' + sizeCap + ' 字符；超了就只写前半部分，并在末尾写 `后续: 还需要……`。'
       + '\n\n' + REFINE_GEN_SPEC;
     refineNote('③ ' + stepLabel + '：阶段 A · 正在生成内容…');
-    var genResp = await callModel([{ role: 'system', content: refineSystem() }, { role: 'user', content: macroFill(genMsg) }]);
+    var genResp = await callModel(refineMessages(refineSystem(), genMsg));
     gen = refineParseGenBlocks(genResp);
     var ao = getEl('opf-rf-applyout');
     if (!gen.units.length) {

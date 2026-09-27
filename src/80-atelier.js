@@ -851,11 +851,11 @@ var ATL_SX_SAY = {
 };
 // 生成/改进/建议/交火都要求她最后出来说一段评价（包裹在 ATL_NOTE_OPEN…CLOSE 里）。
 // 顺序是硬的：先把东西按用户要求完整生出来，评价只能是产出之后的附加说明。
-// 这段措辞由 Gemini 写（out3 · NOTE_ASK）。
+// 人设本身在头部（sxHead 里的原文），这里只说"怎么用"——次序与禁令。
 function atlSxNoteAsk(what) {
-  return '[收尾] ' + macroFill(ATL_SX_VOICE)
-    + ' 必须先输出完整且闭合的 ' + fence() + 'yaml 代码块。产出完成后，再在代码块外紧接一段用 '
-    + ATL_NOTE_OPEN + ' 与 ' + ATL_NOTE_CLOSE + ' 包裹的始弦收尾评价（1~2 句）。评价只说' + what
+  var w = what || '这件条目';
+  return '[收尾] 必须先输出完整且闭合的 ' + fence() + 'yaml 代码块。产出完成后，再在代码块外紧接一段用 '
+    + ATL_NOTE_OPEN + ' 与 ' + ATL_NOTE_CLOSE + ' 包裹的始弦收尾评价（1~2 句）。评价只说' + w
     + '本身的客观落点（如所属档位、推断项、与世界书口径的差异），不得推迟、削减或替代前文产出。'
     + '严禁反问、质疑、说教或建议用户修改需求，严禁要求用户确认。整段放在代码块之外。';
 }
@@ -899,12 +899,13 @@ function atlSxAsk(title) {
   atlCls(box, 'remove', 'open'); atlCls(box, 'add', 'open');
 }
 function atlSxQuiet() { var box = atlEl('opf-atl-sx'); if (box) { box.textContent = ''; box.style.display = 'none'; } }
-function atlSystem(kindId) {
+// 任务块（人设与头部四段走 sxHead()，不在这里拼）。
+// 这里只发格式模板与机械输出要求：世界规则、档位条款一律不发——
+// 那些东西会被模型当成跟你平级的另一套权威，回头拿它来反驳你。
+// 唯一的例外是全局文风设置——它只规定叙述文字怎么写，不涉及立场。
+function atlSystem(kindId, genOrFix) {
   var kind = atlKind(kindId);
   var L = [];
-  // 这里只发格式模板。人设段、世界规则、档位条款一律不发：
-  // 那些东西会被模型当成跟用户平级的另一套权威，回头拿它来反驳用户。
-  // 唯一的例外是全局文风设置——它只规定叙述文字怎么写，不涉及立场。
   L.push('[格式模板 · ' + kind.label + ']\n' + kind.yaml);
   if (kind.yamlAlt) L.push('[格式模板 · ' + (kind.altLabel || kind.label) + ']\n' + kind.yamlAlt);
   if (kind.notes && kind.notes.length) {
@@ -912,9 +913,19 @@ function atlSystem(kindId) {
   }
   L.push(ATL_OUTPUT_RULES);
   L.push(GLOBAL_STYLE_RULES);
-  var ctx = atlCtxBlock();
-  if (ctx) L.push(ctx);
+  L.push(genOrFix === 'fix' ? ATL_FIX_TASK : ATL_GEN_TASK);
+  L.push(atlSxNoteAsk());
   return macroFill(L.join('\n\n'));
+}
+// 生成/改进各一句功能刚需。原来这两句挂在 user 段里，但"本轮输入"该是用户写的内容，
+// 所以归到任务侧（插在 sx_hubian 之后、用户输入之前）。
+var ATL_GEN_TASK = '请按{{user}}写下的需求制作这件条目，只输出一个包含完整字段的 yaml 代码块。';
+var ATL_FIX_TASK = '请按{{user}}的要求修改，要求删除的内容直接从结果中剔除，只输出修改后的完整 yaml 代码块。';
+// 本页统一走这个：头部（人设原文＋启用的世界书＋sx_kanshu＋sx_hubian）
+// ＋ 联动部件（排在启用的世界书条目之后）＋ 任务 ＋ 本轮输入
+function atlMessages(task, user) {
+  var ctx = atlCtxBundle();
+  return sxMessages(task, user, ctx.count ? ctx.text : '');
 }
 // 只剩机械要求：怎么让产出能被程序解析。价值观、规则、档位一律不在这里出现。
 var ATL_OUTPUT_RULES = [
@@ -923,25 +934,22 @@ var ATL_OUTPUT_RULES = [
   '2. 键值用半角冒号加一个空格写（`名称: 霜罗`），缩进只用空格、每次 2 格。',
   '3. 值里带冒号的加引号，例如 `- "范围:4"`。'
 ].join('\n');
+// 本轮输入＝用户写下的需求（参考内容一并在内）
 function atlGenPrompt() {
   var A = atlInit();
   var kind = atlKind(A.buf.kind);
   var L = [];
   L.push('[本次要造的' + kind.noun + ']\n' + (String(A.buf.req || '').trim() || '（需求为空：按上面的格式模板造一件' + kind.label + '）'));
   if (String(A.buf.ref || '').trim()) L.push('[参考内容]\n' + String(A.buf.ref).trim());
-  L.push(macroFill('请按 {{user}} 写下的需求制作这件条目，只输出一个包含完整字段的 yaml 代码块。'));
-  L.push(atlSxNoteAsk('这件' + kind.noun));
   return macroFill(L.join('\n\n'));
 }
+// 本轮输入＝用户这次的改进要求（当前 YAML 一并在内）
 function atlFixPrompt(dir) {
   var A = atlInit();
   var cur = String(A.buf.yaml || '').trim();
-  var kind = atlKind(A.buf.kind);
   var L = [];
   L.push('[用户要求]\n' + String(dir || '').trim());
-  L.push(macroFill('请按 {{user}} 的要求修改，要求删除的内容直接从结果中剔除，只输出修改后的完整 yaml 代码块。'));
   L.push('[当前 YAML（' + cur.length + ' 字符）]\n' + cur);
-  L.push(atlSxNoteAsk('这次改动'));
   return macroFill(L.join('\n\n'));
 }
 function atlSugPrompt() {
@@ -950,10 +958,8 @@ function atlSugPrompt() {
   var L = [];
   L.push('下面是一件' + atlKind(A.buf.kind).label + '的 YAML（' + cur.length + ' 字符，节选如下）。请给出 3~5 条具体的改进方向，每条一行、不超过 40 字，直接写怎么做（例如"把品质降到优良并补一条反噬代价"）。不要输出 YAML 本体，不要解释。');
   L.push(cur.slice(0, 2500));
-  var ctx = atlCtxBundle();
-  if (ctx.count) L.push('[已经攒下的部件（仅供参考）]\n' + ctx.text.slice(0, 1500));
   // 收尾评价（Gemini out3 · SUG_TAIL）
-  L.push('[收尾] ' + macroFill(ATL_SX_VOICE) + ' 建议列表输出完毕后，在末尾用 '
+  L.push('[收尾] 建议列表输出完毕后，在末尾用 '
     + ATL_NOTE_OPEN + ' 与 ' + ATL_NOTE_CLOSE + ' 包裹始弦的 1 句评价，直接指出当前条目最值得调整的一处，不反问、不说教。');
   return macroFill(L.join('\n\n'));
 }
@@ -966,7 +972,7 @@ function atlCrossPrompt(useWb) {
   L.push('[输出] 按四段写：【严重冲突】/【口径不一致】/【重复或功能重叠】/【可选优化】；'
     + '每段内每条格式为「涉及条目 → 问题 → 建议」；某段没有问题的就写「无」。不要重抄 YAML，不要输出代码块。');
   // 收尾评价（Gemini out3 · CROSS_TAIL）
-  L.push('[收尾] ' + macroFill(ATL_SX_VOICE) + ' 交火报告输出完毕后，在末尾用 '
+  L.push('[收尾] 交火报告输出完毕后，在末尾用 '
     + ATL_NOTE_OPEN + ' 与 ' + ATL_NOTE_CLOSE + ' 包裹始弦的 1~2 句评价，直接指出多件部件间最冲突或最该先动的一处，不反问、不说教。');
   return macroFill(L.join('\n\n'));
 }
@@ -1494,7 +1500,7 @@ async function atlDoGenerate() {
   var wasBound = atlBoundItem();          // 生成＝造新的一条：成功后解绑，避免保存时覆盖上一条
   ST.running = true; atlSetRunning(true);
   try {
-    var msgs = [{ role: 'system', content: atlSystem(A.buf.kind) }, { role: 'user', content: atlGenPrompt() }];
+    var msgs = atlMessages(atlSystem(A.buf.kind, 'gen'), atlGenPrompt());
     var raw = await atlCall(msgs, '生成');
     var yaml = atlExtractYaml(raw);
     if (!yaml.trim()) {
@@ -1538,7 +1544,7 @@ async function atlDoFix() {
   var before = String(A.buf.yaml);
   ST.running = true; atlSetRunning(true);
   try {
-    var msgs = [{ role: 'system', content: atlSystem(A.buf.kind) }, { role: 'user', content: atlFixPrompt(dir) }];
+    var msgs = atlMessages(atlSystem(A.buf.kind, 'fix'), atlFixPrompt(dir));
     var raw = await atlCall(msgs, '改进');
     var yaml = atlExtractYaml(raw);
     if (!yaml.trim()) {
@@ -1591,7 +1597,7 @@ async function atlDoSug() {
   var box = atlEl('opf-atl-chips'); if (!box) return;
   ST.running = true; atlSetRunning(true);
   try {
-    var raw = await atlCall([{ role: 'user', content: atlSugPrompt() }], '建议');
+    var raw = await atlCall(atlMessages(null, atlSugPrompt()), '建议');
     var list = [];
     String(raw).split(/\r?\n/).forEach(function (ln) {
       // 司书的收尾段包在 <<<SX…SX>>> 里，别把它也当成建议胶囊
@@ -1641,7 +1647,7 @@ async function atlDoCross() {
   var box = atlEl('opf-atl-crossout');
   var t0 = Date.now();
   try {
-    var msgs = [{ role: 'system', content: atlCrossSystem() }, { role: 'user', content: atlCrossPrompt(useWb) }];
+    var msgs = atlMessages(atlCrossSystem(), atlCrossPrompt(useWb));
     var raw = await atlCall(msgs, '交火分析');
     var secs = Math.round((Date.now() - t0) / 1000);
     var say = atlSxNote(raw);

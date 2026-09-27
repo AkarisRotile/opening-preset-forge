@@ -240,12 +240,12 @@ async function runFrom(pid){
   dirsReset();
   try {
     ST.userName = currentUserName();
-    var msgs = [{ role: "system", content: buildSystemContent() }, { role: "user", content: buildUser0() }];
+    var msgs = sxPresetMessages();
     for (var k = 0; k < start; k++) {
       var ph = PHASES[k];
       var had = ST.results[ph.id];
       if (!had) { toast("前面步骤尚未完成，请先用「生成初稿」", "warning"); ST.running = false; renderRunButtons(); return; }
-      msgs.push({ role: "user", content: phasePrompt(ph) });
+      sxTurn(phasePrompt(ph), '按上面的阶段要求，完成「' + ph.title + '」这一栏。若该栏确实没有合适内容，回复“无”。').forEach(function (m) { msgs.push(m); });
       msgs.push({ role: "assistant", content: had });
     }
     ST.msgs = msgs;
@@ -330,17 +330,16 @@ async function refinePhase(pid, direction){
   if (!dir) dir = "整体打磨：修正设定漏洞、提升与角色/背景的契合度与文笔，条目数量与格式保持不变。";
   ST.running = true; setPhase(pid, "run"); renderRunButtons();
   try {
-    var msgs = [{ role: "system", content: buildSystemContent() }, { role: "user", content: buildUser0() }];
+    var msgs = sxPresetMessages();
     for (var k = 0; k < idx; k++) {
       var pp = PHASES[k];
       if (ST.results[pp.id]) {
-        msgs.push({ role: "user", content: "（供参考的既有内容，本阶段无需改动）：" + pp.title });
         msgs.push({ role: "assistant", content: ST.results[pp.id] });
       }
     }
     var nl = String.fromCharCode(10);
-    var refineMsg = phasePrompt(phase) + nl + nl + "【本步精修指令】" + nl + "方向：" + dir + nl + nl + "[世界规则·创作限制]" + nl + WORLD_RULES + nl + nl + "要求：只输出【" + phase.title + "】这一栏的修订内容（沿用本步的书条目格式与数量，可增删但要有理由），不要改动其它栏目，也不要输出整份 JSON。**方向里点名要改或要删的条目/字段必须真的改掉、删掉**——不许把旧条目留在原位而把新条目接在后面（叠加＝没改）；除本次方向点名的部分外，其余保持原样。若确实无需修改，原样输出“无”。";
-    msgs.push({ role: "user", content: refineMsg });
+    var refineTask = phasePrompt(phase) + nl + nl + "【本步精修指令】" + nl + "方向：" + dir + nl + nl + "[世界规则·创作限制]" + nl + WORLD_RULES + nl + nl + "要求：只输出【" + phase.title + "】这一栏的修订内容（沿用本步的书条目格式与数量，可增删但要有理由），不要改动其它栏目，也不要输出整份 JSON。**方向里点名要改或要删的条目/字段必须真的改掉、删掉**——不许把旧条目留在原位而把新条目接在后面（叠加＝没改）；除本次方向点名的部分外，其余保持原样。若确实无需修改，原样输出“无”。";
+    sxTurn(refineTask, '按上面的任务与方向，只修订「' + phase.title + '」这一栏。').forEach(function (m) { msgs.push(m); });
     var resp = await callModel(msgs);
     ST.results[pid] = resp;
     if (ST.elPre && ST.elPre[pid]) ST.elPre[pid].textContent = (resp || "").slice(0, 4000) + ((resp && resp.length > 4000) ? " ……(截断显示)" : "");
@@ -361,8 +360,9 @@ async function suggestPhaseDirections(pid){
   var cur = String(ST.results[pid]).slice(0, 3500);
   var demand = (getEl("opf-demand") && getEl("opf-demand").value.trim()) || "(未填写)";
   var nl = String.fromCharCode(10);
-  var ask = "请针对【" + phase.title + "】这一栏的现有内容，结合开局需求给出 2-3 条只针对本栏的修改方向。每条一行、≤50字、去掉编号外多余的话、直接可点；必须符合世界规则限制。\n[开局需求]\n" + demand + "\n[世界规则·创作限制]\n" + WORLD_RULES + "\n[本栏现有内容]\n" + cur;
-  var msgs = [{ role: "system", content: buildSystemContent() }, { role: "user", content: ask }];
+  var askTask = "请针对【" + phase.title + "】这一栏的现有内容，结合开局需求给出 2-3 条只针对本栏的修改方向。每条一行、≤50字、去掉编号外多余的话、直接可点；必须符合世界规则限制。\n[世界规则·创作限制]\n" + WORLD_RULES;
+  var askUser = "[开局需求]\n" + demand + "\n[本栏现有内容]\n" + cur;
+  var msgs = sxMessages(buildSystemContent() + '\n\n' + buildWorkNote() + '\n\n' + askTask, askUser);
   var old = ST.running;
   ST.running = true; renderRunButtons();
   try {

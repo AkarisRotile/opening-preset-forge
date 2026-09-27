@@ -52,8 +52,9 @@ async function runCompliance(){
   try {
     var prev = JSON.stringify(ST.finalJson);
     var cur = prev.length > 12000 ? prev.slice(0, 12000) + "……(截断)" : prev;
-    var msg = "【合规自检与修复】请用下面“技能/装备/道具/资产生成规范”逐类检查开局预设 JSON：字段是否齐全、品质是否为七等、标签/消耗/效果/结算/总空间/内部资产等是否符合规范；只修正不合规处，其余内容保持原样，最后完整输出修订后的开局预设 JSON，放在 " + fence() + "text 代码块中。\n\n[生成规范]\n" + COMPLIANCE_SPEC + "\n\n[当前开局预设 JSON]\n" + cur;
-    var msgs = [{ role: "system", content: buildSystemContent() }, { role: "user", content: msg }];
+    var complyTask = "【合规自检与修复】请用下面“技能/装备/道具/资产生成规范”逐类检查开局预设 JSON：字段是否齐全、品质是否为七等、标签/消耗/效果/结算/总空间/内部资产等是否符合规范；只修正不合规处，其余内容保持原样，最后完整输出修订后的开局预设 JSON，放在 " + fence() + "text 代码块中。\n\n[生成规范]\n" + COMPLIANCE_SPEC + '\n\n' + buildSystemContent();
+    var complyUser = "[当前开局预设 JSON]\n" + cur;
+    var msgs = sxMessages(complyTask, complyUser);
     ST._complyRun = true;
     try {
       var resp = await callModel(msgs);

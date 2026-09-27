@@ -544,20 +544,20 @@ function rxApplyCoreFix(item, parsed) {
   if (!re.test(txt)) return '未在核心文本里找到 <' + f.tag + '>，请手动核对语言格式节';
   return '核心与正则的标签名一致，问题可能出在参数或引号形态上（请手动核对格式行：' + want + '）';
 }
+// 任务块（人设与头部四段走 sxHead()，不在这里拼）
+var RX_PAGE_VOICE_HTML = '你是始弦，大图书馆的司书，正在为一个命定系统核心写「对话美化正则」的替换体（HTML 部分）。你把{{user}}当挚友，讲究实用与克制，不写花架子。';
+var RX_PAGE_VOICE_CSS = '你是始弦，大图书馆的司书，正在为一个命定系统核心写「对话美化」的 CSS。你把{{user}}当挚友，讲究实用与克制。';
 function rxSystemContent() {
   var lines = [];
-  lines.push('[角色] ' + macroFill(SX_VOICE_WORK + ' 你正在为一个命定系统核心写「对话美化正则」的替换体（HTML 部分）。'));
   lines.push('[任务] 依据给定的核心语言格式与预算档位，产出一段可在 SillyTavern 消息里直接渲染的 HTML 替换体。匹配式由插件生成，你不要碰。');
   lines.push(RX_RULES);
   lines.push(styleRulesAll());
-  if (ST.worldInfo) lines.push('[世界书参考（世界书页勾选的条目）]\n' + ST.worldInfo);
   return macroFill(lines.join('\n\n'));
 }
 // CSS 生成专用系统提示：不带整本世界书（那是 524 超时的主要负担），只带一小段色彩参考
 function rxSlimSystemContent(colorRef, budget) {
   var cap = Number(budget) || 3000;
   var lines = [];
-  lines.push('[角色] ' + macroFill(SX_VOICE_WORK + ' 你正在为一个命定系统核心写「对话美化」的 CSS。'));
   lines.push('[任务] HTML 骨架已由插件生成并锁定，你只写 CSS 规则，不得输出或改动任何 HTML。');
   lines.push([
     '【CSS 硬约束】',
