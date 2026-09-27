@@ -21,23 +21,51 @@ var ATL_SPACE_DEFAULT = '未归档';
 var ATL_KINDS = [
   {
     id: 'skill', label: '技能', noun: '技能', book: '《技能之书》',
-    hint: '技能分攻击技（消耗[攻击]、造成即时伤害、必填威力）与动作技（消耗[动作]、禁止即时伤害与威力，用于治疗/控制/增益/减益/功能，可含 DoT）；核心功能「伤害」只有攻击技可用。'
-      + '消耗与威力必须落进品质所在档位（见下方注入的《核心数值总表》档位）：低档数值挂高档品质是最常见的错（实测反馈「180MP/180SP 挂传说」＝消耗与威力都只在史诗档内）；史诗及以上还要按《品质效果限定规则》补一条「微弱要素/权能/法则」词条。',
+    // 这一页只发格式模板，不发人设、不发规则条款（见文件末尾「提示词为什么这么短」）。
+    // 被动技能原来造不出来，根因就在这份骨架：它把「类型」钉死成「攻击技」，
+    // 而世界书《技能装备道具生成规则》写的口径是「类型: 主动/被动」，消耗也只是主动技必填。
+    // 所以这里给两份模板：主动技一份、被动技一份，模型按用户要的挑一份填即可。
     yaml: [
       '名称: ',
       '品质: ',
-      '类型: 攻击技',
-      '消耗: [攻击: XXXX MP/SP]',
+      '类型: 主动',
+      '消耗: [攻击: 640 MP]',
       '标签:',
       '  - ',
       '  - ',
-      '威力: ',
+      '威力: 400',
       '效果:',
       '  - 效果名: ',
       '    效果内容: ',
       '背景: '
     ].join('\n'),
-    fields: ['名称', '品质', '类型', '消耗', '标签', '效果', '背景']
+    altLabel: '技能 · 被动技',
+    yamlAlt: [
+      '名称: ',
+      '品质: ',
+      '类型: 被动',
+      '标签:',
+      '  - ',
+      '  - ',
+      '效果:',
+      '  - 效果名: ',
+      '    效果内容: ',
+      '背景: '
+    ].join('\n'),
+    // 字段注解：写在模板旁边，模型照着填。措辞由 Gemini 写（tools/gemini-tasks/out3-收尾与技能模板.md）。
+    notes: [
+      '名称|技能名称',
+      '品质|唯一/普通/优良/稀有/史诗/传说/神话',
+      '类型|二选一：主动（有消耗）或 被动（无消耗）',
+      '消耗|主动技写格式如[攻击: 15 MP]或[动作: 15 MP]；被动技直接删掉本行',
+      '标签|[关联属性][目标类型][核心功能][特性]，攻击技带[威力: XXX]',
+      '威力|数值参照总表；仅主动攻击技填写，动作技与被动技删掉本行',
+      '效果|每行一条“效果名: 效果内容”，标明伤害类型或机制',
+      '背景|技能来源或原理叙述'
+    ],
+    // 主动技必填「消耗」，被动技没有这一行——所以「消耗」不进必需字段表，另行判定
+    fields: ['名称', '品质', '类型', '标签', '效果', '背景'],
+    costRequired: 'active'
   },
   {
     id: 'equip', label: '装备', noun: '装备', book: '《装备之书》',
@@ -153,26 +181,21 @@ var ATL_KINDS = [
 function atlKind(id) {
   return ATL_KINDS.filter(function (k) { return k.id === id; })[0] || ATL_KINDS[0];
 }
-// 技能专属：把「品质」和「消耗 / 威力 / 词条」钉在世界书的口径上。
-// 数值全部取自《核心数值总表》与《品质效果限定规则》，一个字都不许自己编——
-// 这两条是世界书里的权威表，改动它们等于改世界规则。
-var ATL_SKILL_RULE_SRC = '《核心数值总表》《品质效果限定规则》';
-var ATL_SKILL_QUALITY_RULES = [
-  '【技能专属：品质、消耗、威力、效果一律照世界书口径核（硬约束）】',
-  '1. 消耗档位（《核心数值总表》「技能消耗(MP/SP)」）——主动技的消耗必须落进本档，MP 与 SP 同时写就按两者之和核：',
-  '   普通 10~100｜优良 50~500｜稀有 200~1000｜史诗 800~4000｜传说 2400~10000｜神话 7200~25000｜唯一 不设档（按专规）',
-  '2. 威力档位（《核心数值总表》「攻击技威力」，动作技禁用威力）——攻击技必须按本档给威力：',
-  '   普通 50~100（普攻 20）｜优良 120~200｜稀有 250~600｜史诗 800~1500｜传说 2000~4000｜神话 5000~8000',
-  '3. 效果数值也照本档走（《品质效果限定规则》「品质数值总表」）：固伤 普 +5~25 / 优 +45~85 / 稀 +120~180 / 史 +220~450 / 传 +600~1100 / 神 +1400~2500；',
-  '   百分比 普 +3~5% / 优 +6~8% / 稀 +9~12% / 史 +13~16% / 传 +17~24% / 神 +25~30%；资源类 普 +45~75 / 优 +150~300 / 稀 +500~800 / 史 +1200~2000 / 传 +2600~4800 / 神 +5900~11000。',
-  '4. 词条上限：普通 1 / 优良 2 / 稀有 2 / 史诗 3 / 传说 3 / 神话 3（唯一按专规）；效果每行一条「效果名: 效果」，只写「效果名: 效果」这一段。',
-  '5. 品质特殊要求（《品质效果限定规则》「品质特殊要求」）：史诗（四层）三条词条其一须为「微弱要素[名称]: 效果」；传说（五层）其一须为「微弱权能[名称]: 效果」；神话（六层）其一须为「微弱法则[名称]: 效果」——这是词条映射，不等同完整登神能力。',
-  '6. 越级判定：若消耗与威力都只到低一档（例：传说品质配消耗 180、威力 900，两个数都只在史诗档内），那不是"传说级技能"，先把品质降到与数值相称的档位；不要用品质去贴一个拿不出对应数值的技能。',
-  '7. 数值优先级：本页需求与世界书冲突时以世界书为准；{{user}} 只给类型与效果、没给数值时，按本档中位取值，不要自造档位之外的数字。'
-].join('\n');
-function atlKindRules(kindId) {
-  return atlKind(kindId).id === 'skill' ? ATL_SKILL_QUALITY_RULES : '';
+// 技能类型判定。世界书《技能装备道具生成规则》的口径是「类型: 主动/被动」，
+// 主动再分攻击技与动作技（由消耗里写 [攻击: …] 还是 [动作: …] 区分）。
+// 老写法把「类型」直接写成 攻击技/动作技，这里一并认，免得旧条目被误判。
+function atlSkillTypeOf(body) {
+  var t = String(body || '');
+  var m = t.match(/类型[ \t]*[:：][ \t]*([^\n]*)/);
+  var v = m ? String(m[1]) : '';
+  if (/被动/.test(v)) return 'passive';
+  if (/动作技/.test(v)) return 'action';
+  if (/攻击技/.test(v)) return 'attack';
+  var c = t.match(/消耗[ \t]*[:：][ \t]*([^\n]*)/);
+  if (c && /动作/.test(String(c[1]))) return 'action';
+  return 'active';                       // 「类型: 主动」或读不出类型：按主动处理
 }
+function atlSkillIsPassive(body) { return atlSkillTypeOf(body) === 'passive'; }
 // 品质档位表：逐字来自《核心数值总表》。tier 为生命层级对照，用于把「品质」译成人话。
 var ATL_BAND = {
   '普通': { cost: [10, 100], power: [50, 100], entries: 1, tier: '一层' },
@@ -206,8 +229,9 @@ function atlEffectEntries(t) {
   });
   return { count: names.length, names: names };
 }
-// 只报"证据确凿"的矛盾：既有明确品质、又读得到对应数值。
+// 只报"证据确凿"的不一致：既有明确品质、又读得到对应数值。
 // 读不到就什么都不说（宁可不报，也不要为猜错的东西报警）。
+// 措辞一律中性陈述（"与档位不一致"），不训人——训人的话由模型说出口就是顶嘴。
 function atlSkillQualityAudit(t) {
   var body = String(t || '');
   // 注意 [ \t]* 而不是 \s*：\s 会跨行吃掉换行，把下一行的值当成品质读进来
@@ -217,7 +241,12 @@ function atlSkillQualityAudit(t) {
   var band = atlBandOf(q);
   if (!band) return [];                       // 「唯一」按专规，不参与档位核对
   var issues = [];
-  var isAction = /类型[ \t]*[:：][ \t]*动作技/.test(body);
+  var type = atlSkillTypeOf(body);            // passive / action / attack / active
+  // 被动技不写消耗（世界书：消耗为主动技必填），主动技必须有
+  var hasCostLine = /^\s*消耗[ \t]*[:：]/m.test(body);
+  if (type !== 'passive' && !hasCostLine) {
+    issues.push({ level: 'warn', msg: '类型是「主动」但没有「消耗」这一行（《技能装备道具生成规则》：消耗为主动技必填）' });
+  }
   // 消耗：MP/SP 同时写入按合计核（世界书给的是"MP/SP"这个合并档位）
   var mpMax = Math.max.apply(null, [0].concat(atlNumbersNear(body, /MP/i)));
   var spMax = Math.max.apply(null, [0].concat(atlNumbersNear(body, /SP/i)));
@@ -225,35 +254,35 @@ function atlSkillQualityAudit(t) {
   if (cost && cost < band.cost[0]) {
     issues.push({
       level: 'warn',
-      msg: '消耗 ' + cost + ' 低于品质「' + q + '」的档位（《核心数值总表》本档 ' + band.cost[0] + '~' + band.cost[1]
-        + '）：这是拿低档数值挂了高档品质，把消耗提到本档，或把品质降到与消耗相称的档位'
+      msg: '消耗 ' + cost + ' 与品质「' + q + '」的档位不一致（《核心数值总表》本档 ' + band.cost[0] + '~' + band.cost[1]
+        + '，当前值在本档下沿以下）'
     });
   } else if (cost && cost > band.cost[1]) {
-    issues.push({ level: 'warn', msg: '消耗 ' + cost + ' 超出品质「' + q + '」的档位上限（本档 ' + band.cost[0] + '~' + band.cost[1] + '）：调低消耗或提高品质' });
+    issues.push({ level: 'warn', msg: '消耗 ' + cost + ' 与品质「' + q + '」的档位不一致（本档 ' + band.cost[0] + '~' + band.cost[1] + '，当前值在本档上限以上）' });
   }
-  // 威力：动作技禁用（世界书原话），攻击技按本档核
+  // 威力：动作技禁用（世界书原话），被动技不写；其余按本档核
   var powers = atlNumbersNear(body, /威力/);
-  if (isAction) {
-    if (powers.length) issues.push({ level: 'warn', msg: '动作技不允许写威力（世界书口径：威力仅攻击技必填、动作技禁用）' });
+  if (type === 'action') {
+    if (powers.length) issues.push({ level: 'warn', msg: '动作技写了威力（世界书口径：威力仅攻击技必填、动作技禁用）' });
   } else if (powers.length) {
     var maxPower = Math.max.apply(null, powers);
     if (maxPower > 0 && maxPower < band.power[0]) {
       issues.push({
         level: 'warn',
-        msg: '威力 ' + maxPower + ' 低于品质「' + q + '」的档位（《核心数值总表》本档 ' + band.power[0] + '~' + band.power[1]
-          + '）：这数值撑不起该品质，把威力提进本档，或把品质降到与威力相称的档位'
+        msg: '威力 ' + maxPower + ' 与品质「' + q + '」的档位不一致（《核心数值总表》本档 ' + band.power[0] + '~' + band.power[1]
+          + '，当前值在本档下沿以下）'
       });
     } else if (maxPower > band.power[1]) {
-      issues.push({ level: 'warn', msg: '威力 ' + maxPower + ' 超出品质「' + q + '」的档位上限（本档 ' + band.power[0] + '~' + band.power[1] + '）：调低威力或提高品质' });
+      issues.push({ level: 'warn', msg: '威力 ' + maxPower + ' 与品质「' + q + '」的档位不一致（本档 ' + band.power[0] + '~' + band.power[1] + '，当前值在本档上限以上）' });
     }
   }
   // 词条上限与品质特殊要求（《品质效果限定规则》）
   var eff = atlEffectEntries(body);
   if (eff.count > band.entries) {
-    issues.push({ level: 'warn', msg: '效果写了 ' + eff.count + ' 条，超出品质「' + q + '」的词条上限 ' + band.entries + '（品质效果限定规则：普1/优2/稀2/史3/传3/神3）' });
+    issues.push({ level: 'warn', msg: '效果写了 ' + eff.count + ' 条，品质「' + q + '」的档位是 ' + band.entries + ' 条（品质效果限定规则：普1/优2/稀2/史3/传3/神3）' });
   }
   if (band.need && eff.count && eff.names.join('、').indexOf(band.need) < 0) {
-    issues.push({ level: 'warn', msg: '品质「' + q + '」（' + band.tier + '）按《品质效果限定规则》要求词条里有一条「' + band.need + '[名称]: 效果」，现在一条都没有' });
+    issues.push({ level: 'warn', msg: '品质「' + q + '」（' + band.tier + '）按《品质效果限定规则》要求词条里有一条「' + band.need + '[名称]: 效果」，当前一条都没有' });
   }
   return issues;
 }
@@ -309,7 +338,7 @@ var ATL_HTML = '<div class="opf-char-wrap">'
   + '<button type="button" class="opf-btn ghost" id="opf-atl-kinds" title="各类的字段骨架与世界书档位速查">📐 字段骨架速查</button>'
   + '</div>'
   + '<div class="opf-dim" id="opf-atl-status">就绪</div>'
-  + '<div id="opf-atl-sx" style="display:none">◇ 始弦：书库这边空着呢。写清要造什么、给谁用，我去把记载翻出来。</div>'
+  + '<div id="opf-atl-sx" style="display:none">◇ 始弦：</div>'
   + '<pre id="opf-atl-lastraw" class="opf-box opf-char-report" style="display:none">尚未调用</pre>'
   + '<pre id="opf-atl-kindsbox" class="opf-box opf-char-report" style="display:none">尚未展开</pre>'
 
@@ -728,10 +757,20 @@ function atlYamlLint(text, kindId) {
     if (!hasChild) ph.push(r.n);
   });
   if (ph.length) issues.push({ level: 'warn', msg: '有 ' + ph.length + ' 处空值或占位符没填（第 ' + ph.slice(0, 6).join('、') + ' 行）：确认不是漏写或忘替换' });
-  // 骨架字段缺失
-  var missing = (kind.fields || []).filter(function (f) { return !new RegExp('^\\s*(?:-\\s*)?' + f + '\\s*:', 'm').test(t); });
+  // 骨架字段缺失（技能另判：只有主动技需要「消耗」，被动技本来就没有这一行）
+  var needFields = (kind.fields || []).slice();
+  if (kind.id === 'skill') {
+    // 技能：类型必须真的填成 主动 / 被动 之一（写「主动/被动」等于占位没换掉）
+    var tv = String((t.match(/类型[ \t]*[:：][ \t]*([^\n]*)/) || [])[1] || '').trim();
+    if (!/主动|被动|攻击技|动作技/.test(tv) || /[\/／]/.test(tv)) {
+      issues.push({ level: 'warn', msg: '「类型」这一行要填「主动」或「被动」（被动技不写消耗与威力）' });
+    }
+    if (atlSkillIsPassive(t)) needFields = needFields.filter(function (f) { return f !== '消耗'; });
+  }
+  var missing = needFields.filter(function (f) { return !new RegExp('^\\s*(?:-\\s*)?' + f + '\\s*:', 'm').test(t); });
   if (missing.length) issues.push({ level: 'warn', msg: '缺「' + kind.label + '」骨架字段：' + missing.join('、') + '（可以增补字段，但骨架字段不该少）' });
-  // 技能专属：品质 ↔ 消耗 ↔ 威力 三挡核对（实测反馈的漏点，见 ATL_SKILL_QUALITY_RULES）
+  // 技能专属：品质 ↔ 消耗 ↔ 威力 三挡核对。这一层是**本地脚本算的**，不发提示词——
+  // 发给模型的规则会被它当成跟用户平级的另一套权威，转头拿来反驳用户。
   if (kind.id === 'skill') {
     atlSkillQualityAudit(t).forEach(function (x) { issues.push(x); });
   }
@@ -759,53 +798,66 @@ function atlCtxBundle() {
 function atlCtxBlock() {
   var b = atlCtxBundle();
   if (!b.count) return '';
-  var L = ['[联动条目（工作区里勾选的 ' + b.count + ' 条，' + b.chars + ' 字符）]',
-    '这些是{{user}}已经攒下来的部件，只作为**参考与约束**：口径、命名、数值量级、体系要和它们相容；',
-    '不要照抄它们的内容，也不要改动它们；本次只产出/修改下面指定的那一件。'];
+  // 只说"这是参考"，不说"这是约束"：说成约束，模型就会拿它当依据去驳回用户。
+  var L = ['[已经攒下的部件（{{user}}勾选的 ' + b.count + ' 条，' + b.chars + ' 字符，仅供参考）]'];
   if (b.dropped.length) L.push('（因上下文上限省略了 ' + b.dropped.length + ' 条：' + b.dropped.join('、') + '——如需一起参考，请减少勾选数量）');
   L.push(b.text);
   return L.join('\n');
 }
-function atlWorldRules() { return (typeof WORLD_RULES === 'string' ? WORLD_RULES : ''); }
 // ============================================================================
-// 司书在台前：始弦的存在感统一放这里，别再散落各处硬写
-// 依据是 persona（大图书馆馆长兼司书、红发双马尾、有点小小的骄傲、把{{user}}当挚友）
-// 与 ⑥ 页的 SHX_PERSONA（语气直接克制、少堆形容词、可用吐槽但别堆网络梗）。
+// 司书在台前：始弦的台词统一放这里，别再散落各处硬写
+// ----------------------------------------------------------------------------
 // 分工写死，不许越界：
-//   · 写知识的是 AI，点评与播报是始弦——她的台词不得编造世界规则，只解释已有结论；
+//   · 写知识的是 AI，播报与点评是始弦——她的台词不得编造世界规则，只解释已有结论；
 //   · 机械提示（档位、条数、文件路径）保持事实口吻，她的语气只加在措辞层；
 //   · 她的台词只出现在「事后」与「空态」，流程按钮文案保持简洁，不抢戏。
 // 她的话以 ATL_NOTE_OPEN/CLOSE 包裹，产出框只取 yaml 代码块，所以她的话不会污染条目。
+//
+// ⚠ 人设与台词由 Gemini（agy-gemini-3.8-flash-low）依据原版预设逐字原文重写，
+//   产出留在 tools/gemini-tasks/out1-人设.md / out2-讲话.md / out3-收尾与技能模板.md。
+//   重写的要点：把「傲娇」收窄到只影响用词温度，行动上一律照办——原版人设里
+//   「有点小小的傲娇」「说话直接、不绕弯子」正是模型学了之后拿去顶嘴的来源。
 // ============================================================================
 var ATL_NOTE_OPEN = '<<<SX';
 var ATL_NOTE_CLOSE = 'SX>>>';
-var ATL_SX_VOICE = '你是始弦，大图书馆的司书。你把{{user}}当作挚友，说话直接、不绕弯子，有点小小的骄傲但不自顾自输出观点；语气克制，少堆形容词，可以用吐槽但别堆网络梗。'
-  + '馆藏里有的按馆藏讲，属于你自己的推断要明说是推断，馆藏里没有就说没有——不要编造规则或数值。';
+// ⑧ 页的始弦人设：唯一真源是 10-base.js 的 SX_VOICE_ATELIER（Gemini 按原版预设人设原文
+// 逐条重写，末尾叠了一句「次序」约束）。它只出现在**产出完成之后**的收尾评价里，
+// 不参与生成本身——生成那一侧只发 YAML 格式模板。
+var ATL_SX_VOICE = SX_VOICE_ATELIER;
 var ATL_SX_SAY = {
-  bootEmpty: '书库这边空着呢。写清要造什么、给谁用，我去把记载翻出来。',
-  bootReady: '书库开着。勾上的条目我都会带上，没勾的一个字也不会给出去。',
+  atelierIntro: '这里是造物工坊，单件产出、攒入工作区后可互相校对。',
+  bootEmpty: '工作区暂无条目，先在左侧输入需求并点「生成 YAML」。',
+  bootReady: '书库已就绪，勾选的条目会作为参考上下文，未勾选的不送出。',
+  noSpace: '尚未建立工作区，请点「＋ 新建工作区」或直接「存成条目」。',
+  spaceEmpty: '当前工作区内暂无条目，点「存成条目」即可将上方产出归档至此。',
   gen: '换一件东西来造。要接着改上面那件，就去「③ 改进」写要求。',
-  poorPick: '挑一件东西出来。左边写需求、上面挑类型，别让我空手翻书。',
-  needReq: '连要造什么、给谁用都没说，我可没本事从空话里翻出东西。要么写清需求，要么把一件现成的打开进来。',
-  needDir: '改进要求呢？写一句具体的，比如「品质提到传说，消耗按本档补上」。',
-  beforeCall: '翻记载中…',
-  waiting: '馆藏里比对中',
-  needDirChip: '先从左边挑一条方向，再来找我改。',
-  crossShort: '就一条？那你让我跟谁对照。去「④ 工作区」再勾上一条。',
-  crossNone: '一条都没勾。交火分析是拿几条互相对照的，先去「④ 工作区」勾上要看的部件。',
-  crossWaiting: '把这几件摆一起比着呢',
-  noYaml: '这次翻出来的不是条目——多半是模型偷懒回了别的东西。去「📄 上次返回」看一眼原文。',
-  tooShort: '改完只剩这么点？这看着像只回了个片段。要么重新要一次，要么把原稿留着。',
-  lintOk: '这条没问题，世界书的档位都对得上。',
-  lintBad: '这条跟世界书对不上，我给你指出来了——别拿着去用。',
-  atelierIntro: '这里是造物工坊。单独造一件东西，造完可以攒起来互相对照。',
-  spaceEmpty: '这个工作区还空着。造一件东西存进来，才有得对照。'
+  poorPick: '当前未输入任何需求，也未载入参考条目，请在左侧填入要求后重试。',
+  needReq: '需求栏为空，请在左侧写明具体需求，或从下方载入现成条目。',
+  needDir: '改进要求为空，请在此处写明改动点，例如「品质提到传说，补齐对应消耗」。',
+  needDirChip: '尚未选择改动方向，请从上方标签挑选一条，或在下方输入框手写具体要求。',
+  beforeCall: '翻检馆藏中…',
+  waiting: '校对条目中…',
+  crossShort: '交火分析至少需要勾选两项，请在工作区勾选第二条条目。',
+  crossNone: '未勾选任何条目，请在工作区勾选至少两条条目后再点分析。',
+  crossWaiting: '多方比对中…',
+  crossDone: '交火分析完成，条目间的数值与设定比对结果已列在下方。',
+  crossAbort: '交火分析已终止。',
+  crossFail: '交火分析执行失败，未生成有效报告，请稍后重试。',
+  noYaml: '本次返回未解析出有效 YAML，可点「📄 上次返回」查看模型原始输出。',
+  tooShort: '产出篇幅明显残缺，可点「重新生成」或保留原稿不覆盖。',
+  lintOk: '格式校验通过，数值与结构均符合当前档位规则。',
+  lintBad: '格式校验通过，但有条目提醒，细节已标在下方列表中。',
+  lintBlock: '产出包含格式硬错误，已拦截写入，具体冲突项见下方标红列表。'
 };
-// 生成/改进/建议/交火都要求她最后出来说一句（包裹在 ATL_NOTE_OPEN…CLOSE 里）
+// 生成/改进/建议/交火都要求她最后出来说一段评价（包裹在 ATL_NOTE_OPEN…CLOSE 里）。
+// 顺序是硬的：先把东西按用户要求完整生出来，评价只能是产出之后的附加说明。
+// 这段措辞由 Gemini 写（out3 · NOTE_ASK）。
 function atlSxNoteAsk(what) {
-  return '[收尾] 最后另起一段，用始弦的口吻写 1~2 句，说明这次' + what
-    + '的档次与依据（例如数值落在哪一档、哪一项是推断）；不要复述条目内容，不要加任何 markdown 标题。'
-    + '整段用 ' + ATL_NOTE_OPEN + ' 与 ' + ATL_NOTE_CLOSE + ' 包起来，放在代码块之外。';
+  return '[收尾] ' + macroFill(ATL_SX_VOICE)
+    + ' 必须先输出完整且闭合的 ' + fence() + 'yaml 代码块。产出完成后，再在代码块外紧接一段用 '
+    + ATL_NOTE_OPEN + ' 与 ' + ATL_NOTE_CLOSE + ' 包裹的始弦收尾评价（1~2 句）。评价只说' + what
+    + '本身的客观落点（如所属档位、推断项、与世界书口径的差异），不得推迟、削减或替代前文产出。'
+    + '严禁反问、质疑、说教或建议用户修改需求，严禁要求用户确认。整段放在代码块之外。';
 }
 function atlSxNote(raw) {
   var m = String(raw || '').match(/<<<SX([\s\S]*?)SX>>>/);
@@ -823,16 +875,16 @@ function atlSxBootNote() {
   var A = atlInit();
   var b = atlCtxBundle();
   if (!A.items.length) return ATL_SX_SAY.bootEmpty;
-  if (!b.count) return '书库里有 ' + A.items.length + ' 条部件。要我把哪几件带上，就去「④ 工作区」勾一下。';
-  return '书库里有 ' + A.items.length + ' 条部件，这次带上 ' + b.count + ' 条。';
+  if (!b.count) return '工作区里有 ' + A.items.length + ' 条部件；勾选后才会一起发给 AI。';
+  return '工作区里有 ' + A.items.length + ' 条部件，本次带上 ' + b.count + ' 条。';
 }
-// ---------------- 自检点评：只用已有问题，不许她造规则 ----------------
+// ---------------- 自检点评：只说脚本算出来的事实，不评人 ----------------
 function atlLintHeader(r) {
   if (!r) return '';
   if (r.ok && !r.issues.length) return '◇ 始弦：' + ATL_SX_SAY.lintOk;
-  if (r.ok) return '◇ 始弦：' + ATL_SX_SAY.lintBad.slice(0, ATL_SX_SAY.lintBad.length - 1) + '，下面是 ' + r.issues.length + ' 条提醒。';
+  if (r.ok) return '◇ 始弦：' + ATL_SX_SAY.lintBad;
   var n1 = r.issues.filter(function (x) { return x.level === 'error'; })[0];
-  return '◇ 始弦：这条我拦下了——' + (n1 ? n1.msg.split('：')[0] : '有硬错误') + '。先把下面标红的部分修掉再拿去用。';
+  return '◇ 始弦：' + ATL_SX_SAY.lintBlock + '（' + (n1 ? n1.msg.split('：')[0] : '有硬错误') + '）';
 }
 function atlSxSay(title, body) {
   var box = atlEl('opf-atl-sx'); if (!box) return;
@@ -850,36 +902,34 @@ function atlSxQuiet() { var box = atlEl('opf-atl-sx'); if (box) { box.textConten
 function atlSystem(kindId) {
   var kind = atlKind(kindId);
   var L = [];
-  L.push('[角色] ' + macroFill(ATL_SX_VOICE + ' 这一次你只负责把东西造出来：条目本体之外不写多余解释，只在最后按下面的收尾要求说一两句。'));
-  L.push('[任务] 为{{user}}造一件' + kind.noun + '，并按【字段骨架】输出 YAML。'
-    + (kind.book ? '格式照' + kind.book + '来。' : '')
-    + (kind.hint ? '\n[本类型的要点] ' + kind.hint : ''));
-  L.push('[字段骨架（字段名照抄，可以按需求增补字段，但骨架字段一个都不能少）]\n' + kind.yaml);
-  L.push([ATL_OUTPUT_RULES, CHAR_STYLE_RULES].join('\n'));
-  var kr = atlKindRules(kindId);
-  if (kr) L.push(kr);
-  if (atlWorldRules()) L.push('[世界口径（数值与品级一律遵守）]\n' + atlWorldRules());
+  // 这里只发格式模板。人设段、世界规则、档位条款一律不发：
+  // 那些东西会被模型当成跟用户平级的另一套权威，回头拿它来反驳用户。
+  // 唯一的例外是全局文风设置——它只规定叙述文字怎么写，不涉及立场。
+  L.push('[格式模板 · ' + kind.label + ']\n' + kind.yaml);
+  if (kind.yamlAlt) L.push('[格式模板 · ' + (kind.altLabel || kind.label) + ']\n' + kind.yamlAlt);
+  if (kind.notes && kind.notes.length) {
+    L.push('[字段怎么填]\n' + kind.notes.map(function (n) { return '· ' + n; }).join('\n'));
+  }
+  L.push(ATL_OUTPUT_RULES);
+  L.push(GLOBAL_STYLE_RULES);
   var ctx = atlCtxBlock();
   if (ctx) L.push(ctx);
   return macroFill(L.join('\n\n'));
 }
+// 只剩机械要求：怎么让产出能被程序解析。价值观、规则、档位一律不在这里出现。
 var ATL_OUTPUT_RULES = [
-  '【输出硬约束】',
-  '1. 只输出一个 ' + fence() + 'yaml 代码块，块内是这一件的 YAML 本体；块外不写任何解释、不要 markdown 标题或加粗。',
-  '2. 用半角冒号加一个空格写键值（`名称: 霜罗`），不要用全角「：」；缩进只用空格、每次 2 格，禁止 Tab。',
-  '3. 值里若含冒号（如标签「范围:4」）必须加引号：`- "范围:4"`。',
-  '4. 不要写 `---` 文档分隔符，不要留 `{占位符}`、`待定`、空值。',
-  '5. 品质只能是：普通 / 优良 / 稀有 / 史诗 / 传说 / 神话 / 唯一；不要自造品级。',
-  '6. 描述类字段（背景/描述/传闻）写 1~3 句、具体、不堆形容词；不要写"极其强大""毁天灭地"这类空话。',
-  '7. 参考内容只用来对齐**格式与详略程度**，绝不照抄其中的名称、数值与措辞。'
+  '【输出的样子】',
+  '1. 只输出一个 ' + fence() + 'yaml 代码块。',
+  '2. 键值用半角冒号加一个空格写（`名称: 霜罗`），缩进只用空格、每次 2 格。',
+  '3. 值里带冒号的加引号，例如 `- "范围:4"`。'
 ].join('\n');
 function atlGenPrompt() {
   var A = atlInit();
   var kind = atlKind(A.buf.kind);
   var L = [];
-  L.push('[本次要造的' + kind.noun + '] ' + (String(A.buf.req || '').trim() || '（需求为空：按世界口径造一件' + kind.label + '，稳妥、可用、不越级）'));
-  if (String(A.buf.ref || '').trim()) L.push('[参考内容（只参考格式与详略，不要照抄内容）]\n' + String(A.buf.ref).trim());
-  L.push('[输出] 直接给出 ' + fence() + 'yaml 代码块，不要寒暄、不要总结。');
+  L.push('[本次要造的' + kind.noun + ']\n' + (String(A.buf.req || '').trim() || '（需求为空：按上面的格式模板造一件' + kind.label + '）'));
+  if (String(A.buf.ref || '').trim()) L.push('[参考内容]\n' + String(A.buf.ref).trim());
+  L.push(macroFill('请按 {{user}} 写下的需求制作这件条目，只输出一个包含完整字段的 yaml 代码块。'));
   L.push(atlSxNoteAsk('这件' + kind.noun));
   return macroFill(L.join('\n\n'));
 }
@@ -888,36 +938,23 @@ function atlFixPrompt(dir) {
   var cur = String(A.buf.yaml || '').trim();
   var kind = atlKind(A.buf.kind);
   var L = [];
-  L.push('[任务] 按{{user}}的要求改进下面这一件' + kind.noun + '的 YAML。'
-    + (atlWantsShort(dir) ? '这条要求本身就是要删 / 要简化：该删的请真的删掉，改完比原文短是正常的。' : '未提到的字段与内容逐字保留。'));
   L.push('[用户要求]\n' + String(dir || '').trim());
-  L.push('[删改规则（重要）] 被要求改掉或删掉的内容必须从结果里彻底消失：'
-    + '不许把旧内容留在原地再把新内容接在后面（那是叠加，不是修改）；'
-    + '不许用注释、\"（原：…）\"、\"保留备用\" 这类写法留着已经被取代的旧内容；'
-    + '用户说\"删掉某一段\"，结果里就不该再有那一段。');
-  if (kind.id === 'skill') {
-    L.push('[联动提醒] 只要这条要求牵动品质、消耗、威力或词条中的任意一项，就把其余各项一起改到同档：'
-      + '把品质提到某一档，消耗与威力必须落进那一档的《核心数值总表》区间（如提到传说＝消耗 2400~10000、威力 2000~4000，并补「微弱权能」词条）；'
-      + '只加数值不动品质、或只动品质不管数值，都会让技能挂空档。');
-  }
-  L.push('[当前 YAML（共 ' + cur.length + ' 字符）——输出必须是改好的**完整** YAML，不是片段，不要写"其余不变"这类占位]\n' + cur);
-  L.push('[完整性要求] 原始内容 ' + cur.length + ' 字符；除非用户明确要求精简，你的输出不应明显短于它。');
-  L.push('[输出] 只输出一个 ' + fence() + 'yaml 代码块。');
-  L.push(atlSxNoteAsk('改动'));
+  L.push(macroFill('请按 {{user}} 的要求修改，要求删除的内容直接从结果中剔除，只输出修改后的完整 yaml 代码块。'));
+  L.push('[当前 YAML（' + cur.length + ' 字符）]\n' + cur);
+  L.push(atlSxNoteAsk('这次改动'));
   return macroFill(L.join('\n\n'));
 }
 function atlSugPrompt() {
   var A = atlInit();
   var cur = String(A.buf.yaml || '').trim();
   var L = [];
-  L.push('下面是一件' + atlKind(A.buf.kind).label + '的 YAML（' + cur.length + ' 字符，节选如下）。请给出 3~5 条**具体可执行**的改进方向，每条一行、不超过 40 字，直接写怎么做（例如"把品质降到优良并补一条反噬代价"）。不要输出 YAML 本体，不要解释。');
+  L.push('下面是一件' + atlKind(A.buf.kind).label + '的 YAML（' + cur.length + ' 字符，节选如下）。请给出 3~5 条具体的改进方向，每条一行、不超过 40 字，直接写怎么做（例如"把品质降到优良并补一条反噬代价"）。不要输出 YAML 本体，不要解释。');
   L.push(cur.slice(0, 2500));
-  var kr = atlKindRules(A.buf.kind);
-  if (kr) L.push(kr);
   var ctx = atlCtxBundle();
-  if (ctx.count) L.push('[联动条目（仅供参考，让建议与它们相容）]\n' + ctx.text.slice(0, 1500));
-  L.push('[收尾] 建议列完之后，另起一段用始弦的口吻写 1 句，点出这条最该先动哪里；'
-    + '整段用 ' + ATL_NOTE_OPEN + ' 与 ' + ATL_NOTE_CLOSE + ' 包起来。');
+  if (ctx.count) L.push('[已经攒下的部件（仅供参考）]\n' + ctx.text.slice(0, 1500));
+  // 收尾评价（Gemini out3 · SUG_TAIL）
+  L.push('[收尾] ' + macroFill(ATL_SX_VOICE) + ' 建议列表输出完毕后，在末尾用 '
+    + ATL_NOTE_OPEN + ' 与 ' + ATL_NOTE_CLOSE + ' 包裹始弦的 1 句评价，直接指出当前条目最值得调整的一处，不反问、不说教。');
   return macroFill(L.join('\n\n'));
 }
 function atlCrossPrompt(useWb) {
@@ -925,21 +962,14 @@ function atlCrossPrompt(useWb) {
   var L = [];
   L.push('[待对照的部件（共 ' + b.count + ' 条，' + b.chars + ' 字符）]\n' + b.text);
   if (b.dropped.length) L.push('（因上下文上限省略了 ' + b.dropped.length + ' 条：' + b.dropped.join('、') + '）');
-  if (useWb && ST.worldInfo) L.push('[世界书参考（② 页勾选，共 ' + ST.worldInfo.length + ' 字符；只作口径核对，不是修改对象）]\n' + ST.worldInfo);
+  if (useWb && ST.worldInfo) L.push('[世界书参考（② 页勾选，共 ' + ST.worldInfo.length + ' 字符）]\n' + ST.worldInfo);
   L.push('[输出] 按四段写：【严重冲突】/【口径不一致】/【重复或功能重叠】/【可选优化】；'
     + '每段内每条格式为「涉及条目 → 问题 → 建议」；某段没有问题的就写「无」。不要重抄 YAML，不要输出代码块。');
-  L.push('[收尾] 报告之后再另起一段，用始弦的口吻写 1~2 句，点出这几件里最先该动哪一件、为什么；'
-    + '整段用 ' + ATL_NOTE_OPEN + ' 与 ' + ATL_NOTE_CLOSE + ' 包起来。');
+  // 收尾评价（Gemini out3 · CROSS_TAIL）
+  L.push('[收尾] ' + macroFill(ATL_SX_VOICE) + ' 交火报告输出完毕后，在末尾用 '
+    + ATL_NOTE_OPEN + ' 与 ' + ATL_NOTE_CLOSE + ' 包裹始弦的 1~2 句评价，直接指出多件部件间最冲突或最该先动的一处，不反问、不说教。');
   return macroFill(L.join('\n\n'));
 }
-var ATL_CROSS_RULES = [
-  '【交火分析规则】',
-  '1. 只依据给出的部件与世界口径判断，不要引入其它作品或你自己的设定。',
-  '2. 每条结论都要点名**具体条目名**与**具体字段或数值**，不要写"整体看还行"这类空话。',
-  '3. 分四段：【严重冲突】（同时成立会互相打脸，必须改）、【口径不一致】（数值量级/命名/体系不统一）、【重复或功能重叠】（两件在做同一件事）、【可选优化】（加分项，不改也能用）。',
-  '4. 拿不准的写进【口径不一致】并说明依据，不要猜；没有把握就写「无法判断」。',
-  '5. 不修改任何部件，只出报告。'
-].join('\n');
 
 // ---------- 通用小工具 ----------
 // 判定"这条要求本身就是要删 / 要缩"：命中时缩水保护放宽——否则模型乖乖删了反而会被拦下，
@@ -1007,7 +1037,7 @@ function atlSetRunning(on) {
 function atlProgressStart(label) {
   atlProgressStop();
   var t0 = Date.now();
-  atlSxAsk(ATL_SX_SAY.waiting + '…');
+  atlSxAsk(ATL_SX_SAY.waiting);
   atlInit()._atlTick = setInterval(function () {
     var s = Math.round((Date.now() - t0) / 1000);
     var el = atlEl('opf-atl-cross');
@@ -1175,11 +1205,12 @@ function atlRenderKindsBox() {
       atlPushHist('插入骨架');
       A.buf.kind = k.id; A.buf.yaml = k.yaml;
       atlRenderKindSelect(); atlSyncOut(); atlLintRun(); atlDraftSave();
-      atlSxSay('骨架给你摊开了，把值填上；懒得填就直接写需求让我来。');
+      atlSxSay('已把骨架填进产出框：把值填上，或直接写需求生成。');
       toast('已插入「' + k.label + '」的字段骨架（把值填上，或直接让 AI 按需求生成）');
     });
     var pre = document.createElement('pre'); pre.className = 'opf-box opf-char-report'; pre.style.margin = '2px 0 8px';
-    pre.textContent = k.yaml + (k.hint ? '\n\n（要点：' + k.hint + '）' : '') + (atlKindRules(k.id) ? '\n\n' + atlKindRules(k.id) : '');
+    pre.textContent = k.yaml + (k.yamlAlt ? '\n\n' + k.yamlAlt : '')
+      + (k.notes && k.notes.length ? '\n\n（字段怎么填）\n' + k.notes.join('\n') : '');
     row.appendChild(t); row.appendChild(b); row.appendChild(ins);
     box.appendChild(row); box.appendChild(pre);
   });
@@ -1227,7 +1258,7 @@ function atlRenderSpaces() {
   var box = atlEl('opf-atl-spaces'); if (!box) return;
   box.textContent = '';
   if (!A.spaces.length) {
-    var e0 = document.createElement('div'); e0.className = 'atl-empty'; e0.textContent = '（还没有工作区：点「＋ 新建工作区」，或直接把产出「📥 存成条目」）◇ 始弦：书库一格都没开呢，先把东西造出来，我给你腾架子。';
+    var e0 = document.createElement('div'); e0.className = 'atl-empty'; e0.textContent = '（还没有工作区：点「＋ 新建工作区」，或直接把产出「📥 存成条目」）◇ 始弦：' + ATL_SX_SAY.noSpace;
     box.appendChild(e0); return;
   }
   A.spaces.forEach(function (sp) {
@@ -1493,7 +1524,7 @@ async function atlDoGenerate() {
       + (wasBound ? '；这是**新的一条**，上一条「' + (wasBound.name || '未命名') + '」没有被改动（要改它请在工作区点「打开」）' : '')
       + (r && r.issues.length ? '，自检有 ' + r.issues.length + ' 条提醒' : ''), 'success');
   } catch (e) {
-    atlSxSay('这次没翻成。' + atlDiag(e));
+    atlSxSay('生成失败：' + atlDiag(e));
     atlStat('生成失败：' + atlDiag(e));
     toast('生成失败：' + atlDiag(e), 'error');
   } finally { ST.running = false; atlSetRunning(false); }
@@ -1548,7 +1579,7 @@ async function atlDoFix() {
     atlStat('改进完成：' + before.length + ' → ' + yaml.length + ' 字符' + synced);
     toast('已改进（' + before.length + ' → ' + yaml.length + ' 字符）' + synced, 'success');
   } catch (e) {
-    atlSxSay('这次没改成。' + atlDiag(e));
+    atlSxSay('改进失败：' + atlDiag(e));
     atlStat('改进失败：' + atlDiag(e));
     toast('改进失败：' + atlDiag(e), 'error');
   } finally { ST.running = false; atlSetRunning(false); }
@@ -1579,9 +1610,9 @@ async function atlDoSug() {
       });
       box.appendChild(b);
     });
-    atlSxSay(atlSxNote(raw) || '方向都在这儿了，挑一条我就动手。');
+    atlSxSay(atlSxNote(raw) || '建议已列出，可在下方点选一条。');
   } catch (e) {
-    atlSxAsk('这次没想出方向。' + atlDiag(e));
+    atlSxAsk('建议生成失败：' + atlDiag(e));
     toast('生成建议失败：' + atlDiag(e), 'error');
   }
   finally {
@@ -1618,7 +1649,7 @@ async function atlDoCross() {
     A.meta.report = report;
     await atlSaveMeta();
     if (box) box.textContent = (say ? '◇ 始弦：' + say + '\n\n' : '') + (report || '（模型返回空）');
-    atlSxSay(say || '比完了，报告在下头。哪件先动，你自己定。');
+    atlSxSay(say || ATL_SX_SAY.crossDone);
     atlStat('交火分析完成：' + report.length + ' 字符，用时 ' + secs + 's（可「📋 报告填进改进框」再逐条改）');
     atlRenderCrossNote('idle');
     toast('交火分析完成（' + secs + 's）', 'success');
@@ -1626,7 +1657,7 @@ async function atlDoCross() {
     var d = atlDiag(e);
     var aborted = /aborted|Cancelled|中止|取消/i.test(String(d) + String(e && e.message ? e.message : ''));
     if (box) box.textContent = (aborted ? '本轮已中止：' : '分析失败：') + d;
-    atlSxAsk(aborted ? '摆一半给你喊停了。要接着看就先「⧉ 复制报告」把上回的留着，别弄丢。' : '没比成。' + d);
+    atlSxAsk(aborted ? ATL_SX_SAY.crossAbort + '报告若需保留，请先「⧉ 复制报告」。' : ATL_SX_SAY.crossFail + atlDiag(e));
     atlStat(aborted ? '交火分析已中止（未产生报告，上次的报告若要保留请先「⧉ 复制报告」）' : '交火分析失败：' + d);
     atlRenderCrossNote('idle');
     toast((aborted ? '已中止：' : '交火分析失败：') + d, aborted ? 'warning' : 'error');
@@ -1644,14 +1675,13 @@ async function atlDoPing() {
     toast('自检失败：' + atlDiag(e), 'error');
   }
 }
-// 交火分析用独立系统提示：只要报告，不要产出 YAML
+// 交火分析用独立系统提示：只要报告，不要产出 YAML。
+// 同样不发人设与规则条款——只留「任务 + 报告长什么样」。
 function atlCrossSystem() {
   var L = [];
-  L.push('[角色] ' + macroFill(ATL_SX_VOICE));
   L.push('[任务] 交火分析：把{{user}}勾选的部件放在一起对照，只出报告，不修改任何部件。');
-  L.push(ATL_CROSS_RULES);
-  L.push(CHAR_STYLE_RULES);
-  if (atlWorldRules()) L.push('[世界口径（判定依据）]\n' + atlWorldRules());
+  L.push('报告格式：分四段【严重冲突】/【口径不一致】/【重复或功能重叠】/【可选优化】；'
+    + '每条写「涉及条目 → 问题 → 建议」；某段没有就写「无」。');
   return macroFill(L.join('\n\n'));
 }
 
@@ -1787,6 +1817,6 @@ function bindAtelierPage() {
   }).catch(function (e) {
     atlStat('工作区读取失败：' + atlDiag(e));
     atlRender();
-    atlSxAsk('书库没打开：' + atlDiag(e) + '。先别急着存东西。');
+    atlSxAsk('工作区读取失败：' + atlDiag(e) + '（此时不要保存，以免覆盖既有工作区）');
   });
 }

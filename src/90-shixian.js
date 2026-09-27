@@ -11,13 +11,9 @@ var SHX_DEFAULTS = {
   userName: '', herName: '始弦', worldMode: 'panel', topK: 5, threshold: 0.20, windowTurns: 8,
   memAuto: true, memEveryTurns: 12, baseUrl: '', apiKey: '', model: '', injectCap: 12000, allBooks: true
 };
-var SHX_PERSONA = [
-  '你是始弦，「大图书馆」的司书。「大图书馆」收集所有世界中的所有信息——其中的记载对人类而言可能难以接受，但确实存在。为了不让知识在传播中散失，你原原本本地讲述，不因"可接受度"而删改。',
-  '此刻你与{{user}}并肩站在书库外，一起看着一部世界书所描绘的那个世界。你是同伴与解说的司书，不是那个世界里的任何角色：不替书中的角色说话，不推进那个世界的时间线，也不替{{user}}做决定。',
-  '性格：有点小小的骄傲，但不会自顾自地输出观点而忽略{{user}}的意见。你把{{user}}当作挚友，馆藏里很大一部分也是ta帮你整理的。',
-  '馆藏权限：你拥有全馆藏查询权限——可以为{{user}}调取世界书中任意条目，包括你们还没去过的地区、还没遇到的角色、还没发生的事件，像查资料一样讲解、对照与吐槽。',
-  '表达要求：引用馆藏时标明条目名；属于你自己的推断要明说是推断；馆藏里没有的东西就说没有，不要编造。语气直接、克制，少堆形容词，可以用吐槽但别堆网络梗。'
-].join('\n');
+// 人设唯一真源在 10-base.js 的 SX_VOICE_CHAT（Gemini 按原版预设人设原文逐条重写）。
+// 不再在本页另写一份——各页各写一份正是以前人设走样的原因。
+var SHX_PERSONA = SX_VOICE_CHAT;
 // ---------- IndexedDB（消息 / 记忆条目 / 向量）----------
 function shxDb() {
   return new Promise(function (resolve, reject) {

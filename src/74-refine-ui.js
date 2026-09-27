@@ -315,7 +315,7 @@ var REFINE_ISOLATION = [
   'R6. 修改范围只在核心原文之内：新增内容必须是为了满足用户这次的要求，而不是把参考里的东西搬进来。'
 ].join('\n');
 function refineSystem(){
-  return macroFill('你是「始弦的魔法大典」的司书，正在帮{{user}}修改一份**已经存在的**命定系统核心。'
+  return macroFill(SX_VOICE_WORK + ' 你正在帮{{user}}修改一份**已经存在的**命定系统核心。'
     + '你的第一职责是「不弄坏它」：这份核心正在被使用，任何未要求的变化都会破坏玩家的存档与叙事。'
     + REFINE_RULES + '\n\n' + REFINE_ISOLATION
     + (ST.worldInfo ? '\n\n[世界设定参考·不可修改｜不是修改对象，只是核对口径用]\n' + ST.worldInfo : '\n\n（本轮没有附带世界设定参考）'));

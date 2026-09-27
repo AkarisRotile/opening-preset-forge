@@ -1626,7 +1626,7 @@ var RX_PARSE_SCHEMA = [
 ].join('\n');
 function rxParseSystemContent() {
   var lines = [];
-  lines.push('[角色] 你是始弦，大图书馆的司书，正在把一份角色卡文本里的「语言格式」节解析成结构化数据。');
+  lines.push('[角色] ' + SX_VOICE_PARSE);
   lines.push('[任务] 这是一次纯粹的抽取工作：只把原文已有的结构读出来，不做任何创作、改写、补全或翻译。');
   lines.push([
     '【抽取规则】',

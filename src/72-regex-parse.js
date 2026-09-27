@@ -546,10 +546,10 @@ function rxApplyCoreFix(item, parsed) {
 }
 function rxSystemContent() {
   var lines = [];
-  lines.push('[角色] ' + macroFill('你是始弦，大图书馆的司书，正在为一个命定系统核心写「对话美化正则」的替换体（HTML 部分）。你把{{user}}当挚友，讲究实用与克制，不写花架子。'));
+  lines.push('[角色] ' + macroFill(SX_VOICE_WORK + ' 你正在为一个命定系统核心写「对话美化正则」的替换体（HTML 部分）。'));
   lines.push('[任务] 依据给定的核心语言格式与预算档位，产出一段可在 SillyTavern 消息里直接渲染的 HTML 替换体。匹配式由插件生成，你不要碰。');
   lines.push(RX_RULES);
-  lines.push(CHAR_STYLE_RULES);
+  lines.push(styleRulesAll());
   if (ST.worldInfo) lines.push('[世界书参考（世界书页勾选的条目）]\n' + ST.worldInfo);
   return macroFill(lines.join('\n\n'));
 }
@@ -557,7 +557,7 @@ function rxSystemContent() {
 function rxSlimSystemContent(colorRef, budget) {
   var cap = Number(budget) || 3000;
   var lines = [];
-  lines.push('[角色] ' + macroFill('你是始弦，大图书馆的司书，正在为一个命定系统核心写「对话美化」的 CSS。你把{{user}}当挚友，讲究实用与克制。'));
+  lines.push('[角色] ' + macroFill(SX_VOICE_WORK + ' 你正在为一个命定系统核心写「对话美化」的 CSS。'));
   lines.push('[任务] HTML 骨架已由插件生成并锁定，你只写 CSS 规则，不得输出或改动任何 HTML。');
   lines.push([
     '【CSS 硬约束】',

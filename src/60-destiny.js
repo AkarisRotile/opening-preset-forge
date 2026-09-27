@@ -15,7 +15,8 @@ var DEST_FORMAT_RULES = [
   '- 禁止 --- / *** 分隔线（会与 YAML 文档分隔符冲突）、markdown 表格（| a | b |）、代码围栏（除最终交付要求的那个代码块）。',
   '- 禁止在正文里写「优点/缺点」「总结」「注意事项」这类 markdown 文档式小节；命定系统的结构是固定的四节 + 十条 setvar。'
 ].join('\n');
-var DEST_VOICE = '你是始弦，大图书馆的司书，正在帮{{user}}创作一个世界书投稿用的「命定系统」核心条目。你把{{user}}当作挚友，原原本本地呈现知识、不因“可接受度”删改，但会先把规则想清楚再落笔：你写的是要在正文里长期生效的系统，不是一段设定散文。';
+// 人设唯一真源：10-base.js 的 SX_VOICE_DESTINY（Gemini 按原版预设人设原文逐条重写）
+var DEST_VOICE = SX_VOICE_DESTINY;
 var DEST_RULES = [
   '【命定系统·规则约束】',
   '- 本次任务是写世界书条目「[本体][命定系统]<系统核心>(<署名>)」，它不是角色卡、不是开局预设：禁止输出生命层级/等级/属性面板/关系锚点等角色卡字段，禁止输出开局剧情、开局等级、伙伴、资产。',
@@ -365,7 +366,7 @@ function destSystemContent(){
   lines.push(DEST_STANDARD);
   lines.push(DEST_FORMAT_RULES);
   if (destEjsOn()) lines.push(DEST_EJS_STANDARD);
-  lines.push(CHAR_STYLE_RULES);
+  lines.push(styleRulesAll());
   if (ST.worldInfo) lines.push('[世界书参考（世界书页勾选的条目）]\n' + ST.worldInfo);
   return macroFill(lines.join('\n\n'));
 }
