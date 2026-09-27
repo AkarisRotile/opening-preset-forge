@@ -488,7 +488,9 @@ function opfEjsRestore(raw, mark) {
   } catch (e) {}
   return out;
 }
-// 给 UI 读的最近一次统计（含"输入有 EJS、输出一个都没有"这种硬损失）
+// 给 UI / 排障读的最近一次统计（含"输入有 EJS、输出一个都没有"这种硬损失）。
+// 注意：v1.16.9 起**不再往界面上播报**这句警告——它每次都在页面上占一块地方，
+// 用户反馈"有点碍事"。统计照旧记录，需要排障时读这个函数即可（tools/test-ejs-safe.mjs 仍在核它）。
 function opfEjsLastStat(label) {
   try {
     var st = ST.__opfEjsStat || {};
@@ -496,14 +498,6 @@ function opfEjsLastStat(label) {
     var keys = Object.keys(st);
     return keys.length ? st[keys[keys.length - 1]] : { inCount: 0, outCount: 0, lastAt: 0 };
   } catch (e) { return { inCount: 0, outCount: 0, lastAt: 0 }; }
-}
-function opfEjsWarn(label) {
-  var r = opfEjsLastStat(label);
-  if (!r.inCount) return '';
-  if (!r.outCount) return '⚠ 送进去的稿子里有 ' + r.inCount + ' 处 EJS 标签，但这次返回里一个都没有——很可能被宿主提示词管线执行掉了。'
-    + '建议：① 先在框里确认稿子本身是完整的；② 直接重试一次（插件已把 EJS 转义后再发送）；③ 若换了模型仍如此，把你用的提示词模板类扩展在这条链路上关掉。';
-  if (r.outCount < r.inCount) return '⚠ 输入的 EJS 标签 ' + r.inCount + ' 处，返回里只剩 ' + r.outCount + ' 处——请核对是不是有标签在往返途中丢失或被改动。';
-  return '';
 }
 
 async function callModel(msgs, extraOpts) {
@@ -5968,9 +5962,6 @@ async function refineApply(mode){
       lines.push('  对策：点「📍 只重跑定位」或「↻ 重新生成这一步」，会带上最近似的原文让它照抄锚点再删一次。');
     }
     if (res.degraded) lines.push('\n⚠ 有 ' + res.degraded + ' 处是**近似定位**（锚点与原文有空白差异，或退化为按行定位）——请重点看下面的差异预览确认位置对不对。');
-    // EJS 完整性：送进去几处标签、这次回来几处，少了就点名（EJS 被管线吃掉是这一页最隐蔽的坑）
-    var ejsWarn = (typeof opfEjsWarn === 'function') ? opfEjsWarn('') : '';
-    if (ejsWarn) lines.push('\n' + ejsWarn);
     if (ST.refine.taintWarn && ST.refine.taintWarn.length) lines.push('\n⚠ 材料隔离：本次有 ' + ST.refine.taintWarn.length + ' 段新内容疑似来自世界设定参考（你选择了仍然落地）——请核对它们是否本该属于这个核心。');
     else if (pool.length) lines.push('\n✓ 材料隔离核对通过：新内容里没有出现"只在世界参考里才有"的内容（参考池 ' + pool.length + ' 段）。');
     if (parsed.tail) lines.push('\n模型附注：' + parsed.tail);
@@ -6567,9 +6558,6 @@ async function rxAiRewrite(item, f, issues, dir, scope, phase) {
   if (j && typeof j.findRegex === 'string') jj.findRegex = j.findRegex;
   if (payload.kind === 'css') jj.css = payload.text; else jj.replaceString = payload.text;
   out.changed = rxApplyAiResult(item, jj, payload.loose ? raw : '', scope);
-  // EJS 完整性：替换体里可能嵌 EJS，标签数量对不上就在结果说明里点名
-  var ejsW = (typeof opfEjsWarn === 'function') ? opfEjsWarn(phase || '正则工坊') : '';
-  if (ejsW) out.note = (out.note ? out.note + '｜' : '') + ejsW;
   return out;
 }
 function rxRepairPrompt(item, f, issues, dir, scope, mode) {
@@ -8618,11 +8606,13 @@ function atlCtxBlock() {
 // ============================================================================
 var ATL_NOTE_OPEN = '<<<SX';
 var ATL_NOTE_CLOSE = 'SX>>>';
-// ⑧ 页的始弦人设：唯一真源是 10-base.js 的 SX_VOICE_ATELIER（Gemini 按原版预设人设原文
-// 逐条重写，末尾叠了一句「次序」约束）。它只出现在**产出完成之后**的收尾评价里，
-// 不参与生成本身——生成那一侧只发 YAML 格式模板。
+// ⑧ 页的始弦人设：唯一真源是 10-base.js 的 SX_VOICE_ATELIER（原版预设人设原文，一字不改）。
+// 人设只出现在**最终提示词的最头部**（sxHead 的第 0 段）。
 var ATL_SX_VOICE = SX_VOICE_ATELIER;
-var ATL_SX_SAY = {
+// 插件自己的提示文案。⚠ 这些**不是始弦的台词**：它们是脚本根据状态挑出来的固定句子，
+// 出现在状态行 / 交火提示条 / 空态占位里，一律不挂人物标签。
+// 她的那一格（#opf-atl-sx）只放 AI 按人设写出来的那一段（<<<SX…SX>>>），没有就留空。
+var ATL_TIPS = {
   atelierIntro: '这里是造物工坊，单件产出、攒入工作区后可互相校对。',
   bootEmpty: '工作区暂无条目，先在左侧输入需求并点「生成 YAML」。',
   bootReady: '书库已就绪，勾选的条目会作为参考上下文，未勾选的不送出。',
@@ -8653,48 +8643,44 @@ var ATL_SX_SAY = {
 function atlSxNoteAsk(what) {
   var w = what || '这件条目';
   return '[收尾] 必须先输出完整且闭合的 ' + fence() + 'yaml 代码块。产出完成后，再在代码块外紧接一段用 '
-    + ATL_NOTE_OPEN + ' 与 ' + ATL_NOTE_CLOSE + ' 包裹的始弦收尾评价（1~2 句）。评价只说' + w
-    + '本身的客观落点（如所属档位、推断项、与世界书口径的差异），不得推迟、削减或替代前文产出。'
-    + '严禁反问、质疑、说教或建议用户修改需求，严禁要求用户确认。整段放在代码块之外。';
+    + ATL_NOTE_OPEN + ' 与 ' + ATL_NOTE_CLOSE + ' 包裹的始弦收尾评价（1~2 句）。评价按人设来写：'
+    + '就以她的身份说说' + w + '本身（数值落在哪一档、哪一项是推断、哪里和世界书口径不一致），'
+    + '不得推迟、削减或替代前文产出。严禁反问、质疑、说教或建议用户修改需求，严禁要求用户确认。'
+    + '整段放在代码块之外。';
 }
 function atlSxNote(raw) {
   var m = String(raw || '').match(/<<<SX([\s\S]*?)SX>>>/);
   return m ? String(m[1]).trim() : '';
 }
-// ---------------- 空态台词：一次一句，按状态挑 ----------------
-// 页头那句司书招呼：ATL_HTML 是常量、司书台词在后面才定义，所以这里在启动时填进去
+// 页头那句流程说明：插件文案，不是她的话
 function atlRenderHint() {
   var h = atlEl('opf-atl-hint'); if (!h) return;
-  h.textContent = '◇ 始弦：' + ATL_SX_SAY.atelierIntro + ' 流程：写需求（可选参考格式）→ 选类型 → 🎨 生成 YAML → 🔎 自检 → 用改进框提要求让 AI 改（可撤回）→ 📥 存成条目。'
+  h.textContent = ATL_TIPS.atelierIntro + ' 流程：写需求（可选参考格式）→ 选类型 → 🎨 生成 YAML → 🔎 自检 → 用改进框提要求让 AI 改（可撤回）→ 📥 存成条目。'
     + '产出可以攒进「工作区」；勾选的条目会在下一次生成/改进/交火分析时一起发给 AI，没勾的一条都不会发出去。';
 }
 function atlRand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 function atlSxBootNote() {
   var A = atlInit();
   var b = atlCtxBundle();
-  if (!A.items.length) return ATL_SX_SAY.bootEmpty;
+  if (!A.items.length) return ATL_TIPS.bootEmpty;
   if (!b.count) return '工作区里有 ' + A.items.length + ' 条部件；勾选后才会一起发给 AI。';
   return '工作区里有 ' + A.items.length + ' 条部件，本次带上 ' + b.count + ' 条。';
 }
-// ---------------- 自检点评：只说脚本算出来的事实，不评人 ----------------
-function atlLintHeader(r) {
+// ---------------- 自检结论：脚本算出来的机械文本，不挂人物标签 ----------------
+function atlLintVerdict(r) {
   if (!r) return '';
-  if (r.ok && !r.issues.length) return '◇ 始弦：' + ATL_SX_SAY.lintOk;
-  if (r.ok) return '◇ 始弦：' + ATL_SX_SAY.lintBad;
+  if (r.ok && !r.issues.length) return ATL_TIPS.lintOk;
+  if (r.ok) return ATL_TIPS.lintBad;
   var n1 = r.issues.filter(function (x) { return x.level === 'error'; })[0];
-  return '◇ 始弦：' + ATL_SX_SAY.lintBlock + '（' + (n1 ? n1.msg.split('：')[0] : '有硬错误') + '）';
+  return ATL_TIPS.lintBlock + '（' + (n1 ? n1.msg.split('：')[0] : '有硬错误') + '）';
 }
-function atlSxSay(title, body) {
+// 她的那一格：只放 AI 按人设写的那段。空＝隐藏（绝不用脚本的固定句子顶上）
+function atlSxSay(note) {
   var box = atlEl('opf-atl-sx'); if (!box) return;
-  box.textContent = '◇ 始弦：' + String(title || body || '').trim();
-  box.style.display = box.textContent.trim() ? 'block' : 'none';
-}
-function atlSxAsk(title) {
-  var box = atlEl('opf-atl-sx');
-  if (!box) return;
-  box.textContent = '◇ 始弦：' + String(title || '').trim();
-  box.style.display = 'block';
-  atlCls(box, 'remove', 'open'); atlCls(box, 'add', 'open');
+  var t = String(note || '').trim();
+  box.textContent = t ? '◇ 始弦：' + t : '';
+  box.style.display = t ? 'block' : 'none';
+  if (t) { atlCls(box, 'remove', 'open'); atlCls(box, 'add', 'open'); }
 }
 function atlSxQuiet() { var box = atlEl('opf-atl-sx'); if (box) { box.textContent = ''; box.style.display = 'none'; } }
 // 任务块（人设与头部四段走 sxHead()，不在这里拼）。
@@ -8841,7 +8827,7 @@ function atlSetRunning(on) {
 function atlProgressStart(label) {
   atlProgressStop();
   var t0 = Date.now();
-  atlSxAsk(ATL_SX_SAY.waiting);
+  atlStat(ATL_TIPS.waiting);
   atlInit()._atlTick = setInterval(function () {
     var s = Math.round((Date.now() - t0) / 1000);
     var el = atlEl('opf-atl-cross');
@@ -8892,10 +8878,10 @@ function atlRenderCrossNote(state) {
   }
   box.textContent = b.count === 1
     ? '交火分析至少要比 2 条（拿一条跟谁对照？）：请到上面「④ 工作区」的条目前面再勾上至少一条——勾选框在工作区列表里，不在这一屏。'
-      + '\n◇ 始弦：' + ATL_SX_SAY.crossShort
+      + '\n' + ATL_TIPS.crossShort
     : '交火分析需要先勾选条目：请到上面「④ 工作区」把要一起对照的条目勾上（至少 2 条），勾选框在每个条目的左端。'
       + (b.total ? '' : '（工作区还是空的：先在 ① 里生成一件，点「📥 存成条目」存进工作区）')
-      + '\n◇ 始弦：' + (b.total ? ATL_SX_SAY.crossNone : ATL_SX_SAY.bootEmpty);
+      + '\n' + (b.total ? ATL_TIPS.crossNone : ATL_TIPS.bootEmpty);
   atlCls(box, 'add', 'warn');
 }
 // 提示条 + 工作区整体闪一下，把视线拉回去（勾选框在页面别处，容易找不到）
@@ -8917,7 +8903,7 @@ function atlFlashWorkspace() {
 }
 async function atlCall(msgs, label, opts) {
   var o = opts || {};
-  atlStat(label + '：' + ATL_SX_SAY.beforeCall + '（' + label + '）');
+  atlStat(label + '：' + ATL_TIPS.beforeCall + '（' + label + '）');
   var t0 = Date.now();
   var resp = await callModel(msgs, o.extra);
   var A = atlInit();
@@ -8948,8 +8934,8 @@ function atlLintRun() {
   var warnN = r.issues.length - errN;
   L.push((errN ? '❌ ' : '✓ ') + '自检：' + r.stats.lines + ' 行 / ' + r.stats.chars + ' 字符 / 顶层字段 ' + r.stats.fields + ' 个（类型：' + r.stats.kind + '）'
     + (r.issues.length ? '｜错误 ' + errN + ' / 提醒 ' + warnN : '｜没有问题'));
-  // 司书对这份自检的看法（只解释已有问题，不新增规则）
-  var head = atlLintHeader(r);
+  // 自检结论：脚本算出来的机械文本，不挂人物标签（她的话只来自 AI 那一段）
+  var head = atlLintVerdict(r);
   if (head) L.push(head);
   if (r.stats.topKeys && r.stats.topKeys.length) L.push('顶层字段：' + r.stats.topKeys.join('、'));
   r.issues.forEach(function (x) { L.push((x.level === 'error' ? '❌ ' : '⚠ ') + x.msg); });
@@ -9009,7 +8995,7 @@ function atlRenderKindsBox() {
       atlPushHist('插入骨架');
       A.buf.kind = k.id; A.buf.yaml = k.yaml;
       atlRenderKindSelect(); atlSyncOut(); atlLintRun(); atlDraftSave();
-      atlSxSay('已把骨架填进产出框：把值填上，或直接写需求生成。');
+      atlStat('已把骨架填进产出框：把值填上，或直接写需求生成。');
       toast('已插入「' + k.label + '」的字段骨架（把值填上，或直接让 AI 按需求生成）');
     });
     var pre = document.createElement('pre'); pre.className = 'opf-box opf-char-report'; pre.style.margin = '2px 0 8px';
@@ -9062,7 +9048,7 @@ function atlRenderSpaces() {
   var box = atlEl('opf-atl-spaces'); if (!box) return;
   box.textContent = '';
   if (!A.spaces.length) {
-    var e0 = document.createElement('div'); e0.className = 'atl-empty'; e0.textContent = '（还没有工作区：点「＋ 新建工作区」，或直接把产出「📥 存成条目」）◇ 始弦：' + ATL_SX_SAY.noSpace;
+    var e0 = document.createElement('div'); e0.className = 'atl-empty'; e0.textContent = '（还没有工作区：点「＋ 新建工作区」，或直接把产出「📥 存成条目」）' + ATL_TIPS.noSpace;
     box.appendChild(e0); return;
   }
   A.spaces.forEach(function (sp) {
@@ -9087,7 +9073,7 @@ function atlRenderSpaces() {
     d.appendChild(sum);
     var body = document.createElement('div');
     if (!items.length) {
-      var e1 = document.createElement('div'); e1.className = 'atl-empty'; e1.textContent = '（这个工作区还没有条目）◇ 始弦：' + ATL_SX_SAY.spaceEmpty;
+      var e1 = document.createElement('div'); e1.className = 'atl-empty'; e1.textContent = '（这个工作区还没有条目）' + ATL_TIPS.spaceEmpty;
       body.appendChild(e1);
     }
     items.forEach(function (it) { body.appendChild(atlItemRow(it)); });
@@ -9294,7 +9280,7 @@ function atlSpacesByName() {
 async function atlDoGenerate() {
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
   var A = atlInit();
-  if (!String(A.buf.req || '').trim() && !String(A.buf.ref || '').trim()) { atlSxAsk(ATL_SX_SAY.needReq); toast('先写一句需求（或粘一段参考），再生成', 'warning'); return; }
+  if (!String(A.buf.req || '').trim() && !String(A.buf.ref || '').trim()) { atlStat(ATL_TIPS.needReq); toast('先写一句需求（或粘一段参考），再生成', 'warning'); return; }
   var wasBound = atlBoundItem();          // 生成＝造新的一条：成功后解绑，避免保存时覆盖上一条
   ST.running = true; atlSetRunning(true);
   try {
@@ -9302,8 +9288,7 @@ async function atlDoGenerate() {
     var raw = await atlCall(msgs, '生成');
     var yaml = atlExtractYaml(raw);
     if (!yaml.trim()) {
-      atlSxAsk(ATL_SX_SAY.noYaml);
-      atlStat('生成：模型没返回可用的 YAML（点「📄 上次返回」看原文）');
+      atlStat('生成：' + ATL_TIPS.noYaml);
       toast('模型没有返回可用的 YAML：点工具栏「📄 上次返回」看原文，或再试一次', 'warning');
       return;
     }
@@ -9317,18 +9302,16 @@ async function atlDoGenerate() {
     var r = atlLintRun();
     atlSyncSaveButtons();
     atlDraftSave();
-    // 司书出来说一句：优先用模型按收尾要求写的解释，没有就退回自检点评
-    atlSxSay(atlSxNote(raw) || atlLintHeader(r).replace(/^◇ 始弦：/, ''));
-    // EJS 完整性：这一页也可能造带 EJS 的条目，标签数量对不上就如实说（别让残缺内容静默落地）
-    var ejsW = (typeof opfEjsWarn === 'function') ? opfEjsWarn('生成') : '';
-    if (ejsW) atlSxAsk(ejsW);
+    // 她那一格只放 AI 按人设写的那段（没有就留空）；自检结论是脚本算的，走状态行
+    atlSxSay(atlSxNote(raw));
+    atlStat(atlLintVerdict(r));
     atlStat('生成完成：' + yaml.length + ' 字符｜未绑定条目（点「📥 存成条目」新建）'
       + (r && r.issues.length ? '｜自检发现 ' + r.issues.length + ' 条，见下方' : '｜自检通过'));
     toast('已生成（' + yaml.length + ' 字符）'
       + (wasBound ? '；这是**新的一条**，上一条「' + (wasBound.name || '未命名') + '」没有被改动（要改它请在工作区点「打开」）' : '')
       + (r && r.issues.length ? '，自检有 ' + r.issues.length + ' 条提醒' : ''), 'success');
   } catch (e) {
-    atlSxSay('生成失败：' + atlDiag(e));
+    atlStat('生成失败：' + atlDiag(e));
     atlStat('生成失败：' + atlDiag(e));
     toast('生成失败：' + atlDiag(e), 'error');
   } finally { ST.running = false; atlSetRunning(false); }
@@ -9337,8 +9320,8 @@ async function atlDoFix() {
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
   var A = atlInit();
   var dir = String(A.buf.dir || '').trim() || String((atlEl('opf-atl-dir') || {}).value || '').trim();
-  if (!String(A.buf.yaml || '').trim()) { atlSxAsk(ATL_SX_SAY.needReq); toast('还没有可改的产出：先生成一件，或把工作区里的条目「打开」进来', 'warning'); return; }
-  if (!dir) { atlSxAsk(ATL_SX_SAY.needDir); toast('先写一句改进要求，例如「品质降到优良、补一条反噬代价」', 'warning'); return; }
+  if (!String(A.buf.yaml || '').trim()) { atlStat(ATL_TIPS.needReq); toast('还没有可改的产出：先生成一件，或把工作区里的条目「打开」进来', 'warning'); return; }
+  if (!dir) { atlStat(ATL_TIPS.needDir); toast('先写一句改进要求，例如「品质降到优良、补一条反噬代价」', 'warning'); return; }
   var before = String(A.buf.yaml);
   ST.running = true; atlSetRunning(true);
   try {
@@ -9346,8 +9329,7 @@ async function atlDoFix() {
     var raw = await atlCall(msgs, '改进');
     var yaml = atlExtractYaml(raw);
     if (!yaml.trim()) {
-      atlSxAsk(ATL_SX_SAY.noYaml);
-      atlStat('改进：模型没返回可用的 YAML（点「📄 上次返回」看原文）');
+      atlStat('改进：' + ATL_TIPS.noYaml);
       toast('模型没有返回可用的 YAML，原样保留', 'warning');
       return;
     }
@@ -9358,8 +9340,7 @@ async function atlDoFix() {
         + '要用这个偏短的结果替换吗？（取消＝保留原样）\n'
         + '· 若你的要求里本来就包含"删掉/去掉/精简"，那这次变短可能就是删对了 —— 确认即可；\n'
         + '· 取消的话，原内容会原样留着（被要求删掉的那些旧内容也会一起留下）。')) {
-        atlSxAsk(ATL_SX_SAY.tooShort);
-        atlStat('改进：结果偏短，已保留原样（' + before.length + ' 字符）');
+        atlStat('改进：' + ATL_TIPS.tooShort + '（结果偏短，已保留原样 ' + before.length + ' 字符）');
         return;
       }
     }
@@ -9377,13 +9358,12 @@ async function atlDoFix() {
       synced = '，已同步到条目「' + (it.name || '未命名') + '」（行内「↩ 回退」可退）';
     }
     atlDraftSave();
-    atlSxSay(atlSxNote(raw) || atlLintHeader(r).replace(/^◇ 始弦：/, ''));
-    var ejsWF = (typeof opfEjsWarn === 'function') ? opfEjsWarn('生成') : '';
-    if (ejsWF) atlSxAsk(ejsWF);
+    atlSxSay(atlSxNote(raw));
+    atlStat(atlLintVerdict(r));
     atlStat('改进完成：' + before.length + ' → ' + yaml.length + ' 字符' + synced);
     toast('已改进（' + before.length + ' → ' + yaml.length + ' 字符）' + synced, 'success');
   } catch (e) {
-    atlSxSay('改进失败：' + atlDiag(e));
+    atlStat('改进失败：' + atlDiag(e));
     atlStat('改进失败：' + atlDiag(e));
     toast('改进失败：' + atlDiag(e), 'error');
   } finally { ST.running = false; atlSetRunning(false); }
@@ -9391,7 +9371,7 @@ async function atlDoFix() {
 async function atlDoSug() {
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
   var A = atlInit();
-  if (!String(A.buf.yaml || '').trim()) { atlSxAsk(ATL_SX_SAY.needReq); toast('先生成一件，或打开工作区里的条目，再要建议', 'warning'); return; }
+  if (!String(A.buf.yaml || '').trim()) { atlStat(ATL_TIPS.needReq); toast('先生成一件，或打开工作区里的条目，再要建议', 'warning'); return; }
   var box = atlEl('opf-atl-chips'); if (!box) return;
   ST.running = true; atlSetRunning(true);
   try {
@@ -9414,9 +9394,10 @@ async function atlDoSug() {
       });
       box.appendChild(b);
     });
-    atlSxSay(atlSxNote(raw) || '建议已列出，可在下方点选一条。');
+    atlSxSay(atlSxNote(raw));
+    atlStat('建议已列出，可在下方点选一条。');
   } catch (e) {
-    atlSxAsk('建议生成失败：' + atlDiag(e));
+    atlStat('建议生成失败：' + atlDiag(e));
     toast('生成建议失败：' + atlDiag(e), 'error');
   }
   finally {
@@ -9431,7 +9412,7 @@ async function atlDoCross() {
   var b0 = atlCtxBundle();
   if (b0.count < 2) {
     atlFlashWorkspace();
-    atlSxAsk(b0.count === 1 ? ATL_SX_SAY.crossShort : ATL_SX_SAY.crossNone);
+    atlStat(b0.count === 1 ? ATL_TIPS.crossShort : ATL_TIPS.crossNone);
     toast(b0.count === 1
       ? '交火分析至少要比 2 条：到「④ 工作区」再勾上一条（勾选框在条目前面）'
       : '交火分析需要先在工作区勾选至少 2 条：勾选框在「④ 工作区」每个条目的左端', 'warning');
@@ -9453,7 +9434,8 @@ async function atlDoCross() {
     A.meta.report = report;
     await atlSaveMeta();
     if (box) box.textContent = (say ? '◇ 始弦：' + say + '\n\n' : '') + (report || '（模型返回空）');
-    atlSxSay(say || ATL_SX_SAY.crossDone);
+    atlSxSay(say);
+    atlStat(ATL_TIPS.crossDone);
     atlStat('交火分析完成：' + report.length + ' 字符，用时 ' + secs + 's（可「📋 报告填进改进框」再逐条改）');
     atlRenderCrossNote('idle');
     toast('交火分析完成（' + secs + 's）', 'success');
@@ -9461,7 +9443,7 @@ async function atlDoCross() {
     var d = atlDiag(e);
     var aborted = /aborted|Cancelled|中止|取消/i.test(String(d) + String(e && e.message ? e.message : ''));
     if (box) box.textContent = (aborted ? '本轮已中止：' : '分析失败：') + d;
-    atlSxAsk(aborted ? ATL_SX_SAY.crossAbort + '报告若需保留，请先「⧉ 复制报告」。' : ATL_SX_SAY.crossFail + atlDiag(e));
+    atlStat(aborted ? ATL_TIPS.crossAbort + '报告若需保留，请先「⧉ 复制报告」。' : ATL_TIPS.crossFail + atlDiag(e));
     atlStat(aborted ? '交火分析已中止（未产生报告，上次的报告若要保留请先「⧉ 复制报告」）' : '交火分析失败：' + d);
     atlRenderCrossNote('idle');
     toast((aborted ? '已中止：' : '交火分析失败：') + d, aborted ? 'warning' : 'error');
@@ -9617,11 +9599,11 @@ function bindAtelierPage() {
   atlLoad().then(function () {
     atlRender();
     atlStat('就绪' + (atlStoreMode === 'mem' ? '（IndexedDB 不可用，本次保存在本地缓存里）' : ''));
-    atlSxSay(atlSxBootNote());
+    atlStat(atlSxBootNote());
   }).catch(function (e) {
     atlStat('工作区读取失败：' + atlDiag(e));
     atlRender();
-    atlSxAsk('工作区读取失败：' + atlDiag(e) + '（此时不要保存，以免覆盖既有工作区）');
+    atlStat('工作区读取失败：' + atlDiag(e) + '（此时不要保存，以免覆盖既有工作区）');
   });
 }
 

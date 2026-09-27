@@ -471,7 +471,9 @@ function opfEjsRestore(raw, mark) {
   } catch (e) {}
   return out;
 }
-// 给 UI 读的最近一次统计（含"输入有 EJS、输出一个都没有"这种硬损失）
+// 给 UI / 排障读的最近一次统计（含"输入有 EJS、输出一个都没有"这种硬损失）。
+// 注意：v1.16.9 起**不再往界面上播报**这句警告——它每次都在页面上占一块地方，
+// 用户反馈"有点碍事"。统计照旧记录，需要排障时读这个函数即可（tools/test-ejs-safe.mjs 仍在核它）。
 function opfEjsLastStat(label) {
   try {
     var st = ST.__opfEjsStat || {};
@@ -479,14 +481,6 @@ function opfEjsLastStat(label) {
     var keys = Object.keys(st);
     return keys.length ? st[keys[keys.length - 1]] : { inCount: 0, outCount: 0, lastAt: 0 };
   } catch (e) { return { inCount: 0, outCount: 0, lastAt: 0 }; }
-}
-function opfEjsWarn(label) {
-  var r = opfEjsLastStat(label);
-  if (!r.inCount) return '';
-  if (!r.outCount) return '⚠ 送进去的稿子里有 ' + r.inCount + ' 处 EJS 标签，但这次返回里一个都没有——很可能被宿主提示词管线执行掉了。'
-    + '建议：① 先在框里确认稿子本身是完整的；② 直接重试一次（插件已把 EJS 转义后再发送）；③ 若换了模型仍如此，把你用的提示词模板类扩展在这条链路上关掉。';
-  if (r.outCount < r.inCount) return '⚠ 输入的 EJS 标签 ' + r.inCount + ' 处，返回里只剩 ' + r.outCount + ' 处——请核对是不是有标签在往返途中丢失或被改动。';
-  return '';
 }
 
 async function callModel(msgs, extraOpts) {

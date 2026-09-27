@@ -530,9 +530,6 @@ async function rxAiRewrite(item, f, issues, dir, scope, phase) {
   if (j && typeof j.findRegex === 'string') jj.findRegex = j.findRegex;
   if (payload.kind === 'css') jj.css = payload.text; else jj.replaceString = payload.text;
   out.changed = rxApplyAiResult(item, jj, payload.loose ? raw : '', scope);
-  // EJS 完整性：替换体里可能嵌 EJS，标签数量对不上就在结果说明里点名
-  var ejsW = (typeof opfEjsWarn === 'function') ? opfEjsWarn(phase || '正则工坊') : '';
-  if (ejsW) out.note = (out.note ? out.note + '｜' : '') + ejsW;
   return out;
 }
 function rxRepairPrompt(item, f, issues, dir, scope, mode) {
