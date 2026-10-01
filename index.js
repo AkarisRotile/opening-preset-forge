@@ -5508,7 +5508,7 @@ function rxExtractHtml(text) {
   return (end > start ? t.slice(start + 1, end) : t.slice(start + 1)).replace(/^\n+/, '').replace(/\s+$/, '');
 }
 // ---------- 页面 ----------
-var RX_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">✦ 正则工坊 · 命定系统对话美化</div><div class="opf-dim">流程：粘贴核心全文（或从 ④ 页带入）→ 解析语言格式 → 勾选要美化的格式 → 选用途、预算档位与初始框架 → 生成（匹配式与 HTML 骨架由插件确定，样式由模型产出）→ 实时预览 → 自检 → 导出 JSON。</div><textarea id="opf-rx-core" class="opf-char-input" placeholder="把命定系统核心条目全文粘在这里（必须含「语言格式」节）"></textarea><div class="opf-char-tools"><button type="button" class="opf-btn ghost" id="opf-rx-pull">⬅ 从 ④ 页带入</button><button type="button" class="opf-btn primary" id="opf-rx-parse">🔍 解析语言格式（AI）</button><button type="button" class="opf-btn ghost" id="opf-rx-parse2">⚙ 脚本解析（离线）</button><button type="button" class="opf-btn ghost" id="opf-rx-gen">🎨 生成替换体</button><button type="button" class="opf-btn ghost" id="opf-rx-check">🔎 自检</button><button type="button" class="opf-btn ghost" id="opf-rx-fix">🔧 自动修复</button><button type="button" class="opf-btn ghost" id="opf-rx-copy1">⧉ 复制单条 JSON</button><button type="button" class="opf-btn ghost" id="opf-rx-copyall">⧉ 复制 JSON 数组</button><button type="button" class="opf-btn ghost" id="opf-rx-new">🗑 清空</button><button type="button" class="opf-btn ghost" id="opf-rx-ping">🩺 连通性自检</button><button type="button" class="opf-btn ghost" id="opf-rx-last">📄 上次返回</button></div><pre id="opf-rx-lastraw" class="opf-box opf-char-report" style="display:none">尚未调用</pre><div class="opf-shx-cfg"><label class="opf-opt">生成传输<select id="opf-rx-transport" class="opf-ref-input"><option value="st">酒馆主 API（零配置·推荐）</option><option value="server">经酒馆服务端转发 + 流式（需自填反代）</option><option value="direct">浏览器直连 + 流式（需自填接口）</option></select></label><span class="opf-dim" id="opf-rx-txnote"></span></div><div class="opf-shx-cfg" id="opf-rx-cfg-server" style="display:none"><button type="button" class="opf-btn ghost" id="opf-rx-pulltavern">📋 用酒馆的反代设置</button><label class="opf-opt">协议源<select id="opf-rx-source" class="opf-ref-input"><option value="makersuite">Google AI Studio (makersuite)</option><option value="vertexai">Vertex AI (vertexai)</option></select></label><label class="opf-opt">中转/反代地址<input id="opf-rx-reverse" class="opf-ref-input" placeholder="https://你的中转域名"></label><label class="opf-opt">代理密码/密钥<input id="opf-rx-proxypass" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">模型名<input id="opf-rx-model" class="opf-ref-input" list="opf-rx-modellist" placeholder="点右侧按钮获取；也可直接手填，填过会记住"><datalist id="opf-rx-modellist"></datalist></label><button type="button" class="opf-btn ghost" id="opf-rx-models">🔌 获取模型列表</button></div><div class="opf-shx-cfg" id="opf-rx-cfg-direct" style="display:none"><label class="opf-opt">直连协议<select id="opf-rx-proto" class="opf-ref-input"><option value="openai">OpenAI 兼容 (/chat/completions)</option><option value="gemini">Google 原生 (:streamGenerateContent)</option></select></label><label class="opf-opt">直连地址<input id="opf-rx-base" class="opf-ref-input" placeholder="https://api.example.com/v1"></label><label class="opf-opt">直连密钥<input id="opf-rx-key" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">直连模型<input id="opf-rx-chatmodel" class="opf-ref-input" placeholder="留空则用上面的模型名"></label></div><div class="opf-dim" id="opf-rx-statusline">就绪</div><div class="opf-sec"><div class="opf-sec-label">语言格式解析结果（只读核对）</div><pre id="opf-rx-parsed" class="opf-box opf-char-report">尚未解析</pre></div><div id="opf-rx-items"></div><div class="opf-sec"><div class="opf-sec-label">自检</div><pre id="opf-rx-issues" class="opf-box opf-char-report">尚未自检</pre></div></div>';
+var RX_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">✦ 正则工坊 · 命定系统对话美化</div><div class="opf-dim">流程：粘贴核心全文（或从 ④ 页带入）→ 解析语言格式 → 勾选要美化的格式 → 选用途、预算档位与初始框架 → 生成（匹配式与 HTML 骨架由插件确定，样式由模型产出）→ 实时预览 → 自检 → 导出 JSON。</div><textarea id="opf-rx-core" class="opf-char-input" placeholder="把命定系统核心条目全文粘在这里（必须含「语言格式」节）"></textarea><div class="opf-char-tools"><button type="button" class="opf-btn ghost" id="opf-rx-pull">⬅ 从 ④ 页带入</button><button type="button" class="opf-btn primary" id="opf-rx-parse">🔍 解析语言格式（AI）</button><button type="button" class="opf-btn ghost" id="opf-rx-parse2">⚙ 脚本解析（离线）</button><button type="button" class="opf-btn ghost" id="opf-rx-gen">🎨 生成替换体</button><button type="button" class="opf-btn ghost" id="opf-rx-check">🔎 自检</button><button type="button" class="opf-btn ghost" id="opf-rx-fix">🔧 自动修复</button><button type="button" class="opf-btn ghost" id="opf-rx-copy1">⧉ 复制单条 JSON</button><button type="button" class="opf-btn ghost" id="opf-rx-copyall">⧉ 复制 JSON 数组</button><button type="button" class="opf-btn ghost" id="opf-rx-new">🗑 清空</button><button type="button" class="opf-btn ghost" id="opf-rx-ping">🩺 连通性自检</button><button type="button" class="opf-btn ghost" id="opf-rx-last">📄 上次返回</button></div><pre id="opf-rx-lastraw" class="opf-box opf-char-report" style="display:none">尚未调用</pre><div class="opf-shx-cfg"><label class="opf-opt">生成传输<select id="opf-rx-transport" class="opf-ref-input"><option value="st">酒馆主 API（零配置·推荐）</option><option value="server">经酒馆服务端转发 + 流式（需自填反代）</option><option value="direct">浏览器直连 + 流式（需自填接口）</option></select></label><span class="opf-dim" id="opf-rx-txnote"></span></div><div class="opf-shx-cfg" id="opf-rx-cfg-server" style="display:none"><button type="button" class="opf-btn ghost" id="opf-rx-pulltavern">📋 用酒馆的反代设置</button><label class="opf-opt">协议源<select id="opf-rx-source" class="opf-ref-input"><option value="makersuite">Google AI Studio (makersuite)</option><option value="vertexai">Vertex AI (vertexai)</option></select></label><label class="opf-opt">中转/反代地址<input id="opf-rx-reverse" class="opf-ref-input" placeholder="https://你的中转域名"></label><label class="opf-opt">代理密码/密钥<input id="opf-rx-proxypass" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">模型名<input id="opf-rx-model" class="opf-ref-input" list="opf-rx-modellist" placeholder="点右侧按钮获取；也可直接手填，填过会记住"><datalist id="opf-rx-modellist"></datalist></label><button type="button" class="opf-btn ghost" id="opf-rx-models">🔌 获取模型列表</button></div><div class="opf-shx-cfg" id="opf-rx-cfg-direct" style="display:none"><label class="opf-opt">直连协议<select id="opf-rx-proto" class="opf-ref-input"><option value="openai">OpenAI 兼容 (/chat/completions)</option><option value="gemini">Google 原生 (:streamGenerateContent)</option></select></label><label class="opf-opt">直连地址<input id="opf-rx-base" class="opf-ref-input" placeholder="https://api.example.com/v1"></label><label class="opf-opt">直连密钥<input id="opf-rx-key" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">直连模型<input id="opf-rx-chatmodel" class="opf-ref-input" placeholder="留空则用上面的模型名"></label></div><div class="opf-dim" id="opf-rx-statusline">就绪</div><div id="opf-rx-modelall-wrap" style="display:none"><div class="opf-sec-label">全部模型<span class="opf-dim" id="opf-rx-modelall-note"></span></div><div class="opf-dim">datalist 只在聚焦输入框时才弹、浏览器还会自己截断条数，所以这里给一份常驻清单：一条不省，点一条即选中。</div><div id="opf-rx-modelall" style="max-height:200px;overflow:auto;border:1px solid rgba(255,122,138,.25);border-radius:8px;padding:5px;background:rgba(10,2,5,.35)"></div></div><div class="opf-sec"><div class="opf-sec-label">语言格式解析结果（只读核对）</div><pre id="opf-rx-parsed" class="opf-box opf-char-report">尚未解析</pre></div><div id="opf-rx-items"></div><div class="opf-sec"><div class="opf-sec-label">自检</div><pre id="opf-rx-issues" class="opf-box opf-char-report">尚未自检</pre></div></div>';
 
 function rxInit() {
   ST.rx = ST.rx || { core: '', coreName: '', parsed: null, items: [], _inited: false };
@@ -7254,6 +7254,7 @@ function rxFillModelList(list) {
     dl.textContent = '';
     list.forEach(function (id) { var o = document.createElement('option'); o.value = id; dl.appendChild(o); });
   }
+  rxRenderAllModels(list || []);
   var inp = getEl('opf-rx-model');
   if (inp && !String(inp.value || '').trim() && list.length) {
     var prefer = list.filter(function (x) { return /gemini-2\.5-pro|gemini-2\.5-flash|gemini-2\.0-flash|gemini-pro/i.test(x); })[0] || list[0];
@@ -7261,6 +7262,38 @@ function rxFillModelList(list) {
     rxCfg().model = prefer;
     rxCacheSave();
   }
+}
+// 完整模型清单：**一个都不省**。
+// 为什么不能只靠 datalist：它只在聚焦输入框时才弹出，而且浏览器会按自己的规则截断候选条数——
+// 用户看到的就是「75 个，却只列 8 个」。所以另给一块常驻的可滚动清单，点一条即选中。
+function rxRenderAllModels(list) {
+  var wrap = getEl('opf-rx-modelall-wrap');
+  var box = getEl('opf-rx-modelall');
+  var note = getEl('opf-rx-modelall-note');
+  if (wrap) wrap.style.display = (list && list.length) ? '' : 'none';
+  if (note) note.textContent = (list && list.length) ? ('（共 ' + list.length + ' 个）') : '';
+  if (!box) return;
+  box.textContent = '';
+  (list || []).forEach(function (id) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'opf-dir-chip';
+    b.textContent = id;
+    b.title = '选中 ' + id;
+    b.addEventListener('click', function () { rxPickModel(id); });
+    box.appendChild(b);
+  });
+}
+// 点清单里的一条 = 选中它（写进输入框与共用配置并落盘）
+function rxPickModel(id) {
+  var s = String(id || '').trim();
+  if (!s) return;
+  var inp = getEl('opf-rx-model'); if (inp) inp.value = s;
+  rxCfg().model = s;
+  rxCacheSave();
+  var st = getEl('opf-rx-statusline');
+  if (st) st.textContent = '已选模型：' + s + (rxTransportUsable() ? '（传输配置完整，可生成）' : '（' + rxTransportWhy() + '）');
+  toast('已选模型：' + s);
 }
 // 手填的模型名自动记住，下次直接从下拉里选
 function rxRememberModel(name) {
@@ -7283,8 +7316,9 @@ async function rxDoFetchModels(btn) {
     rxFillModelList(r.list);
     var msg = '列表 ' + r.list.length + ' 个（原始 ' + r.raw + ' / ST 过滤后 ' + r.server + ' / 自定义 ' + r.custom + '）'
       + (r.errs.length ? '｜部分通道失败：' + r.errs.join('；') : '');
-    if (st) st.textContent = msg + '｜' + r.list.slice(0, 8).join('、') + (r.list.length > 8 ? ' …' : '');
-    toast('取到 ' + r.list.length + ' 个模型（可下拉可手填）');
+    // 状态行不再塞前 8 个再加省略号（那会让人以为只有这几个）：完整清单在下方「全部模型」里全列出来
+    if (st) st.textContent = msg + '｜完整清单见下方「全部模型」（共 ' + r.list.length + ' 个，一条不省），点一条即选中';
+    toast('取到 ' + r.list.length + ' 个模型（下方清单可点选，也可在输入框手填）');
   } catch (e) {
     var m2 = rxDiagError(e);
     if (st) st.textContent = '模型列表获取失败：' + m2;

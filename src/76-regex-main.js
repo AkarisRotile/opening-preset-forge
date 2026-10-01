@@ -1036,6 +1036,7 @@ function rxFillModelList(list) {
     dl.textContent = '';
     list.forEach(function (id) { var o = document.createElement('option'); o.value = id; dl.appendChild(o); });
   }
+  rxRenderAllModels(list || []);
   var inp = getEl('opf-rx-model');
   if (inp && !String(inp.value || '').trim() && list.length) {
     var prefer = list.filter(function (x) { return /gemini-2\.5-pro|gemini-2\.5-flash|gemini-2\.0-flash|gemini-pro/i.test(x); })[0] || list[0];
@@ -1043,6 +1044,38 @@ function rxFillModelList(list) {
     rxCfg().model = prefer;
     rxCacheSave();
   }
+}
+// 完整模型清单：**一个都不省**。
+// 为什么不能只靠 datalist：它只在聚焦输入框时才弹出，而且浏览器会按自己的规则截断候选条数——
+// 用户看到的就是「75 个，却只列 8 个」。所以另给一块常驻的可滚动清单，点一条即选中。
+function rxRenderAllModels(list) {
+  var wrap = getEl('opf-rx-modelall-wrap');
+  var box = getEl('opf-rx-modelall');
+  var note = getEl('opf-rx-modelall-note');
+  if (wrap) wrap.style.display = (list && list.length) ? '' : 'none';
+  if (note) note.textContent = (list && list.length) ? ('（共 ' + list.length + ' 个）') : '';
+  if (!box) return;
+  box.textContent = '';
+  (list || []).forEach(function (id) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'opf-dir-chip';
+    b.textContent = id;
+    b.title = '选中 ' + id;
+    b.addEventListener('click', function () { rxPickModel(id); });
+    box.appendChild(b);
+  });
+}
+// 点清单里的一条 = 选中它（写进输入框与共用配置并落盘）
+function rxPickModel(id) {
+  var s = String(id || '').trim();
+  if (!s) return;
+  var inp = getEl('opf-rx-model'); if (inp) inp.value = s;
+  rxCfg().model = s;
+  rxCacheSave();
+  var st = getEl('opf-rx-statusline');
+  if (st) st.textContent = '已选模型：' + s + (rxTransportUsable() ? '（传输配置完整，可生成）' : '（' + rxTransportWhy() + '）');
+  toast('已选模型：' + s);
 }
 // 手填的模型名自动记住，下次直接从下拉里选
 function rxRememberModel(name) {
@@ -1065,8 +1098,9 @@ async function rxDoFetchModels(btn) {
     rxFillModelList(r.list);
     var msg = '列表 ' + r.list.length + ' 个（原始 ' + r.raw + ' / ST 过滤后 ' + r.server + ' / 自定义 ' + r.custom + '）'
       + (r.errs.length ? '｜部分通道失败：' + r.errs.join('；') : '');
-    if (st) st.textContent = msg + '｜' + r.list.slice(0, 8).join('、') + (r.list.length > 8 ? ' …' : '');
-    toast('取到 ' + r.list.length + ' 个模型（可下拉可手填）');
+    // 状态行不再塞前 8 个再加省略号（那会让人以为只有这几个）：完整清单在下方「全部模型」里全列出来
+    if (st) st.textContent = msg + '｜完整清单见下方「全部模型」（共 ' + r.list.length + ' 个，一条不省），点一条即选中';
+    toast('取到 ' + r.list.length + ' 个模型（下方清单可点选，也可在输入框手填）');
   } catch (e) {
     var m2 = rxDiagError(e);
     if (st) st.textContent = '模型列表获取失败：' + m2;
