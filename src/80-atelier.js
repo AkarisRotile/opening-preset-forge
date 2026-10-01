@@ -1119,7 +1119,11 @@ async function atlCall(msgs, label, opts) {
   var o = opts || {};
   atlStat(label + '：' + ATL_TIPS.beforeCall + '（' + label + '）');
   var t0 = Date.now();
-  var resp = await callModel(msgs, o.extra);
+  // 与分段写同一条通道：配了真流式就走流式（绕开 Cloudflare 524），接收进度打到状态行；
+  // 传了 extra（如 responseLength 覆盖）时仍走原 callModel，避免选项被静默丢掉。
+  var resp = o.extra
+    ? await callModel(msgs, o.extra)
+    : await callModelSeg(msgs, label, function (note) { atlStat('◇ ' + note); });
   var A = atlInit();
   A.meta.lastRaw = String(resp || '');
   atlStat(label + '：返回 ' + A.meta.lastRaw.length + ' 字符（' + Math.round((Date.now() - t0) / 1000) + 's）');

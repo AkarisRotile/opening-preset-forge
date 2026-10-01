@@ -1583,13 +1583,27 @@ function rxCacheSave() {
   if (rxCacheSave._t) clearTimeout(rxCacheSave._t);
   rxCacheSave._t = setTimeout(function () {
     if (!ST.rx) return;
-    lsSet(LS_RX_KEY, { core: ST.rx.core, coreName: ST.rx.coreName, items: ST.rx.items });
+    // cfg 也要存：它是**全插件共用的生成传输**（①③⑧ 的分段写同样读它），
+    // 从前只存草稿不存 cfg，刷新酒馆后反代地址/模型名就没了，共用配置会形同虚设。
+    lsSet(LS_RX_KEY, { core: ST.rx.core, coreName: ST.rx.coreName, items: ST.rx.items, cfg: ST.rx.cfg });
   }, 500);
 }
 function rxCacheRestore() {
   rxInit();
   var c = lsGet(LS_RX_KEY); if (!c || typeof c !== 'object') return;
   ST.rx.core = c.core || ''; ST.rx.coreName = c.coreName || ''; ST.rx.items = c.items || [];
+  if (c.cfg && typeof c.cfg === 'object') {
+    ST.rx.cfg = c.cfg;
+    // 页面比这里先建好，UI 还停在默认值上——把恢复出来的配置回填到 ⑤ 页控件
+    try {
+      [['opf-rx-transport', 'transport'], ['opf-rx-source', 'source'], ['opf-rx-reverse', 'reverseProxy'],
+       ['opf-rx-proxypass', 'proxyPassword'], ['opf-rx-model', 'model'], ['opf-rx-proto', 'directProtocol'],
+       ['opf-rx-base', 'baseUrl'], ['opf-rx-key', 'apiKey'], ['opf-rx-chatmodel', 'chatModel']].forEach(function (pair) {
+        var el = getEl(pair[0]); if (el) el.value = ST.rx.cfg[pair[1]] || '';
+      });
+      rxSyncTransportUi();
+    } catch (e) { opfErr('rxCacheRestore cfg->ui', e); }
+  }
   var el = getEl('opf-rx-core'); if (el && !el.value) el.value = ST.rx.core;
   if (ST.rx.core) { try { rxDoParseSilent(); } catch (e) { opfErr('rxDoParseSilent', e); } }
   try { rxRenderItems(); } catch (e) { opfErr('rxRenderItems', e); }

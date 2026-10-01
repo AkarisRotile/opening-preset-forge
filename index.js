@@ -36,7 +36,9 @@ var DEFAULT_SETTINGS = {
   metaMode: 'full',          // 'full' 导出含 name/createdAt/updatedAt；'core' 只含 character 起
   autoCompliance: true,      // 生成初稿/重汇总后自动按《技能装备道具生成规则》自检修复
   activePage: 'preset',      // 全屏壳当前页：preset | world | char | p4..p6
-  modelNote: ''              // 附加一句给模型的叮嘱
+  modelNote: '',             // 附加一句给模型的叮嘱
+  segAutoRetry: false,       // 分段写超时自动重roll（仅分段写阶段触发）
+  retryTimeoutSec: 180       // 分段写单段超过该秒数无响应则重roll
 };
 
 // ---------------- 始弦人设（唯一真源 · 原版预设原文，一字不改） ----------------
@@ -515,6 +517,162 @@ async function callModel(msgs, extraOpts) {
   return opfEjsRestore(out, { count: prep.count, label: '' });
 }
 
+// ---------------- 分段写超时自动重roll ----------------
+// generateRaw 是非流式（sendOpenAIRequest('quiet', …)），模型返回前整段阻塞、拿不到
+// 逐字回显；超时只能靠「发起后 N 秒内未返回」判断。超时后先真正中止底层请求
+// （STscript 的 /abort，经 TavernHelper.triggerSlash 转发），再对同一分段重试，
+// 每段最多重 roll RETRY_MAX 次，避免无限空转烧钱。
+var SEG_RETRY_MAX = 3;
+
+// 真正中止当前主 API 等待：拿不到 TavernHelper 就如实返回失败（否则残留并发请求）。
+async function abortRawWait() {
+  var th = (typeof TavernHelper !== 'undefined' && TavernHelper && typeof TavernHelper.triggerSlash === 'function') ? TavernHelper : null;
+  if (!th) return false;
+  try { await th.triggerSlash('/abort'); return true; } catch (e) { opfErr('abortRawWait', e); return false; }
+}
+
+// 带超时的分段调用：只包超时，不在这里重试（重试由 callModelSeg 这层做，便于归并提示与状态）。
+async function callModelWithTimeout(msgs, timeoutMs) {
+  var timer = null;
+  var settle = function () { if (timer) { clearTimeout(timer); timer = null; } };
+  try {
+    var result = await Promise.race([
+      callModel(msgs),
+      new Promise(function (_, reject) {
+        timer = setTimeout(function () {
+          timer = null;
+          reject(new Error('OPF_SEG_TIMEOUT:' + timeoutMs));
+        }, timeoutMs);
+      })
+    ]);
+    settle();
+    return result;
+  } catch (e) {
+    settle();
+    throw e;
+  }
+}
+
+// ---------------- 生成传输：分段写可走「真流式」，从根上绕开 Cloudflare 100 秒墙 ----------------
+// 背景：generateRaw 固定 sendOpenAIRequest('quiet', …)，请求体 stream=false——非流式意味着
+// 中转必须等整段回包，长输出必然撞 Cloudflare 的 100 秒源站超时（524，报错来自中转站）。
+// ⑤ 页已实现两档真流式（经酒馆服务端转发 / 浏览器直连），实测能绕开：字节持续在流，
+// Cloudflare 就不会判定源站失联。本层让 ①③⑧ 的分段写也能用上同一套传输。
+//
+// 配置口径：**全插件共用一套**（就是 ⑤ 页那份 ST.rx.cfg，见 rx/cfg 持久化）。
+// 这里只做「读取 + 委派」，不复制实现——传输核心（rxReadSse/rxServerStream/rxDirectStream/
+// rxStreamCall）仍在 76-regex-main.js，靠函数声明提升在运行时可用。
+function genCfg() {
+  try { if (typeof rxCfg === 'function') return rxCfg(); } catch (e) { opfErr('genCfg', e); }
+  return { transport: 'st' };
+}
+// 流式档是否「已配置且可用」：transport 仍是 st（或配置不全）时返回 false，行为与从前完全一致。
+function genStreamReady(cfg) {
+  cfg = cfg || genCfg();
+  if (!cfg || !cfg.transport || cfg.transport === 'st') return false;
+  try { if (typeof rxTransportUsable === 'function') return !!rxTransportUsable(cfg); } catch (e) { opfErr('genStreamReady', e); }
+  return false;
+}
+// 委派到 ⑤ 的流式调度器；⑤ 模块缺失时退化为主 API（绝不静默失败）
+function genStreamCall(msgs, onNote, opts) {
+  if (typeof rxStreamCall === 'function') {
+    // ⑤ 页在「配置不完整」时会把它置 true 做本次降级。走到这里说明配置已经可用，
+    // 若不清掉，一次失败的 ⑤ 生成会让后续 ①③⑧ 的分段写静默退回非流式。
+    try { if (typeof rxForceSt !== 'undefined') rxForceSt = false; } catch (e) {}
+    return rxStreamCall(msgs, onNote, opts);
+  }
+  return callModel(msgs).then(function (t) { return { text: String(t), stalled: false }; });
+}
+function genTransportLabel() {
+  var cfg = genCfg();
+  if (!genStreamReady(cfg)) return '酒馆主 API（非流式）';
+  return cfg.transport === 'server' ? '酒馆服务端转发（真流式）' : '浏览器直连（真流式）';
+}
+// ① 页那份传输镜像控件的同步。真正的配置只有一份（⑤ 页的 ST.rx.cfg），这里只负责显示与改写它。
+function genSyncTxUi() {
+  var cfg = genCfg();
+  var t = cfg.transport || 'st';
+  var sel = getEl('opf-tx-transport'); if (sel) sel.value = t;
+  var note = getEl('opf-tx-note'); if (!note) return;
+  if (t === 'st') {
+    note.textContent = '当前：酒馆主 API（非流式）。长分段容易撞中转站的 100 秒墙（524）——换上面两档「真流式」可绕开。';
+    return;
+  }
+  var why = '';
+  try { if (typeof rxTransportWhy === 'function') why = rxTransportWhy(cfg); } catch (e) {}
+  note.textContent = why
+    ? ('⚠ ' + why)
+    : ('当前：' + genTransportLabel() + '——字节持续在流，不会再撞 100 秒墙。');
+}
+
+// 分段写专用调用：优先走已配置的真流式传输，否则走主 API。
+// 两条路共用同一套自动重roll（受 segAutoRetry 开关控制，每段最多 SEG_RETRY_MAX 次）：
+//   · 非流式：墙钟超时（N 秒内整段没回）；
+//   · 真流式：停顿检测（idleMs 内没有新字节）——比墙钟更准，不必等满 N 秒。
+// onProgress(displayText)：流式档下把「已收到多少字 / 已用多少秒」实时报给界面。
+async function callModelSeg(msgs, label, onProgress) {
+  var s = getSettings();
+  var useStream = genStreamReady();
+  // 开关关闭且走非流式档：完全等价于从前的 callModel（不引入任何新超时，零回归）
+  if (!s.segAutoRetry && !useStream) return await callModel(msgs);
+  var timeoutMs = Math.max(15000, (parseInt(s.retryTimeoutSec, 10) || 180) * 1000);
+  // 流式的停顿窗口：开了重roll就按用户阈值判停顿；没开则给足 5 分钟，只当防真死的兜底
+  var idleMs = s.segAutoRetry ? timeoutMs : Math.max(timeoutMs, 300000);
+  var maxTries = s.segAutoRetry ? SEG_RETRY_MAX : 1;
+  var lastErr = null;
+  for (var attempt = 1; attempt <= maxTries; attempt++) {
+    if (isStop()) throw new Error('已停止');
+    try {
+      if (useStream) {
+        // 流式：字节在流动就不会 524；idleMs 内没有新字节 → 判定停顿，交给下面的重roll
+        var res = await genStreamCall(msgs, onProgress, { phase: label, idleMs: idleMs, maxMs: 600000, maxTokens: 8192 });
+        var text = (res && typeof res.text === 'string') ? res.text : '';
+        if (res && res.stalled && !String(text).trim()) throw new Error('OPF_SEG_TIMEOUT:' + idleMs);
+        if (!String(text).trim()) throw new Error('模型返回空（可能被中转截断或安全策略拦下），可重试。');
+        if (attempt > 1) { toast('【' + (label || '本段') + '】第 ' + attempt + ' 次重roll成功'); }
+        return text;
+      }
+      var out = await callModelWithTimeout(msgs, timeoutMs);
+      if (attempt > 1) { toast('【' + (label || '本段') + '】第 ' + attempt + ' 次重roll成功'); }
+      return out;
+    } catch (e) {
+      lastErr = e;
+      if (!isSegRetryable(e)) throw e;                 // 真实报错（如鉴权/参数）不重roll，直接抛
+      if (attempt >= maxTries) break;                  // 达到上限（或开关关闭）退出重试
+      opfLog('seg retryable failure, auto-retry', label, attempt, '/', maxTries, e && e.message);
+      toast('【' + (label || '分段') + '】' + segRetryReason(e, idleMs) + '，自动重roll（' + attempt + '/' + maxTries + '）', 'warning');
+      if (!useStream) {                                 // 流式档已自行断开；非流式档要真正中止残留请求
+        var aborted = await abortRawWait();
+        if (!aborted) opfLog('（该环境无 TavernHelper，无法 /abort，可能残留并发请求）');
+      }
+      await waitTick();
+    }
+  }
+  var err = new Error('【' + (label || '分段') + '】连续 ' + maxTries + ' 次失败，已停止该段（可手动「重跑」或稍后重试）。');
+  err.isSegTimeout = true;
+  err.cause = lastErr;
+  throw err;
+}
+// 值得重roll的失败：超时/停顿、以及网关类与空返回——与 ⑤ 页 rxDiagError 的口径一致
+// （76-regex-main.js：/524|502|503|504|timeout|timed out|超时|empty|为空|network|fetch|No message/i）。
+// 这条很关键：524 是「返回了一个错误」而不是「没响应」，只判超时会漏掉它。
+function isSegRetryable(err) {
+  var m = (err && err.message) ? String(err.message) : String(err || '');
+  if (m.indexOf('OPF_SEG_TIMEOUT:') === 0) return true;
+  if (m.indexOf('已停止') === 0) return false;
+  return /524|502|503|504|timeout|timed out|超时|停顿|empty|为空|network|fetch|No message|返回空/i.test(m);
+}
+function segRetryReason(err, timeoutMs) {
+  var m = (err && err.message) ? String(err.message) : String(err || '');
+  if (m.indexOf('OPF_SEG_TIMEOUT:') === 0) {
+    return genStreamReady() ? ('停顿超 ' + Math.round(timeoutMs / 1000) + 's 无新内容') : ('无响应超 ' + Math.round(timeoutMs / 1000) + 's');
+  }
+  if (/524/.test(m)) return '中转站 524（源站 100 秒没回字节）';
+  if (/\b(50[234])\b/.test(m)) return '网关返回 ' + /(\b(?:50[234])\b)/.exec(m)[1];
+  if (/No message|返回空|为空/.test(m)) return '模型返回空';
+  return '可重试类失败';
+}
+
 async function runOne(phase) {
   setPhase(phase.id, 'run');
   var msgs = ST.msgs;
@@ -522,7 +680,12 @@ async function runOne(phase) {
   var turn = sxTurn(phasePrompt(phase), '按上面的阶段要求，完成「' + phase.title + '」这一栏。若该栏确实没有合适内容，回复“无”。');
   turn.forEach(function (m) { msgs.push(m); });
   try {
-    var resp = await callModel(msgs);
+    // 流式档下把「已收 N 字 / 已用 Ns」实时写进本步的结果区——
+    // 非流式时这条回调不会触发，界面行为与从前一致。
+    var resp = await callModelSeg(msgs, phase.title, function (note) {
+      var pre = ST.elPre && ST.elPre[phase.id];
+      if (pre && note) pre.textContent = '◇ ' + note;
+    });
     ST.results[phase.id] = resp;
     msgs.push({ role: 'assistant', content: resp });
     // 过长时丢弃最早若干条 assistant 结果，防止超上下文。
@@ -776,7 +939,7 @@ function getEl(id){return document.getElementById(id);}
 
 //@module 30-preset-ui — ① 开局预设：页面 UI + 分步管线 + 每步精修 + 重新汇总
 var OPF_CSS = "#opf-root,#opf-launcher{box-sizing:border-box;font-family:'Noto Sans SC','Microsoft YaHei',sans-serif;letter-spacing:.3px}#opf-root *,#opf-launcher *{box-sizing:border-box}#opf-launcher{position:fixed;right:6px;top:42%;z-index:2147480001;width:38px;height:38px;border-radius:12px 6px 6px 12px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#ffd9de;background:linear-gradient(160deg,rgba(74,10,20,.92),rgba(24,3,8,.88));border:1px solid rgba(255,106,122,.28);box-shadow:0 0 6px rgba(255,77,94,.55),0 0 18px rgba(200,16,46,.35);font-size:18px;transition:transform .18s ease,box-shadow .18s ease;user-select:none}#opf-launcher:hover{transform:scale(1.08);box-shadow:0 0 6px rgba(255,77,94,.55),0 0 18px rgba(200,16,46,.35),0 0 24px rgba(255,77,94,.5)}#opf-launcher .opf-la-dot{position:absolute;top:-3px;right:-3px;width:10px;height:10px;border-radius:50%;background:#39d353;border:1px solid rgba(0,0,0,.5);display:none}#opf-launcher.running .opf-la-dot{display:block;animation:opfPulse 1s infinite}@keyframes opfPulse{0%,100%{opacity:1}50%{opacity:.25}}#opf-root{position:fixed;z-index:2147480000;width:392px;max-width:calc(100vw - 18px);max-height:min(760px,92vh);display:flex;flex-direction:column;border-radius:14px;color:#fdeef0;overflow:hidden;background:linear-gradient(180deg,rgba(46,6,14,.92) 0%,rgba(30,4,10,.90) 45%,rgba(16,2,6,.94) 100%);border:1px solid rgba(255,122,138,.34);box-shadow:0 0 0 1px rgba(0,0,0,.35),0 10px 34px rgba(0,0,0,.55),inset 0 0 42px rgba(255,60,80,.05),0 0 22px rgba(255,77,94,.22);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);transition:opacity .16s ease,transform .16s ease}#opf-root::before{content:'';position:absolute;inset:0 0 auto 0;height:2px;background:linear-gradient(90deg,transparent,#ff4d5e 18%,#ffd9a8 50%,#c8102e 82%,transparent);box-shadow:0 0 12px rgba(255,90,100,.8);opacity:.9}#opf-root.opf-hidden{opacity:0;pointer-events:none;transform:translateY(6px) scale(.98)}#opf-head{display:flex;align-items:center;gap:6px;padding:8px 10px 7px 12px;cursor:move;user-select:none;background:linear-gradient(90deg,rgba(255,200,210,.10),rgba(200,16,46,.06) 55%,rgba(255,200,210,.04));border-bottom:1px solid rgba(255,122,138,.18)}#opf-title{font-weight:700;font-size:13px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#ffd9de;text-shadow:0 0 8px rgba(255,77,94,.65)}#opf-title .s{color:#ffb7be;font-size:11px;font-weight:500;margin-left:6px}.opf-ico-btn{border:1px solid transparent;background:rgba(255,255,255,.04);color:#ff8a95;border-radius:7px;cursor:pointer;width:24px;height:22px;font-size:12px;line-height:1;transition:all .14s ease}.opf-ico-btn:hover{background:rgba(255,77,94,.18);color:#fff;border-color:rgba(255,106,122,.28);box-shadow:0 0 4px rgba(255,77,94,.35),0 0 12px rgba(200,16,46,.22)}#opf-body{overflow-y:auto;display:flex;flex-direction:column;min-height:0}#opf-meta{display:flex;flex-wrap:wrap;gap:4px 8px;padding:6px 12px;font-size:11px;color:rgba(255,230,234,.72);background:rgba(255,255,255,.02);border-bottom:1px dashed rgba(255,122,138,.16)}#opf-meta .tag{padding:1px 6px;border-radius:20px;font-size:10px;background:rgba(255,77,94,.12);border:1px solid rgba(255,122,138,.25);color:#ffc9ce}#opf-meta .tag.ok{color:#a5f0c0;border-color:rgba(120,255,170,.35);background:rgba(60,160,90,.14)}#opf-meta .tag.err{color:#ffd0a3;border-color:rgba(255,170,90,.4);background:rgba(200,110,40,.14)}.opf-sec{padding:8px 12px 6px}.opf-sec-label{font-size:10px;letter-spacing:2px;color:rgba(255,170,180,.62);margin-bottom:6px;text-transform:uppercase;display:flex;align-items:center;gap:6px}.opf-sec-label::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(255,120,135,.35),transparent)}#opf-demand{width:100%;resize:vertical;min-height:44px;max-height:120px;border-radius:9px;padding:7px 9px;color:#ffeef1;font-size:12px;line-height:1.5;background:rgba(10,2,5,.55);border:1px solid rgba(255,122,138,.25);outline:none;transition:border-color .15s ease,box-shadow .15s ease}#opf-demand:focus{border-color:rgba(255,110,125,.6);box-shadow:0 0 10px rgba(255,77,94,.25)}#opf-demand::placeholder{color:rgba(255,210,216,.35)}.opf-opts{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:4px 12px 6px}.opf-opt{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:rgba(255,226,230,.78);cursor:pointer}.opf-opt input{accent-color:#ff4d5e;cursor:pointer}.opf-num{width:54px;background:rgba(10,2,5,.55);color:#ffeef1;border:1px solid rgba(255,122,138,.25);border-radius:6px;padding:2px 5px;font-size:11px}#opf-pname{width:150px;background:rgba(10,2,5,.55);color:#ffeef1;border:1px solid rgba(255,122,138,.25);border-radius:6px;padding:2px 6px;font-size:11px}.opf-steps{padding:2px 12px 6px;display:flex;flex-direction:column;gap:6px;overflow-y:auto;max-height:290px}.opf-step{border-radius:10px;border:1px solid rgba(255,122,138,.18);background:rgba(255,235,238,.035);transition:background .15s ease,border-color .15s ease,box-shadow .15s ease}.opf-step[data-st=run]{background:rgba(255,90,105,.10);border-color:rgba(255,120,135,.5);box-shadow:0 0 4px rgba(255,77,94,.35),0 0 12px rgba(200,16,46,.22)}.opf-step[data-st=ok]{background:rgba(120,230,160,.05);border-color:rgba(140,255,180,.25)}.opf-step[data-st=err]{border-color:rgba(255,150,90,.55)}.opf-step-head{display:flex;align-items:center;gap:7px;padding:6px 8px;cursor:pointer}.opf-idx{width:17px;height:17px;border-radius:6px 2px 6px 2px;flex:none;font-size:10px;font-weight:700;color:#ffd7dc;display:inline-flex;align-items:center;justify-content:center;background:linear-gradient(140deg,rgba(200,16,46,.55),rgba(80,10,22,.65));border:1px solid rgba(255,120,135,.35);box-shadow:0 0 6px rgba(255,77,94,.25)}.opf-dot{width:14px;font-size:11px;text-align:center;color:#8e6670;flex:none}.opf-step[data-st=run] .opf-dot{color:#ff8a95;animation:opfPulse 1s infinite}.opf-step[data-st=ok] .opf-dot{color:#7fe6a0}.opf-step[data-st=err] .opf-dot{color:#ffb066}.opf-step-title{flex:1;font-size:12px;color:#ffe9ec}.opf-step-sub{font-size:10px;color:rgba(255,200,208,.45)}.opf-step-act{border:none;background:rgba(255,255,255,.05);color:#ffc0c8;cursor:pointer;border-radius:6px;padding:2px 7px;font-size:10px;transition:all .14s ease}.opf-step-act:hover{background:rgba(255,77,94,.2);color:#fff;box-shadow:0 0 4px rgba(255,77,94,.35),0 0 12px rgba(200,16,46,.22)}.opf-step-body{display:none;padding:4px 9px 8px 30px;font-size:11px;line-height:1.55;color:rgba(255,226,230,.82)}.opf-step.open .opf-step-body{display:block}.opf-step-body pre{white-space:pre-wrap;word-break:break-word;margin:0;font-family:inherit}.opf-out{padding:2px 12px 8px}#opf-json-out{max-height:170px;overflow:auto;margin:0;padding:8px 10px;border-radius:9px;font-size:10.5px;line-height:1.5;white-space:pre-wrap;word-break:break-word;color:#ffd9de;background:rgba(8,1,4,.72);border:1px solid rgba(255,122,138,.22);box-shadow:inset 0 0 24px rgba(255,60,80,.05)}#opf-actions{display:flex;gap:6px;padding:8px 12px 10px;background:linear-gradient(0deg,rgba(200,16,46,.10),rgba(200,16,46,.02));border-top:1px solid rgba(255,122,138,.18)}.opf-btn{flex:1;cursor:pointer;border-radius:8px;border:1px solid transparent;font-size:12px;padding:7px 4px;color:#fff;letter-spacing:1px;transition:all .15s ease}.opf-btn:hover{filter:brightness(1.12)}.opf-btn:disabled{opacity:.45;cursor:not-allowed;filter:none}.opf-btn.primary{background:linear-gradient(135deg,rgba(255,110,120,.92),rgba(190,16,42,.96));border-color:rgba(255,180,190,.5);box-shadow:0 0 6px rgba(255,77,94,.55),0 0 18px rgba(200,16,46,.35);text-shadow:0 0 6px rgba(255,255,255,.4)}.opf-btn.ghost{background:rgba(255,235,238,.06);border-color:rgba(255,122,138,.25);color:#ffd5da}.opf-btn.ghost:hover{background:rgba(255,90,105,.14)}@media (max-width:640px){#opf-root{width:calc(100vw - 14px);left:7px !important;right:auto !important}}";
-var OPF_HTML = "<div id=\"opf-head\"><div id=\"opf-title\">✦ 始弦的魔法大典<span class=\"s\">destiny preset forge</span></div><button class=\"opf-ico-btn\" id=\"opf-btn-mini\" title=\"最小化\">─</button><button class=\"opf-ico-btn\" id=\"opf-btn-close\" title=\"关闭\">✕</button></div><div id=\"opf-body\"><div id=\"opf-meta\"></div><div class=\"opf-sec\"><div class=\"opf-sec-label\">开局需求</div><textarea id=\"opf-demand\" placeholder=\"例如：给一位从迷雾森林走出、想在瓦伦蒂亚城谋生的流浪剑士配齐开局（1级、偏好近战、带一只契约伙伴……）\"></textarea></div><div class=\"opf-opts\"><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-card\"> 带角色卡</label><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-world\"> 带世界书</label><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-const\"> 仅常驻</label><label class=\"opf-opt\">注入上限<input type=\"number\" id=\"opf-cap\" class=\"opf-num\" min=\"2000\" max=\"200000\" step=\"1000\"></label><label class=\"opf-opt\">名称<input id=\"opf-pname\" value=\"【自定义开局】\" title=\"开局预设名称（导出 name 字段与文件名）\"></label></div><div class=\"opf-opts\"><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-quick\"> 快出模式(单次)</label><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-meta\"> 导出含文件元数据</label><button class=\"opf-step-act\" id=\"opf-wload\" type=\"button\">导入世界书文件</button><button class=\"opf-step-act\" id=\"opf-wclear\" type=\"button\">清世界书</button></div><div class=\"opf-sec\"><div class=\"opf-sec-label\">创作步骤</div><div class=\"opf-steps\" id=\"opf-steps\"></div></div><div class=\"opf-out\"><div class=\"opf-sec-label\">预设 JSON</div><pre id=\"opf-json-out\">尚未生成</pre></div></div><div id=\"opf-actions\"><button class=\"opf-btn primary\" id=\"opf-btn-run\">▶ 生成初稿</button><button class=\"opf-btn ghost\" id=\"opf-btn-quick\">⚡ 快速初稿</button><button class=\"opf-btn ghost\" id=\"opf-btn-save\">⬇ 导出 .preset.json</button><button class=\"opf-btn ghost\" id=\"opf-btn-copy\">⧉ 复制</button></div>";
+var OPF_HTML = "<div id=\"opf-head\"><div id=\"opf-title\">✦ 始弦的魔法大典<span class=\"s\">destiny preset forge</span></div><button class=\"opf-ico-btn\" id=\"opf-btn-mini\" title=\"最小化\">─</button><button class=\"opf-ico-btn\" id=\"opf-btn-close\" title=\"关闭\">✕</button></div><div id=\"opf-body\"><div id=\"opf-meta\"></div><div class=\"opf-sec\"><div class=\"opf-sec-label\">开局需求</div><textarea id=\"opf-demand\" placeholder=\"例如：给一位从迷雾森林走出、想在瓦伦蒂亚城谋生的流浪剑士配齐开局（1级、偏好近战、带一只契约伙伴……）\"></textarea></div><div class=\"opf-opts\"><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-card\"> 带角色卡</label><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-world\"> 带世界书</label><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-const\"> 仅常驻</label><label class=\"opf-opt\">注入上限<input type=\"number\" id=\"opf-cap\" class=\"opf-num\" min=\"2000\" max=\"200000\" step=\"1000\"></label><label class=\"opf-opt\">名称<input id=\"opf-pname\" value=\"【自定义开局】\" title=\"开局预设名称（导出 name 字段与文件名）\"></label></div><div class=\"opf-opts\"><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-quick\"> 快出模式(单次)</label><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-meta\"> 导出含文件元数据</label><button class=\"opf-step-act\" id=\"opf-wload\" type=\"button\">导入世界书文件</button><button class=\"opf-step-act\" id=\"opf-wclear\" type=\"button\">清世界书</button></div><div class=\"opf-opts\"><label class=\"opf-opt\" title=\"仅分段写阶段触发：开局预设的创作分段与二创角色的分段；单次快出/汇总/精修/交火梳理不触发\"><input type=\"checkbox\" id=\"opf-ck-segretry\"> 分段超时自动重roll</label><label class=\"opf-opt\" title=\"分段写单段超过该秒数无响应即自动重roll（每段最多3次）\">超时阈值<input type=\"number\" id=\"opf-retrytimeout\" class=\"opf-num\" min=\"15\" max=\"3600\" step=\"15\"> 秒</label></div><div class=\"opf-opts\"><label class=\"opf-opt\" title=\"全插件共用一套传输：这里改了，⑤ 正则工坊与 ①③⑧ 的分段写一起生效\">生成传输<select id=\"opf-tx-transport\" class=\"opf-ref-input\"><option value=\"st\">酒馆主 API（非流式）</option><option value=\"server\">经酒馆服务端转发 + 真流式</option><option value=\"direct\">浏览器直连 + 真流式</option></select></label><button class=\"opf-step-act\" id=\"opf-tx-pull\" type=\"button\">📋 用酒馆的反代设置</button></div><div class=\"opf-dim\" id=\"opf-tx-note\"></div><div class=\"opf-sec\"><div class=\"opf-sec-label\">创作步骤</div><div class=\"opf-steps\" id=\"opf-steps\"></div></div><div class=\"opf-out\"><div class=\"opf-sec-label\">预设 JSON</div><pre id=\"opf-json-out\">尚未生成</pre></div></div><div id=\"opf-actions\"><button class=\"opf-btn primary\" id=\"opf-btn-run\">▶ 生成初稿</button><button class=\"opf-btn ghost\" id=\"opf-btn-quick\">⚡ 快速初稿</button><button class=\"opf-btn ghost\" id=\"opf-btn-save\">⬇ 导出 .preset.json</button><button class=\"opf-btn ghost\" id=\"opf-btn-copy\">⧉ 复制</button></div>";
 
 function injectStyle(){ if (getEl(NS + "_css")) return; var st = document.createElement("style"); st.id = NS + "_css"; st.textContent = OPF_CSS; document.head.appendChild(st); var st2 = document.createElement("style"); st2.id = NS + "_css_extra"; st2.textContent = EXTRA_CSS; document.head.appendChild(st2); }
 function launcher(){
@@ -881,12 +1044,29 @@ function bindPanel(root){
   root.querySelector("#opf-ck-const").addEventListener("change", syncFromControl);
   root.querySelector("#opf-ck-quick").addEventListener("change", syncFromControl);
   root.querySelector("#opf-ck-meta").addEventListener("change", syncFromControl);
+  root.querySelector("#opf-ck-segretry").addEventListener("change", syncFromControl);
+  root.querySelector("#opf-retrytimeout").addEventListener("change", syncFromControl);
   root.querySelector("#opf-cap").addEventListener("change", syncFromControl);
   root.querySelector("#opf-pname").addEventListener("change", syncFromControl);
   var fi = document.createElement("input"); fi.type = "file"; fi.accept = ".json,application/json"; ST.fileInput = fi;
   fi.addEventListener("change", function(){ var f = fi.files && fi.files[0]; if (!f) return; loadWorldFromFile(f).then(function(res){ applyWorldResult(res); renderMetaStatus(); toast("世界书已从文件载入：" + (res.fileName || "")); try { switchPage("world"); } catch (e) {} }).catch(function(e){ toast("世界书文件解析失败：" + (e && e.message ? e.message : e), "error"); }); fi.value = ""; });
   root.querySelector("#opf-wload").addEventListener("click", function(){ fi.click(); });
   root.querySelector("#opf-wclear").addEventListener("click", function(){ clearWorldbook(); });
+  // 生成传输：写的是**全插件共用**的那份配置（⑤ 页同一份），因此改完要让 ⑤ 的控件跟着走
+  if (root.querySelector("#opf-tx-transport")) {
+    root.querySelector("#opf-tx-transport").addEventListener("change", function () {
+      try { genCfg().transport = this.value; } catch (e) { opfErr("tx transport set", e); }
+      if (typeof rxCacheSave === "function") { try { rxCacheSave(); } catch (e) {} }
+      if (typeof rxSyncTransportUi === "function") { try { rxSyncTransportUi(); } catch (e) {} }
+      genSyncTxUi();
+    });
+  }
+  if (root.querySelector("#opf-tx-pull")) {
+    root.querySelector("#opf-tx-pull").addEventListener("click", function () {
+      if (typeof rxPullFromTavern !== "function") { toast("该环境读不到传输配置模块", "warning"); return; }
+      if (rxPullFromTavern()) { genSyncTxUi(); toast("已切到真流式：分段写不会再撞 100 秒墙"); }
+    });
+  }
   makeDraggable(root.querySelector("#opf-head"), root);
   window.addEventListener("resize", keepPanelInView);
 }
@@ -900,6 +1080,9 @@ function syncFromControl(){
   s.metaMode = getEl("opf-ck-meta").checked ? "full" : "core";
   var cap = parseInt(getEl("opf-cap").value, 10);
   s.capChars = isNaN(cap) ? 30000 : clamp(cap, 2000, 200000);
+  s.segAutoRetry = getEl("opf-ck-segretry").checked;
+  var rt = parseInt(getEl("opf-retrytimeout").value, 10);
+  s.retryTimeoutSec = isNaN(rt) ? 180 : clamp(rt, 15, 3600);
   s.lastName = getEl("opf-pname").value;
   saveSettings(); renderMetaStatus();
 }
@@ -911,8 +1094,11 @@ function syncFromSettings(){
   getEl("opf-ck-quick").checked = !!s.quickMode;
   getEl("opf-ck-meta").checked = s.metaMode !== "core";
   getEl("opf-cap").value = s.capChars;
+  getEl("opf-ck-segretry").checked = !!s.segAutoRetry;
+  getEl("opf-retrytimeout").value = s.retryTimeoutSec || 180;
   if (s.lastName) getEl("opf-pname").value = s.lastName;
   renderMetaStatus();
+  genSyncTxUi();
 }
 
 function makeDraggable(handle, root){
@@ -2375,7 +2561,11 @@ async function runCharSeg(seg, msgs, idx){
   var segTask = "【分段" + (idx + 1) + "/" + CHAR_SEGS.length + "：" + seg.title + "】\n" + macroFill(CHAR_SEG_PROMPTS[seg.id] || "") + (prev ? "\n\n[此前已定分段（既有设定，必须一致，禁止改动）]\n" + prev : "");
   sxTurn(segTask, '按上面的分段要求，只完成「' + seg.title + '」这一段。').forEach(function (m) { msgs.push(m); });
   try {
-    var resp = await callModel(msgs);
+    // 流式档下把接收进度实时写进本段结果区（非流式时不触发，行为不变）
+    var resp = await callModelSeg(msgs, seg.title, function (note) {
+      var pre = ST.charEls && ST.charEls[seg.id];
+      if (pre && note) pre.textContent = '◇ ' + note;
+    });
     ST.char.segs[seg.id] = resp;
     msgs.push({ role: "assistant", content: resp });
     var headLen = sxHeadLen();
@@ -7611,13 +7801,27 @@ function rxCacheSave() {
   if (rxCacheSave._t) clearTimeout(rxCacheSave._t);
   rxCacheSave._t = setTimeout(function () {
     if (!ST.rx) return;
-    lsSet(LS_RX_KEY, { core: ST.rx.core, coreName: ST.rx.coreName, items: ST.rx.items });
+    // cfg 也要存：它是**全插件共用的生成传输**（①③⑧ 的分段写同样读它），
+    // 从前只存草稿不存 cfg，刷新酒馆后反代地址/模型名就没了，共用配置会形同虚设。
+    lsSet(LS_RX_KEY, { core: ST.rx.core, coreName: ST.rx.coreName, items: ST.rx.items, cfg: ST.rx.cfg });
   }, 500);
 }
 function rxCacheRestore() {
   rxInit();
   var c = lsGet(LS_RX_KEY); if (!c || typeof c !== 'object') return;
   ST.rx.core = c.core || ''; ST.rx.coreName = c.coreName || ''; ST.rx.items = c.items || [];
+  if (c.cfg && typeof c.cfg === 'object') {
+    ST.rx.cfg = c.cfg;
+    // 页面比这里先建好，UI 还停在默认值上——把恢复出来的配置回填到 ⑤ 页控件
+    try {
+      [['opf-rx-transport', 'transport'], ['opf-rx-source', 'source'], ['opf-rx-reverse', 'reverseProxy'],
+       ['opf-rx-proxypass', 'proxyPassword'], ['opf-rx-model', 'model'], ['opf-rx-proto', 'directProtocol'],
+       ['opf-rx-base', 'baseUrl'], ['opf-rx-key', 'apiKey'], ['opf-rx-chatmodel', 'chatModel']].forEach(function (pair) {
+        var el = getEl(pair[0]); if (el) el.value = ST.rx.cfg[pair[1]] || '';
+      });
+      rxSyncTransportUi();
+    } catch (e) { opfErr('rxCacheRestore cfg->ui', e); }
+  }
   var el = getEl('opf-rx-core'); if (el && !el.value) el.value = ST.rx.core;
   if (ST.rx.core) { try { rxDoParseSilent(); } catch (e) { opfErr('rxDoParseSilent', e); } }
   try { rxRenderItems(); } catch (e) { opfErr('rxRenderItems', e); }
@@ -8905,7 +9109,11 @@ async function atlCall(msgs, label, opts) {
   var o = opts || {};
   atlStat(label + '：' + ATL_TIPS.beforeCall + '（' + label + '）');
   var t0 = Date.now();
-  var resp = await callModel(msgs, o.extra);
+  // 与分段写同一条通道：配了真流式就走流式（绕开 Cloudflare 524），接收进度打到状态行；
+  // 传了 extra（如 responseLength 覆盖）时仍走原 callModel，避免选项被静默丢掉。
+  var resp = o.extra
+    ? await callModel(msgs, o.extra)
+    : await callModelSeg(msgs, label, function (note) { atlStat('◇ ' + note); });
   var A = atlInit();
   A.meta.lastRaw = String(resp || '');
   atlStat(label + '：返回 ' + A.meta.lastRaw.length + ' 字符（' + Math.round((Date.now() - t0) / 1000) + 's）');

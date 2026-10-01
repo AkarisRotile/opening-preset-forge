@@ -19,7 +19,9 @@ var DEFAULT_SETTINGS = {
   metaMode: 'full',          // 'full' 导出含 name/createdAt/updatedAt；'core' 只含 character 起
   autoCompliance: true,      // 生成初稿/重汇总后自动按《技能装备道具生成规则》自检修复
   activePage: 'preset',      // 全屏壳当前页：preset | world | char | p4..p6
-  modelNote: ''              // 附加一句给模型的叮嘱
+  modelNote: '',             // 附加一句给模型的叮嘱
+  segAutoRetry: false,       // 分段写超时自动重roll（仅分段写阶段触发）
+  retryTimeoutSec: 180       // 分段写单段超过该秒数无响应则重roll
 };
 
 // ---------------- 始弦人设（唯一真源 · 原版预设原文，一字不改） ----------------
@@ -498,6 +500,162 @@ async function callModel(msgs, extraOpts) {
   return opfEjsRestore(out, { count: prep.count, label: '' });
 }
 
+// ---------------- 分段写超时自动重roll ----------------
+// generateRaw 是非流式（sendOpenAIRequest('quiet', …)），模型返回前整段阻塞、拿不到
+// 逐字回显；超时只能靠「发起后 N 秒内未返回」判断。超时后先真正中止底层请求
+// （STscript 的 /abort，经 TavernHelper.triggerSlash 转发），再对同一分段重试，
+// 每段最多重 roll RETRY_MAX 次，避免无限空转烧钱。
+var SEG_RETRY_MAX = 3;
+
+// 真正中止当前主 API 等待：拿不到 TavernHelper 就如实返回失败（否则残留并发请求）。
+async function abortRawWait() {
+  var th = (typeof TavernHelper !== 'undefined' && TavernHelper && typeof TavernHelper.triggerSlash === 'function') ? TavernHelper : null;
+  if (!th) return false;
+  try { await th.triggerSlash('/abort'); return true; } catch (e) { opfErr('abortRawWait', e); return false; }
+}
+
+// 带超时的分段调用：只包超时，不在这里重试（重试由 callModelSeg 这层做，便于归并提示与状态）。
+async function callModelWithTimeout(msgs, timeoutMs) {
+  var timer = null;
+  var settle = function () { if (timer) { clearTimeout(timer); timer = null; } };
+  try {
+    var result = await Promise.race([
+      callModel(msgs),
+      new Promise(function (_, reject) {
+        timer = setTimeout(function () {
+          timer = null;
+          reject(new Error('OPF_SEG_TIMEOUT:' + timeoutMs));
+        }, timeoutMs);
+      })
+    ]);
+    settle();
+    return result;
+  } catch (e) {
+    settle();
+    throw e;
+  }
+}
+
+// ---------------- 生成传输：分段写可走「真流式」，从根上绕开 Cloudflare 100 秒墙 ----------------
+// 背景：generateRaw 固定 sendOpenAIRequest('quiet', …)，请求体 stream=false——非流式意味着
+// 中转必须等整段回包，长输出必然撞 Cloudflare 的 100 秒源站超时（524，报错来自中转站）。
+// ⑤ 页已实现两档真流式（经酒馆服务端转发 / 浏览器直连），实测能绕开：字节持续在流，
+// Cloudflare 就不会判定源站失联。本层让 ①③⑧ 的分段写也能用上同一套传输。
+//
+// 配置口径：**全插件共用一套**（就是 ⑤ 页那份 ST.rx.cfg，见 rx/cfg 持久化）。
+// 这里只做「读取 + 委派」，不复制实现——传输核心（rxReadSse/rxServerStream/rxDirectStream/
+// rxStreamCall）仍在 76-regex-main.js，靠函数声明提升在运行时可用。
+function genCfg() {
+  try { if (typeof rxCfg === 'function') return rxCfg(); } catch (e) { opfErr('genCfg', e); }
+  return { transport: 'st' };
+}
+// 流式档是否「已配置且可用」：transport 仍是 st（或配置不全）时返回 false，行为与从前完全一致。
+function genStreamReady(cfg) {
+  cfg = cfg || genCfg();
+  if (!cfg || !cfg.transport || cfg.transport === 'st') return false;
+  try { if (typeof rxTransportUsable === 'function') return !!rxTransportUsable(cfg); } catch (e) { opfErr('genStreamReady', e); }
+  return false;
+}
+// 委派到 ⑤ 的流式调度器；⑤ 模块缺失时退化为主 API（绝不静默失败）
+function genStreamCall(msgs, onNote, opts) {
+  if (typeof rxStreamCall === 'function') {
+    // ⑤ 页在「配置不完整」时会把它置 true 做本次降级。走到这里说明配置已经可用，
+    // 若不清掉，一次失败的 ⑤ 生成会让后续 ①③⑧ 的分段写静默退回非流式。
+    try { if (typeof rxForceSt !== 'undefined') rxForceSt = false; } catch (e) {}
+    return rxStreamCall(msgs, onNote, opts);
+  }
+  return callModel(msgs).then(function (t) { return { text: String(t), stalled: false }; });
+}
+function genTransportLabel() {
+  var cfg = genCfg();
+  if (!genStreamReady(cfg)) return '酒馆主 API（非流式）';
+  return cfg.transport === 'server' ? '酒馆服务端转发（真流式）' : '浏览器直连（真流式）';
+}
+// ① 页那份传输镜像控件的同步。真正的配置只有一份（⑤ 页的 ST.rx.cfg），这里只负责显示与改写它。
+function genSyncTxUi() {
+  var cfg = genCfg();
+  var t = cfg.transport || 'st';
+  var sel = getEl('opf-tx-transport'); if (sel) sel.value = t;
+  var note = getEl('opf-tx-note'); if (!note) return;
+  if (t === 'st') {
+    note.textContent = '当前：酒馆主 API（非流式）。长分段容易撞中转站的 100 秒墙（524）——换上面两档「真流式」可绕开。';
+    return;
+  }
+  var why = '';
+  try { if (typeof rxTransportWhy === 'function') why = rxTransportWhy(cfg); } catch (e) {}
+  note.textContent = why
+    ? ('⚠ ' + why)
+    : ('当前：' + genTransportLabel() + '——字节持续在流，不会再撞 100 秒墙。');
+}
+
+// 分段写专用调用：优先走已配置的真流式传输，否则走主 API。
+// 两条路共用同一套自动重roll（受 segAutoRetry 开关控制，每段最多 SEG_RETRY_MAX 次）：
+//   · 非流式：墙钟超时（N 秒内整段没回）；
+//   · 真流式：停顿检测（idleMs 内没有新字节）——比墙钟更准，不必等满 N 秒。
+// onProgress(displayText)：流式档下把「已收到多少字 / 已用多少秒」实时报给界面。
+async function callModelSeg(msgs, label, onProgress) {
+  var s = getSettings();
+  var useStream = genStreamReady();
+  // 开关关闭且走非流式档：完全等价于从前的 callModel（不引入任何新超时，零回归）
+  if (!s.segAutoRetry && !useStream) return await callModel(msgs);
+  var timeoutMs = Math.max(15000, (parseInt(s.retryTimeoutSec, 10) || 180) * 1000);
+  // 流式的停顿窗口：开了重roll就按用户阈值判停顿；没开则给足 5 分钟，只当防真死的兜底
+  var idleMs = s.segAutoRetry ? timeoutMs : Math.max(timeoutMs, 300000);
+  var maxTries = s.segAutoRetry ? SEG_RETRY_MAX : 1;
+  var lastErr = null;
+  for (var attempt = 1; attempt <= maxTries; attempt++) {
+    if (isStop()) throw new Error('已停止');
+    try {
+      if (useStream) {
+        // 流式：字节在流动就不会 524；idleMs 内没有新字节 → 判定停顿，交给下面的重roll
+        var res = await genStreamCall(msgs, onProgress, { phase: label, idleMs: idleMs, maxMs: 600000, maxTokens: 8192 });
+        var text = (res && typeof res.text === 'string') ? res.text : '';
+        if (res && res.stalled && !String(text).trim()) throw new Error('OPF_SEG_TIMEOUT:' + idleMs);
+        if (!String(text).trim()) throw new Error('模型返回空（可能被中转截断或安全策略拦下），可重试。');
+        if (attempt > 1) { toast('【' + (label || '本段') + '】第 ' + attempt + ' 次重roll成功'); }
+        return text;
+      }
+      var out = await callModelWithTimeout(msgs, timeoutMs);
+      if (attempt > 1) { toast('【' + (label || '本段') + '】第 ' + attempt + ' 次重roll成功'); }
+      return out;
+    } catch (e) {
+      lastErr = e;
+      if (!isSegRetryable(e)) throw e;                 // 真实报错（如鉴权/参数）不重roll，直接抛
+      if (attempt >= maxTries) break;                  // 达到上限（或开关关闭）退出重试
+      opfLog('seg retryable failure, auto-retry', label, attempt, '/', maxTries, e && e.message);
+      toast('【' + (label || '分段') + '】' + segRetryReason(e, idleMs) + '，自动重roll（' + attempt + '/' + maxTries + '）', 'warning');
+      if (!useStream) {                                 // 流式档已自行断开；非流式档要真正中止残留请求
+        var aborted = await abortRawWait();
+        if (!aborted) opfLog('（该环境无 TavernHelper，无法 /abort，可能残留并发请求）');
+      }
+      await waitTick();
+    }
+  }
+  var err = new Error('【' + (label || '分段') + '】连续 ' + maxTries + ' 次失败，已停止该段（可手动「重跑」或稍后重试）。');
+  err.isSegTimeout = true;
+  err.cause = lastErr;
+  throw err;
+}
+// 值得重roll的失败：超时/停顿、以及网关类与空返回——与 ⑤ 页 rxDiagError 的口径一致
+// （76-regex-main.js：/524|502|503|504|timeout|timed out|超时|empty|为空|network|fetch|No message/i）。
+// 这条很关键：524 是「返回了一个错误」而不是「没响应」，只判超时会漏掉它。
+function isSegRetryable(err) {
+  var m = (err && err.message) ? String(err.message) : String(err || '');
+  if (m.indexOf('OPF_SEG_TIMEOUT:') === 0) return true;
+  if (m.indexOf('已停止') === 0) return false;
+  return /524|502|503|504|timeout|timed out|超时|停顿|empty|为空|network|fetch|No message|返回空/i.test(m);
+}
+function segRetryReason(err, timeoutMs) {
+  var m = (err && err.message) ? String(err.message) : String(err || '');
+  if (m.indexOf('OPF_SEG_TIMEOUT:') === 0) {
+    return genStreamReady() ? ('停顿超 ' + Math.round(timeoutMs / 1000) + 's 无新内容') : ('无响应超 ' + Math.round(timeoutMs / 1000) + 's');
+  }
+  if (/524/.test(m)) return '中转站 524（源站 100 秒没回字节）';
+  if (/\b(50[234])\b/.test(m)) return '网关返回 ' + /(\b(?:50[234])\b)/.exec(m)[1];
+  if (/No message|返回空|为空/.test(m)) return '模型返回空';
+  return '可重试类失败';
+}
+
 async function runOne(phase) {
   setPhase(phase.id, 'run');
   var msgs = ST.msgs;
@@ -505,7 +663,12 @@ async function runOne(phase) {
   var turn = sxTurn(phasePrompt(phase), '按上面的阶段要求，完成「' + phase.title + '」这一栏。若该栏确实没有合适内容，回复“无”。');
   turn.forEach(function (m) { msgs.push(m); });
   try {
-    var resp = await callModel(msgs);
+    // 流式档下把「已收 N 字 / 已用 Ns」实时写进本步的结果区——
+    // 非流式时这条回调不会触发，界面行为与从前一致。
+    var resp = await callModelSeg(msgs, phase.title, function (note) {
+      var pre = ST.elPre && ST.elPre[phase.id];
+      if (pre && note) pre.textContent = '◇ ' + note;
+    });
     ST.results[phase.id] = resp;
     msgs.push({ role: 'assistant', content: resp });
     // 过长时丢弃最早若干条 assistant 结果，防止超上下文。

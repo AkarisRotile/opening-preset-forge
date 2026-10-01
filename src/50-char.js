@@ -151,7 +151,11 @@ async function runCharSeg(seg, msgs, idx){
   var segTask = "【分段" + (idx + 1) + "/" + CHAR_SEGS.length + "：" + seg.title + "】\n" + macroFill(CHAR_SEG_PROMPTS[seg.id] || "") + (prev ? "\n\n[此前已定分段（既有设定，必须一致，禁止改动）]\n" + prev : "");
   sxTurn(segTask, '按上面的分段要求，只完成「' + seg.title + '」这一段。').forEach(function (m) { msgs.push(m); });
   try {
-    var resp = await callModel(msgs);
+    // 流式档下把接收进度实时写进本段结果区（非流式时不触发，行为不变）
+    var resp = await callModelSeg(msgs, seg.title, function (note) {
+      var pre = ST.charEls && ST.charEls[seg.id];
+      if (pre && note) pre.textContent = '◇ ' + note;
+    });
     ST.char.segs[seg.id] = resp;
     msgs.push({ role: "assistant", content: resp });
     var headLen = sxHeadLen();
