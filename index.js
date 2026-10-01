@@ -7199,26 +7199,54 @@ async function rxModelsViaServer() {
   if (!ids.length) throw new Error(j.error ? '上游返回错误' : '列表为空');
   return ids;
 }
+// Google 原生 models.list 是**上游自己分页**的：一次只回一页，并给一个 nextPageToken。
+// 原来只请求一次、不跟 token —— 上游有 80 个也可能只拿到第一页。这里跟着 token 一直翻，
+// 直到上游不再给 nextPageToken 为止：**收多少显示多少，不设条数上限**。
+// （pageSize 不是上限，是"每趟多要一点"，纯粹为了少跑几趟。）
+async function rxGeminiModelsPaged(base, headers, params) {
+  var all = [], token = '', guard = 0;
+  while (guard++ < 500) {                      // 纯跑飞保护，不是条数上限
+    var qs = [];
+    for (var k in (params || {})) if (params[k]) qs.push(encodeURIComponent(k) + '=' + encodeURIComponent(params[k]));
+    qs.push('pageSize=1000');
+    if (token) qs.push('pageToken=' + encodeURIComponent(token));
+    var r = await fetch(base + '?' + qs.join('&'), { headers: headers });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var j = await r.json();
+    var arr = (j && (j.models || j.data)) || [];
+    arr.forEach(function (m) {
+      var id = String((m && (m.name || m.id)) || '').replace(/^models\//, '');
+      if (id) all.push(id);                    // 不过滤：保留全部（含没有 supportedGenerationMethods 的新模型）
+    });
+    token = (j && (j.nextPageToken || j.next_page_token)) || '';
+    if (!token) break;
+  }
+  return all;
+}
 async function rxModelsRaw(base, key, proto) {
   base = String(base || '').trim().replace(/\/+$/, '');
   if (!base) throw new Error('地址为空');
-  var urls = [];
   if (proto === 'openai') {
-    urls.push({ u: base + '/models', h: key ? { 'Authorization': 'Bearer ' + key } : {} });
-  } else {
-    urls.push({ u: base + '/v1beta/models' + (key ? '?key=' + encodeURIComponent(key) : ''), h: key ? { 'x-goog-api-key': key } : {} });
-    urls.push({ u: base + '/v1beta/models', h: key ? { 'x-goog-api-key': key } : {} });   // 反代可能自带上游 key
+    // OpenAI 兼容的 /models 一次性返回全部，没有分页
+    var r0 = await fetch(base + '/models', { headers: key ? { 'Authorization': 'Bearer ' + key } : {} });
+    if (!r0.ok) throw new Error('HTTP ' + r0.status);
+    var j0 = await r0.json();
+    var arr0 = (j0 && (j0.data || j0.models)) || [];
+    var ids0 = arr0.map(function (m) { return String((m && (m.name || m.id)) || '').replace(/^models\//, ''); }).filter(Boolean);
+    if (!ids0.length) throw new Error('列表为空');
+    return ids0;
   }
+  // 两种鉴权写法都试（反代可能自带上游 key）；每种都翻到底
+  var tries = [
+    { h: key ? { 'x-goog-api-key': key } : {}, q: key ? { key: key } : {} },
+    { h: key ? { 'x-goog-api-key': key } : {}, q: {} }
+  ];
   var lastErr = null;
-  for (var i = 0; i < urls.length; i++) {
+  for (var i = 0; i < tries.length; i++) {
     try {
-      var r = await fetch(urls[i].u, { headers: urls[i].h });
-      if (!r.ok) { lastErr = new Error('HTTP ' + r.status); continue; }
-      var j = await r.json();
-      var arr = j.models || j.data || [];
-      var ids = arr.map(function (m) { return String((m && (m.name || m.id)) || '').replace(/^models\//, ''); }).filter(Boolean);
-      if (ids.length) return ids;      // 不过滤：保留全部（含没有 supportedGenerationMethods 的新模型）
-    } catch (e) { lastErr = e; }        // CORS 或网络错误 → 试下一个
+      var all = await rxGeminiModelsPaged(base + '/v1beta/models', tries[i].h, tries[i].q);
+      if (all.length) return all;
+    } catch (e) { lastErr = e; }               // CORS 或网络错误 → 试下一种
   }
   throw lastErr || new Error('未取到原始列表');
 }
