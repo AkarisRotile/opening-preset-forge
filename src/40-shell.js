@@ -14,28 +14,72 @@ var PAGE_DEFS = [
   { id: "settings", label: "⚙ 设置" },
   { id: "p6",     label: "⑩ 更多功能", ph: true }
 ];
+// v1.17.0：导航按**任务**分组，不再是一排扁平数字标签。
+// 「② 世界书」是全局参考、「⚙ 设置」是全局配置——它们属于顶部 chrome，不属于这一层。
+// world / settings 仍是 PAGE_DEFS 里的页（容器照建），只是不进左侧导航。
+var NAV_GROUPS = [
+  { title: "创作", items: ["preset", "char", "destiny"] },
+  { title: "单件", items: ["regex", "refine", "atelier"] },
+  { title: "对话", items: ["shixian"] }
+];
+// 外壳第二层样式（覆盖 SHELL_CSS 里那套横向标签）：左侧竖向分组导航 + 顶部 chrome。
+// 单独一份并在 SHELL_CSS 之后注入，避免去动那条几千字符的老 CSS 字符串。
+var SHELL_CSS2 = [
+  "#opf-shell-body{flex:1;min-height:0;display:flex;align-items:stretch}",
+  "#opf-nav{flex:none;width:200px;display:flex;flex-direction:column;gap:2px;padding:10px 8px 16px;overflow-y:auto;overflow-x:hidden;border-right:1px solid rgba(255,122,138,.18);background:rgba(20,3,8,.5);scrollbar-width:thin}",
+  ".opf-nav-group{flex:none;font-size:11px;letter-spacing:2px;color:rgba(255,170,180,.5);padding:12px 10px 5px;text-transform:uppercase}",
+  "#opf-nav .opf-tab{display:block;width:100%;flex:none;text-align:left;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;border:1px solid transparent;border-radius:8px;background:transparent;color:#ffc9cf;padding:9px 12px!important;cursor:pointer;min-height:0;transition:background .14s ease,color .14s ease}",
+  "#opf-nav .opf-tab:hover{background:rgba(255,235,238,.08);color:#fff}",
+  "#opf-nav .opf-tab.active{background:linear-gradient(90deg,rgba(255,77,94,.30),rgba(255,77,94,.05));color:#fff;border-color:rgba(255,150,165,.45);box-shadow:inset 3px 0 0 #ff4d5e}",
+  ".opf-chrome-btn{flex:none;border:1px solid rgba(255,122,138,.3);background:rgba(255,235,238,.06);color:#ffc9cf;border-radius:8px;padding:7px 11px;font-size:12.5px;cursor:pointer;white-space:nowrap}",
+  ".opf-chrome-btn:hover{background:rgba(255,77,94,.22);color:#fff}",
+  // 分段创作页（①③④）统一模板：左控制 / 右产出。用两类选择器压过 .opf-char-wrap 的单栏定义。
+  ".opf-char-wrap.opf-2col{display:grid;grid-template-columns:minmax(300px,380px) minmax(0,1fr);gap:14px 22px;max-width:1680px;align-items:start}",
+  ".opf-char-wrap.opf-2col .opf-col{display:flex;flex-direction:column;gap:8px;min-width:0}",
+  "@media (max-width:920px){.opf-char-wrap.opf-2col{grid-template-columns:minmax(0,1fr)}}",
+  "@media (max-width:860px){#opf-nav{width:140px;padding:8px 6px 12px}.opf-nav-group{font-size:10px;padding:9px 6px 3px}#opf-nav .opf-tab{font-size:12.5px;padding:7px 8px!important}.opf-chrome-btn{padding:6px 8px;font-size:11.5px}}"
+].join("");
 
 var SHELL_CSS = "#opf-shell{position:fixed;inset:0;height:100vh;height:100dvh;z-index:2147480002;display:flex;flex-direction:column;color:#fdeef0;font-family:'Noto Sans SC','Microsoft YaHei',sans-serif;letter-spacing:.3px;background:linear-gradient(180deg,#18040b 0%,#0d0206 55%,#0a0105 100%);border:none;transition:opacity .16s ease,transform .16s ease}#opf-shell.opf-shell-hidden{opacity:0;pointer-events:none;transform:translateY(12px)}#opf-shell *{box-sizing:border-box}#opf-shell-head{position:relative;display:flex;align-items:center;gap:10px;padding:8px 12px;flex:none;background:rgba(46,6,14,.6);border-bottom:1px solid rgba(255,122,138,.28)}#opf-shell-head::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#ff4d5e 18%,#ffd9a8 50%,#c8102e 82%,transparent);box-shadow:0 0 12px rgba(255,90,100,.8)}#opf-shell-title{font-size:15px;font-weight:600;color:#ffd9de;text-shadow:0 0 10px rgba(255,77,94,.35);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#opf-shell-close{margin-left:auto;flex:none;border:1px solid rgba(255,122,138,.35);background:rgba(255,77,94,.14);color:#ff8a95;width:40px;height:40px;min-width:40px;border-radius:10px;font-size:16px;cursor:pointer}#opf-shell-close:hover{background:rgba(255,77,94,.3);color:#fff}#opf-nav{display:flex;gap:5px;padding:8px 10px 0;overflow-x:auto;overflow-y:hidden;flex:none;scrollbar-width:thin;scrollbar-color:rgba(255,122,138,.4) transparent}.opf-tab{flex:none;border:1px solid rgba(255,122,138,.26);background:rgba(255,235,238,.05);color:#ffc9cf;border-radius:10px 10px 0 0;padding:9px 13px;font-size:12.5px;line-height:1.2;cursor:pointer;white-space:nowrap;min-height:40px}.opf-tab.active{background:linear-gradient(180deg,rgba(255,77,94,.26),rgba(255,77,94,.07));color:#fff;border-color:rgba(255,150,165,.65);box-shadow:inset 0 2px 0 #ff4d5e}.opf-tab.placeholder{opacity:.6;border-style:dashed}#opf-pages{flex:1;min-height:0;position:relative}.opf-page{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;padding:10px 12px 14px;display:none;scrollbar-width:thin}.opf-page.active{display:block}.opf-page-ph{padding:32px 16px;text-align:center;color:rgba(255,200,208,.55);font-size:13.5px;line-height:2.2;white-space:pre-line}#opf-shell #opf-root{position:static;width:100%;max-width:100%;height:auto;min-height:100%;max-height:none;margin:0;border:none;border-radius:0;box-shadow:none;background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none}#opf-shell #opf-root.opf-hidden{opacity:1;pointer-events:auto;transform:none}#opf-shell #opf-root::before{display:none}#opf-shell #opf-lside{position:static;transform:none;width:100%;max-width:none;height:100%;top:auto;bottom:auto;left:auto;border:none;border-radius:0;box-shadow:none;background:transparent}#opf-shell #opf-lside.open{transform:none}.opf-char-wrap{display:flex;flex-direction:column;gap:8px;max-width:860px;margin:0 auto}.opf-char-input{width:100%;border-radius:8px;padding:8px 10px;font-size:12.5px;color:#ffeef1;background:rgba(10,2,5,.55);border:1px solid rgba(255,122,138,.25);outline:none;resize:vertical}.opf-char-input:focus{border-color:rgba(255,110,125,.6);box-shadow:0 0 6px rgba(255,77,94,.25)}#opf-char-demand{min-height:56px}#opf-char-ref{min-height:48px;font-size:12px}.opf-char-tools{display:flex;gap:6px;flex-wrap:wrap}.opf-char-tools .opf-btn{flex:1 1 130px;min-height:44px;font-size:13px}.opf-box{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;margin:6px 0 0;padding:10px 12px;border:1px solid rgba(255,122,138,.32);border-radius:10px;background:rgba(10,2,5,.62);box-shadow:inset 0 0 14px rgba(255,60,80,.05);color:#ffeef1;font-size:12px;line-height:1.55;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;overflow:auto}.opf-char-report{max-height:300px;min-height:64px}#opf-char-out{max-height:56vh;min-height:140px;font-size:12.5px;scrollbar-width:thin}.opf-char-copyrow{margin-top:6px}#opf-dest-demand{min-height:56px}#opf-dest-ref{min-height:48px;font-size:12px}#opf-dest-out{max-height:56vh;min-height:140px;font-size:12.5px;scrollbar-width:thin}#opf-dest-ejswrap{display:flex;align-items:flex-start;gap:7px;font-size:11.5px;line-height:1.5;color:#ffc9cf;background:rgba(60,140,200,.10);border:1px dashed rgba(120,190,255,.35);border-radius:8px;padding:7px 9px;cursor:pointer}#opf-dest-ejswrap input{width:16px;height:16px;margin:1px 0 0;flex:none;accent-color:#3c8cc8}.opf-rx-preview{max-width:100%;overflow:auto;border:1px dashed rgba(255,122,138,.3);border-radius:8px;padding:6px;margin:4px 0;background:rgba(10,2,5,.5);font-size:12px}#opf-rx-items select.opf-ref-input{flex:0 0 auto;min-width:120px}#opf-rx-core{min-height:90px}.opf-shx-cfg{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:4px 0}.opf-shx-cfg .opf-opt{display:flex;align-items:center;gap:5px;font-size:11.5px;color:#ffc9cf}.opf-shx-cfg .opf-ref-input{min-width:130px}.opf-shx-log{max-height:46vh;min-height:160px;overflow:auto;border:1px solid rgba(255,122,138,.28);border-radius:10px;background:rgba(10,2,5,.55);padding:8px 10px;display:flex;flex-direction:column;gap:8px}.opf-shx-msg{padding:7px 9px;border-radius:9px;font-size:12.5px;line-height:1.7}.opf-shx-msg.me{background:rgba(255,77,94,.10);border:1px solid rgba(255,122,138,.22);align-self:flex-end;max-width:86%}.opf-shx-msg.her{background:rgba(120,190,255,.08);border:1px solid rgba(120,190,255,.25);align-self:flex-start;max-width:92%}.opf-shx-who{font-size:10px;letter-spacing:1px;opacity:.65;margin-bottom:3px}.opf-shx-text{white-space:pre-wrap;word-break:break-word}#opf-shx-input{min-height:56px}.opf-shx-wblist{max-height:220px;overflow:auto;border:1px solid rgba(255,122,138,.2);border-radius:8px;padding:5px 7px;margin-top:5px}@media (max-width:760px){#opf-shell-head{padding:6px 8px}#opf-shell-title{font-size:13px}#opf-shell-close{width:40px;height:40px}.opf-tab{padding:8px 10px;font-size:11.5px;min-height:40px}.opf-page{padding:8px 8px 12px}#opf-shell #opf-root{font-size:13px}.opf-page .opf-btn{min-height:44px}.opf-char-tools .opf-btn{min-height:46px}.opf-wi-row{min-height:40px}.opf-wi-row input{width:18px;height:18px}#opf-lside-tools{gap:6px}#opf-lside-tools .opf-step-act{min-height:40px;font-size:12px}}";
 
 function buildShell(){
   if (getEl("opf-shell")) return;
   try { if (!getEl(NS + "_css_shell")) { var st = document.createElement("style"); st.id = NS + "_css_shell"; st.textContent = SHELL_CSS; document.head.appendChild(st); } } catch (e) { opfErr("shell css", e); }
+  try { if (!getEl(NS + "_css_shell2")) { var st2 = document.createElement("style"); st2.id = NS + "_css_shell2"; st2.textContent = SHELL_CSS2; document.head.appendChild(st2); } } catch (e) { opfErr("shell css2", e); }
   var shell = document.createElement("div"); shell.id = "opf-shell"; shell.className = "opf-shell-hidden";
+
+  // ---- 顶部全局 chrome：标题 ·（右）传输状态 · 世界书 · 设置 · 关闭 ----
   var head = document.createElement("div"); head.id = "opf-shell-head";
-  var title = document.createElement("div"); title.id = "opf-shell-title"; title.textContent = "✦ 始弦的魔法大典 · 多功能工坊";
+  var title = document.createElement("div"); title.id = "opf-shell-title"; title.textContent = "✦ 始弦的魔法大典";
   var tx = document.createElement("button"); tx.type = "button"; tx.id = "opf-tx-status"; tx.className = "opf-tx-status opf-tx-st"; tx.textContent = "传输：—";
   tx.addEventListener("click", function () { switchPage("settings"); });
+  var wbtn = document.createElement("button"); wbtn.type = "button"; wbtn.id = "opf-chrome-world"; wbtn.className = "opf-chrome-btn"; wbtn.textContent = "▤ 世界书";
+  wbtn.title = "打开世界书条目勾选（决定哪些条目发送给 AI；勾选与导入自动缓存）";
+  wbtn.addEventListener("click", function () { toggleWorldSide(); });
+  var gear = document.createElement("button"); gear.type = "button"; gear.id = "opf-chrome-settings"; gear.className = "opf-chrome-btn"; gear.textContent = "⚙";
+  gear.title = "设置：生成传输 / API / 模型";
+  gear.addEventListener("click", function () { switchPage("settings"); });
   var close = document.createElement("button"); close.type = "button"; close.id = "opf-shell-close"; close.title = "关闭"; close.textContent = "✕";
   close.addEventListener("click", hidePanel);
-  head.appendChild(title); head.appendChild(tx); head.appendChild(close); shell.appendChild(head);
+  head.appendChild(title); head.appendChild(tx); head.appendChild(wbtn); head.appendChild(gear); head.appendChild(close);
+  shell.appendChild(head);
+
+  // ---- 主体：左侧分组导航 + 右侧内容区 ----
+  var bodyWrap = document.createElement("div"); bodyWrap.id = "opf-shell-body";
   var nav = document.createElement("nav"); nav.id = "opf-nav";
-  PAGE_DEFS.forEach(function (p) {
-    var t = document.createElement("button"); t.type = "button"; t.id = "opf-tab-" + p.id; t.className = "opf-tab" + (p.ph ? " placeholder" : "");
-    t.textContent = p.label; t.title = p.ph ? "占位页 · 留给后续功能" : p.label;
-    t.addEventListener("click", function () { switchPage(p.id); });
-    nav.appendChild(t);
+  var byId = {}; PAGE_DEFS.forEach(function (p) { byId[p.id] = p; });
+  NAV_GROUPS.forEach(function (g) {
+    var gt = document.createElement("div"); gt.className = "opf-nav-group"; gt.textContent = g.title; nav.appendChild(gt);
+    g.items.forEach(function (id) {
+      var p = byId[id]; if (!p) return;
+      var t = document.createElement("button"); t.type = "button"; t.id = "opf-tab-" + id; t.className = "opf-tab";
+      t.textContent = p.label; t.title = p.label;
+      t.addEventListener("click", function () { switchPage(id); });
+      nav.appendChild(t);
+    });
   });
-  shell.appendChild(nav);
+  bodyWrap.appendChild(nav);
+
   var pages = document.createElement("div"); pages.id = "opf-pages";
   PAGE_DEFS.forEach(function (p) {
     var d = document.createElement("div"); d.id = "opf-page-" + p.id; d.className = "opf-page";
@@ -65,7 +109,9 @@ function buildShell(){
     }
     pages.appendChild(d);
   });
-  shell.appendChild(pages);
+  bodyWrap.appendChild(pages);
+  shell.appendChild(bodyWrap);
+
   document.body.appendChild(shell);
   launcher();
   var root = getEl("opf-root");
