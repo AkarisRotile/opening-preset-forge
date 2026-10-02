@@ -320,8 +320,7 @@ var ATL_CSS = '#opf-page-atelier{font-size:13px}'
   + '#opf-page-atelier .atl-cross-note .atl-sx-line{display:block;margin-top:3px;color:#ffe6cf}';
 var ATL_HTML = '<div class="opf-char-wrap">'
   + '<div class="opf-sec-label">✦ 造物工坊 · 单件生成 + 长期工作区</div>'
-  + '<div class="opf-dim" id="opf-atl-hint">流程：写需求（可选参考格式）→ 选类型 → 🎨 生成 YAML → 🔎 自检 → 用改进框提要求让 AI 改（可撤回）→ 📥 存成条目。产出可以攒进「工作区」；<b>勾选的条目会在下一次生成/改进/交火分析时一起发给 AI</b>，没勾的一条都不会发出去。<br>'
-  + '⚠ 保存分两种：<b>📥 存成条目</b>＝新建一条；<b>💾 更新「某条」</b>＝覆盖已打开/刚存的那条（按钮文字会写明要覆盖谁）。<b>要做下一件东西：点「🆕 开始下一个条目」清空编辑区，或直接改需求再点「🎨 生成 YAML」——生成会自动另起一条，绝不会覆盖上一条。</b></div>'
+  + '<div class="opf-dim" id="opf-atl-hint">写需求选类型 → 生成 YAML → 自检 → 改进 → 存条目。</div>'
 
   + '<div class="opf-sec"><div class="opf-sec-label">① 需求与参考</div></div>'
   + '<div class="opf-step-ref-row">'
@@ -869,8 +868,7 @@ function atlSxNote(raw) {
 // 页头那句流程说明：插件文案，不是她的话
 function atlRenderHint() {
   var h = atlEl('opf-atl-hint'); if (!h) return;
-  h.textContent = ATL_TIPS.atelierIntro + ' 流程：写需求（可选参考格式）→ 选类型 → 🎨 生成 YAML → 🔎 自检 → 用改进框提要求让 AI 改（可撤回）→ 📥 存成条目。'
-    + '产出可以攒进「工作区」；勾选的条目会在下一次生成/改进/交火分析时一起发给 AI，没勾的一条都不会发出去。';
+  h.textContent = ATL_TIPS.atelierIntro;
 }
 function atlRand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 function atlSxBootNote() {
@@ -1023,14 +1021,19 @@ function atlConfirm(msg, fallback) {
   return !!fallback;
 }
 function atlSetRunning(on) {
-  ['opf-atl-gen', 'opf-atl-ping', 'opf-atl-kinds', 'opf-atl-check', 'opf-atl-copy', 'opf-atl-download', 'opf-atl-save',
+  ['opf-atl-ping', 'opf-atl-kinds', 'opf-atl-check', 'opf-atl-copy', 'opf-atl-download', 'opf-atl-save',
     'opf-atl-fix', 'opf-atl-sug', 'opf-atl-newspace', 'opf-atl-regroup', 'opf-atl-all', 'opf-atl-none', 'opf-atl-export',
     'opf-atl-wipe', 'opf-atl-crosstodir', 'opf-atl-crosscopy', 'opf-atl-undo'].forEach(function (id) {
       var b = atlEl(id); if (b) b.disabled = !!on;
     });
-  // 生成按钮跟着全局运行态走；交火按钮的文案由 atlProgress 自己写（运行中要显示已用时间），
-  // 所以这里只负责它的禁用态，并把结束后的文案复位。
-  var g = atlEl('opf-atl-gen'); if (g) g.textContent = on ? '■ 运行中…' : '🎨 生成 YAML';
+  // 生成按钮跟着全局运行态走：运行时**不禁用**，改成「停止生成」，点了就立即中止（原来是 disabled，停不下来）
+  // 交火按钮的文案由 atlProgress 自己写（运行中要显示已用时间），这里只负责它的禁用态与收尾复位。
+  var g = atlEl('opf-atl-gen');
+  if (g) {
+    g.disabled = false;
+    g.textContent = on ? (ST.stopReq ? '■ 停止中…' : '■ 停止生成') : '🎨 生成 YAML';
+    g.title = on ? '点一下立即停止：中止在途请求' : '按需求造一件新的：这一下不会覆盖工作区里已有的条目';
+  }
   if (!on) {
     var x = atlEl('opf-atl-cross');
     if (x) { x.textContent = '🔥 交火分析'; atlCls(x, 'remove', 'atl-danger'); }
@@ -1732,7 +1735,7 @@ function bindAtelierPage() {
     toast('类型已切到「' + atlKind(this.value).label + '」：自检会按这套骨架核对字段', 'success');
   });
   var on = function (id, fn) { var e = atlEl(id); if (e) e.addEventListener('click', fn); };
-  on('opf-atl-gen', function () { atlDoGenerate(); });
+  on('opf-atl-gen', function () { if (ST.running) { stopGeneration(); return; } atlDoGenerate(); });
   on('opf-atl-ping', function () { atlDoPing(); });
   on('opf-atl-check', function () {
     var r = atlLintRun();

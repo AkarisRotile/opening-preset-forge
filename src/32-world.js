@@ -293,7 +293,63 @@ function buildWorldSideButton(root){
 }
 
 var LSIDE_CSS3 = "#opf-lside{font-size:12.5px;top:60px;bottom:60px}.opf-wi-cat{cursor:pointer;user-select:none;font-size:11.5px;padding:3px 8px}.opf-wi-cat:hover{color:#ff8a95;border-color:rgba(255,150,165,.55);background:rgba(255,90,105,.12)}.opf-wi-row{font-size:11.5px}.opf-wi-row .ln{font-size:10px}.opf-lside-hint{font-size:11.5px}#opf-lside-filter{font-size:12px}#opf-lside-count{font-size:10.5px}.opf-wi-cat-row{display:flex;align-items:center;gap:4px;margin:6px 0 2px;flex:none}.opf-wi-cat-row .opf-wi-cat{flex:1;margin:0}.opf-cat-all{border:none;cursor:pointer;border-radius:6px;padding:1px 7px;font-size:10px;color:#ffd5da;background:rgba(255,77,94,.12);border:1px solid rgba(255,122,138,.3)}.opf-cat-all:hover{background:rgba(255,77,94,.25)}.opf-cat-all.off{color:#ffc0c8;background:rgba(255,255,255,.06)}.opf-wi-row .b{flex:none;color:#b7d7ff;font-size:9px;border:1px solid rgba(140,180,255,.35);border-radius:8px;padding:0 4px}.opf-wi-sub{display:flex;gap:6px;align-items:center;cursor:pointer;user-select:none;font-size:11px;font-weight:600;color:#ffd9b0;background:rgba(255,170,90,.10);border:1px solid rgba(255,190,120,.25);border-radius:6px;padding:2px 8px;margin:5px 2px 1px}.opf-wi-sub:hover{color:#fff;background:rgba(255,170,90,.18)}";
-var SIZE_CSS = "#opf-root{width:448px;font-size:13px}#opf-title{font-size:14.5px}.opf-sec-label{font-size:11px;letter-spacing:1.5px}#opf-demand{font-size:13px;min-height:50px}.opf-opt{font-size:12px}#opf-meta{font-size:12px}.opf-step-title{font-size:13px}.opf-step-sub{font-size:11px}.opf-step-act{font-size:11px;padding:3px 8px}.opf-btn{font-size:13px;padding:8px 5px}#opf-json-out{font-size:11.5px}.opf-dim{font-size:11.5px}.opf-ref-input{font-size:11.5px}.opf-dir-chip{font-size:12px}.opf-step-body{font-size:12px}#opf-pname{font-size:12px;width:170px}.opf-num{font-size:12px}";
+var SIZE_CSS = [
+  // ===== 全局字号（整体上调 2~3px，覆盖所有页面）=====
+  "#opf-shell{font-size:14px!important}",
+  "#opf-shell-title{font-size:17px!important}",
+  ".opf-tab{font-size:14.5px!important;padding:10px 15px!important}",
+  "#opf-shell-close{margin-left:0!important}",
+  // 顶栏传输状态 chip
+  ".opf-tx-status{margin-left:auto!important;flex:none;font-size:13px!important;color:#ffd9de;background:rgba(255,77,94,.12);border:1px solid rgba(255,122,138,.32);border-radius:999px;padding:5px 13px!important;cursor:pointer;white-space:nowrap}",
+  ".opf-tx-status:hover{background:rgba(255,77,94,.26);color:#fff}",
+  ".opf-tx-status.opf-tx-stream{color:#baf7cc;background:rgba(60,210,120,.14);border-color:rgba(120,230,150,.42)}",
+  // ===== ① 开局预设 =====
+  "#opf-root{width:480px!important;font-size:15px!important}",
+  "#opf-title{font-size:16px!important}",
+  ".opf-sec-label{font-size:13px!important;letter-spacing:1px!important}",
+  "#opf-demand{font-size:14px!important;min-height:60px!important}",
+  ".opf-opt{font-size:13.5px!important}",
+  "#opf-meta{font-size:13px!important}",
+  "#opf-pname{font-size:13px!important;width:190px!important}",
+  ".opf-num{font-size:13.5px!important}",
+  // ===== 分步卡片 / 精修 / 按钮（多页共用）=====
+  ".opf-step-title{font-size:14.5px!important}",
+  ".opf-step-sub{font-size:12.5px!important}",
+  ".opf-step-act{font-size:12.5px!important;padding:4px 10px!important}",
+  ".opf-step-body{font-size:13.5px!important}",
+  ".opf-ref-input{font-size:13px!important}",
+  ".opf-ref-tag{font-size:11.5px!important}",
+  ".opf-dir-chip{font-size:13.5px!important}",
+  ".opf-btn{font-size:15px!important;padding:9px 6px!important}",
+  ".opf-dot{font-size:13px!important}",
+  // ===== 通用文本 / 输出框 / 输入框 =====
+  ".opf-dim{font-size:12.5px!important;line-height:1.65!important}",
+  ".opf-char-input{font-size:14px!important}",
+  ".opf-box{font-size:13px!important}",
+  ".opf-char-report{font-size:13px!important}",
+  ".opf-char-tools{font-size:13.5px!important}",
+  ".opf-outnote{font-size:12.5px!important}",
+  "#opf-json-out{font-size:13px!important}",
+  // ===== ② 世界书侧栏 =====
+  "#opf-lside{font-size:13px!important}",
+  ".opf-wi-row{font-size:12.5px!important}",
+  ".opf-wi-row .tx{line-height:1.5!important}",
+  "#opf-lside-filter{font-size:13px!important}",
+  ".opf-lside-hint{font-size:12.5px!important}",
+  "#opf-lside-head{font-size:13.5px!important}",
+  // ===== ① 页备忘录 =====
+  ".opf-memo-hint{font-size:12px!important}",
+  ".opf-memo-out{font-size:12.5px!important}",
+  ".opf-memo-raw{font-size:12.5px!important}",
+  // ===== ⑧ 造物工坊 =====
+  "#opf-page-atelier{font-size:15px!important}",
+  ".atl-space-name{font-size:13.5px!important}",
+  ".atl-item-name{font-size:13px!important}",
+  ".atl-empty{font-size:12.5px!important}",
+  ".atl-cross-note{font-size:12.5px!important}",
+  ".atl-open{font-size:12px!important}",
+  ".atl-item-meta{font-size:12px!important}"
+].join("");
 function injectGlobalSizeCSS(){
   try { if (getEl(NS + "_css_size")) return; var st = document.createElement("style"); st.id = NS + "_css_size"; st.textContent = SIZE_CSS; document.head.appendChild(st); } catch (e) { opfErr("injectGlobalSizeCSS", e); }
 }

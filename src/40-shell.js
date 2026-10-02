@@ -11,7 +11,7 @@ var PAGE_DEFS = [
   { id: "shixian",label: "⑥ 与始弦聊天" },
   { id: "refine", label: "⑦ 核心精修" },
   { id: "atelier",label: "⑧ 造物工坊" },
-  { id: "p5",     label: "⑨ DLC物品", ph: true },
+  { id: "settings", label: "⚙ 设置" },
   { id: "p6",     label: "⑩ 更多功能", ph: true }
 ];
 
@@ -23,9 +23,11 @@ function buildShell(){
   var shell = document.createElement("div"); shell.id = "opf-shell"; shell.className = "opf-shell-hidden";
   var head = document.createElement("div"); head.id = "opf-shell-head";
   var title = document.createElement("div"); title.id = "opf-shell-title"; title.textContent = "✦ 始弦的魔法大典 · 多功能工坊";
+  var tx = document.createElement("button"); tx.type = "button"; tx.id = "opf-tx-status"; tx.className = "opf-tx-status opf-tx-st"; tx.textContent = "传输：—";
+  tx.addEventListener("click", function () { switchPage("settings"); });
   var close = document.createElement("button"); close.type = "button"; close.id = "opf-shell-close"; close.title = "关闭"; close.textContent = "✕";
   close.addEventListener("click", hidePanel);
-  head.appendChild(title); head.appendChild(close); shell.appendChild(head);
+  head.appendChild(title); head.appendChild(tx); head.appendChild(close); shell.appendChild(head);
   var nav = document.createElement("nav"); nav.id = "opf-nav";
   PAGE_DEFS.forEach(function (p) {
     var t = document.createElement("button"); t.type = "button"; t.id = "opf-tab-" + p.id; t.className = "opf-tab" + (p.ph ? " placeholder" : "");
@@ -52,6 +54,8 @@ function buildShell(){
       d.innerHTML = REFINE_HTML;
     } else if (p.id === "atelier") {
       d.innerHTML = ATL_HTML;
+    } else if (p.id === "settings") {
+      d.innerHTML = SETTINGS_HTML;
     } else if (p.id === "world") {
       /* 世界书侧栏由 buildWorldSide 挂载到本页 */
     } else {

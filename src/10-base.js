@@ -148,6 +148,7 @@ function saveSettings() {
 var ST = {
   running: false,
   stopReq: false,
+  abortCtl: null,      // 当前在途流式请求的 AbortController（手动停止时 abort 它）
   msgs: null,          // 当前分步会话的消息数组
   results: {},         // phaseId -> 文本
   status: {},          // phaseId -> 'wait'|'run'|'ok'|'err'
@@ -507,6 +508,12 @@ async function callModel(msgs, extraOpts) {
 // 每段最多重 roll RETRY_MAX 次，避免无限空转烧钱。
 var SEG_RETRY_MAX = 3;
 
+// 单次生成的最大输出 token 数（＝最大回复长度）。默认六万。
+// 这是**默认值**：调用方若显式传 maxTokens 就以它为准（⑤ 页的 CSS 分段有自己更小的预算）。
+// 注意：改大只影响"最多允许吐多少"，不代表一定会吐这么多；但允许得越大，
+// 单次请求在途时间越久，撞中转超时（524）的风险也越高——分段写建议配合真流式使用。
+var GEN_MAX_OUTPUT_TOKENS = 60000;
+
 // 真正中止当前主 API 等待：拿不到 TavernHelper 就如实返回失败（否则残留并发请求）。
 async function abortRawWait() {
   var th = (typeof TavernHelper !== 'undefined' && TavernHelper && typeof TavernHelper.triggerSlash === 'function') ? TavernHelper : null;
@@ -571,21 +578,19 @@ function genTransportLabel() {
   if (!genStreamReady(cfg)) return '酒馆主 API（非流式）';
   return cfg.transport === 'server' ? '酒馆服务端转发（真流式）' : '浏览器直连（真流式）';
 }
-// ① 页那份传输镜像控件的同步。真正的配置只有一份（⑤ 页的 ST.rx.cfg），这里只负责显示与改写它。
-function genSyncTxUi() {
+// 全插件唯一的「传输状态」指示：显示在 shell 顶栏，所有页面都看得到。
+// 配置只有一个入口（⑤ 正则工坊页），这里**只读显示**，不再提供第二份可改控件——
+// 之前 ① 页也放了个选择器、③④⑥⑧ 又什么都没有，才会让人问「传输到底谁决定」。
+function renderTxStatus() {
+  var el = getEl('opf-tx-status'); if (!el) return;
   var cfg = genCfg();
   var t = cfg.transport || 'st';
-  var sel = getEl('opf-tx-transport'); if (sel) sel.value = t;
-  var note = getEl('opf-tx-note'); if (!note) return;
-  if (t === 'st') {
-    note.textContent = '当前：酒馆主 API（非流式）。长分段容易撞中转站的 100 秒墙（524）——换上面两档「真流式」可绕开。';
-    return;
-  }
+  var label = genTransportLabel();
   var why = '';
-  try { if (typeof rxTransportWhy === 'function') why = rxTransportWhy(cfg); } catch (e) {}
-  note.textContent = why
-    ? ('⚠ ' + why)
-    : ('当前：' + genTransportLabel() + '——字节持续在流，不会再撞 100 秒墙。');
+  if (t !== 'st') { try { if (typeof rxTransportWhy === 'function') why = rxTransportWhy(cfg); } catch (e) {} }
+  el.textContent = '传输：' + label + (why ? '（⚠ ' + why + '）' : '');
+  el.className = 'opf-tx-status' + (t === 'st' ? ' opf-tx-st' : ' opf-tx-stream');
+  el.title = '全插件共用同一套生成传输，配置入口在 ⚙ 设置页。点此前往配置。';
 }
 
 // 分段写专用调用：优先走已配置的真流式传输，否则走主 API。
@@ -607,8 +612,14 @@ async function callModelSeg(msgs, label, onProgress) {
     if (isStop()) throw new Error('已停止');
     try {
       if (useStream) {
+        // 每次尝试一个独立的 controller：手动停止时 abort 它，就能立刻掐断在途的流式请求
+        var ctl = newAbortCtl();
+        ST.abortCtl = ctl;
         // 流式：字节在流动就不会 524；idleMs 内没有新字节 → 判定停顿，交给下面的重roll
-        var res = await genStreamCall(msgs, onProgress, { phase: label, idleMs: idleMs, maxMs: 600000, maxTokens: 8192 });
+        var res = await genStreamCall(msgs, onProgress, { phase: label, idleMs: idleMs, maxMs: 600000, maxTokens: GEN_MAX_OUTPUT_TOKENS, signal: ctl.signal });
+        ST.abortCtl = null;
+        // 用户按了停止：哪怕收到了半截内容也算停，不把残稿当成功写进结果
+        if (isStop() || (res && res.aborted)) throw new Error('已停止');
         var text = (res && typeof res.text === 'string') ? res.text : '';
         if (res && res.stalled && !String(text).trim()) throw new Error('OPF_SEG_TIMEOUT:' + idleMs);
         if (!String(text).trim()) throw new Error('模型返回空（可能被中转截断或安全策略拦下），可重试。');
@@ -616,10 +627,14 @@ async function callModelSeg(msgs, label, onProgress) {
         return text;
       }
       var out = await callModelWithTimeout(msgs, timeoutMs);
+      if (isStop()) throw new Error('已停止');
       if (attempt > 1) { toast('【' + (label || '本段') + '】第 ' + attempt + ' 次重roll成功'); }
       return out;
     } catch (e) {
+      ST.abortCtl = null;
       lastErr = e;
+      // 手动停止优先：绝不因为"停止"触发重roll，也绝不装作成功
+      if (isStop() || (e && e.name === 'AbortError')) throw new Error('已停止');
       if (!isSegRetryable(e)) throw e;                 // 真实报错（如鉴权/参数）不重roll，直接抛
       if (attempt >= maxTries) break;                  // 达到上限（或开关关闭）退出重试
       opfLog('seg retryable failure, auto-retry', label, attempt, '/', maxTries, e && e.message);
@@ -635,6 +650,33 @@ async function callModelSeg(msgs, label, onProgress) {
   err.isSegTimeout = true;
   err.cause = lastErr;
   throw err;
+}
+// 建一个 AbortController；环境没有就返回一个永远不 abort 的替身（功能降级，但不炸）
+function newAbortCtl() {
+  try {
+    if (typeof AbortController === 'function') return new AbortController();
+  } catch (e) {}
+  return { signal: null, abort: function () {} };
+}
+// ---------------- 手动停止 ----------------
+// 一键停下正在跑的整条流程。做三件事，缺一不可：
+//   ① 置 stopReq —— 所有分段循环的下一步之前都会看到它并退出（不会"停完这一步又接着跑"）；
+//   ② abort 在途的流式请求 —— 掐断 reader，立刻结束，不必等模型吐完；
+//   ③ /abort 在途的非流式请求 —— generateRaw 没有 signal 可用，只能走 STscript 的 /abort。
+// 说明：以前「再点一次生成按钮」其实是**死代码**——运行时按钮被设成 disabled，根本点不到；
+// stopReq 也只能在两个阶段之间生效，在途那次请求完全停不下来。
+function stopGeneration() {
+  if (!ST.running) { toast('当前没有正在跑的生成'); return false; }
+  if (ST.stopReq) return true;
+  ST.stopReq = true;
+  var cut = [];
+  try { if (ST.abortCtl && typeof ST.abortCtl.abort === 'function') { ST.abortCtl.abort(); cut.push('流式'); } } catch (e) { opfErr('stop: abort stream', e); }
+  try { abortRawWait().then(function (ok) { if (ok) opfLog('已发送 /abort'); }); cut.push('主 API'); } catch (e) { opfErr('stop: /abort', e); }
+  // 立刻把按钮/状态切到"停止中"，让界面马上有反应（真正的收尾在各自 finally 里）
+  renderRunButtons();
+  toast('已请求停止：正在中止当前请求…', 'warning');
+  opfLog('stopGeneration：已请求停止', cut);
+  return true;
 }
 // 值得重roll的失败：超时/停顿、以及网关类与空返回——与 ⑤ 页 rxDiagError 的口径一致
 // （76-regex-main.js：/524|502|503|504|timeout|timed out|超时|empty|为空|network|fetch|No message/i）。

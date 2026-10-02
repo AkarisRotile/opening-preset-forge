@@ -452,7 +452,7 @@ function shxLoadCfgToUi() {
 function bindShxPage() {
   shxInit();
   var s = getEl('opf-shx-send'); if (!s || s._b) return; s._b = true;
-  s.addEventListener('click', function () { shxSend(); });
+  s.addEventListener('click', function () { if (ST.running) { stopGeneration(); return; } shxSend(); });
   getEl('opf-shx-wbfile').addEventListener('click', function () { shxPickFile(); });
   getEl('opf-shx-wbactive').addEventListener('click', function () { shxWbUseActive(); });
   getEl('opf-shx-wbclear').addEventListener('click', function () { shxWbReset(); renderShxWb(); shxRenderBooks(); toast('已清空本面板书目（其它板块不受影响）'); });

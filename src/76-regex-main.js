@@ -4,7 +4,7 @@ function bindRxPage() {  rxInit();
   getEl('opf-rx-pull').addEventListener('click', function(){ rxPullFromDestiny(); });
   getEl('opf-rx-parse').addEventListener('click', function(){ rxDoParse(); });
   getEl('opf-rx-parse2').addEventListener('click', function(){ rxDoParseScript(); });
-  getEl('opf-rx-gen').addEventListener('click', function(){ rxGenerate(); });
+  getEl('opf-rx-gen').addEventListener('click', function(){ if (ST.running) { stopGeneration(); return; } rxGenerate(); });
   getEl('opf-rx-check').addEventListener('click', function(){ rxDoCheck(true); });
   getEl('opf-rx-fix').addEventListener('click', function(){ rxAutoFixAll(); });
   getEl('opf-rx-copy1').addEventListener('click', function(){ rxCopy(false); });
@@ -293,9 +293,14 @@ function rxSetButtons() {
   var ps = getEl('opf-rx-parse');
   if (ps) ps.textContent = ST.running ? '■ 解析中…' : '🔍 解析语言格式（AI）';
   var g = getEl('opf-rx-gen');
-  if (g) { g.disabled = !!ST.running; g.textContent = ST.running ? '■ 运行中…' : '🎨 生成替换体'; }
+  // 运行时不禁用，改成「停止生成」，点了立即中止在途请求（原来 disabled 掉就停不下来了）
+  if (g) {
+    g.disabled = false;
+    g.textContent = ST.running ? (ST.stopReq ? '■ 停止中…' : '■ 停止生成') : '🎨 生成替换体';
+    g.title = ST.running ? '点一下立即停止：中止在途请求' : '';
+  }
   var sb = getEl('opf-shx-send');
-  if (sb) { sb.disabled = !!ST.running; sb.textContent = ST.running ? '■ 她在翻书…' : '▶ 发送'; }
+  if (sb) { sb.disabled = false; sb.textContent = ST.running ? (ST.stopReq ? '■ 停止中…' : '■ 停止生成') : '▶ 发送'; sb.title = ST.running ? '点一下立即停止：中止在途请求' : ''; }
   ['opf-shx-compress', 'opf-shx-clear', 'opf-shx-export', 'opf-shx-models'].forEach(function (id) {
     var b2 = getEl(id); if (b2) b2.disabled = !!ST.running;
   });
@@ -794,10 +799,17 @@ async function rxReadSse(resp, onDelta, opts) {
   var maxChars = Number(o.maxChars) || 0;
   if (!resp.body || !resp.body.getReader) throw new Error('当前环境不支持流式读取（ReadableStream 不可用）');
   var reader = resp.body.getReader(), dec = new TextDecoder(), buf = '', full = '';
-  var lastByte = Date.now(), stalled = false;
+  var lastByte = Date.now(), stalled = false, aborted = false;
   var kill = function () { stalled = true; try { reader.cancel().catch(function () {}); } catch (e) {} };
   var tIdle = setTimeout(function () { if (Date.now() - lastByte >= idleMs) kill(); }, idleMs + 300);
   var tMax = setTimeout(kill, maxMs);
+  // 手动停止：外部 abort 时立刻取消读取，不必等下一块数据或下一个 idle 周期
+  var sig = o.signal;
+  var onAbort = function () { aborted = true; kill(); };
+  if (sig) {
+    if (sig.aborted) onAbort();
+    else if (typeof sig.addEventListener === 'function') sig.addEventListener('abort', onAbort);
+  }
   try {
     while (true) {
       var chunk;
@@ -819,9 +831,11 @@ async function rxReadSse(resp, onDelta, opts) {
         } catch (e) { /* 心跳或非 JSON 行 */ }
       }
       if (maxChars && full.length >= maxChars) { kill(); break; }   // 收够就停，防模型跑飞
+      if (aborted) break;
     }
   } finally {
     clearTimeout(tIdle); clearTimeout(tMax);
+    if (sig && typeof sig.removeEventListener === 'function') sig.removeEventListener('abort', onAbort);
   }
   // 尾缓冲（没有换行结尾的最后一段）也要处理
   if (buf.trim()) {
@@ -830,7 +844,7 @@ async function rxReadSse(resp, onDelta, opts) {
       try { var t2 = rxSseText(JSON.parse(last.slice(5).trim())); if (t2) { full += t2; if (onDelta) onDelta(t2, full.length); } } catch (e) {}
     }
   }
-  return { text: full, stalled: stalled };
+  return { text: full, stalled: stalled, aborted: aborted };
 }
 // ① 经酒馆服务端转发（推荐：兼容类反向代理、无 CORS 问题、Google 协议由 ST 转换）
 async function rxServerStream(messages, onDelta, opts) {
@@ -852,16 +866,16 @@ async function rxServerStream(messages, onDelta, opts) {
     messages: messages.map(function (m) { return { role: m.role, content: m.content }; }),
     use_sysprompt: true,
     stream: true,
-    max_tokens: Number(o.maxTokens) || 8192,   // 按每段预算换算，硬顶防跑飞
+    max_tokens: Number(o.maxTokens) || GEN_MAX_OUTPUT_TOKENS,   // 调用方没给就用默认上限（六万）
     temperature: 0.85
   };
-  var r = await fetch(origin + '/api/backends/chat-completions/generate', { method: 'POST', headers: h, body: JSON.stringify(body) });
+  var r = await fetch(origin + '/api/backends/chat-completions/generate', { method: 'POST', headers: h, body: JSON.stringify(body), signal: o.signal });
   if (!r.ok) {
     var txt = '';
     try { txt = (await r.text()).slice(0, 300); } catch (e) {}
     throw new Error('酒馆服务端转发失败 HTTP ' + r.status + ' ' + txt);
   }
-  return rxReadSse(r, onDelta, { idleMs: o.idleMs, maxMs: o.maxMs, maxChars: o.maxChars });
+  return rxReadSse(r, onDelta, { idleMs: o.idleMs, maxMs: o.maxMs, maxChars: o.maxChars, signal: o.signal });
 }
 // ② 浏览器直连（OpenAI 兼容 / Google 原生）
 function rxGeminiBody(messages) {
@@ -869,7 +883,7 @@ function rxGeminiBody(messages) {
   var contents = messages.filter(function (m) { return m.role !== 'system'; }).map(function (m) {
     return { role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] };
   });
-  var body = { contents: contents, generationConfig: { maxOutputTokens: 8192, temperature: 0.85 } };
+  var body = { contents: contents, generationConfig: { maxOutputTokens: GEN_MAX_OUTPUT_TOKENS, temperature: 0.85 } };
   if (sys) body.systemInstruction = { parts: [{ text: sys }] };
   return body;
 }
@@ -893,9 +907,9 @@ async function rxDirectStream(messages, onDelta, opts) {
     if (o.maxTokens) body.max_tokens = Number(o.maxTokens);
     if (key) headers['Authorization'] = 'Bearer ' + key;
   }
-  var r = await fetch(url, { method: 'POST', headers: headers, body: JSON.stringify(body) });
+  var r = await fetch(url, { method: 'POST', headers: headers, body: JSON.stringify(body), signal: o.signal });
   if (!r.ok) { var t = ''; try { t = (await r.text()).slice(0, 300); } catch (e) {} throw new Error('HTTP ' + r.status + ' ' + t); }
-  return rxReadSse(r, onDelta, { idleMs: o.idleMs, maxMs: o.maxMs, maxChars: o.maxChars });
+  return rxReadSse(r, onDelta, { idleMs: o.idleMs, maxMs: o.maxMs, maxChars: o.maxChars, signal: o.signal });
 }
 function rxStreamCall(messages, onNote, opts) {
   var cfg = rxCfg();
@@ -1101,7 +1115,7 @@ function rxPickModel(id) {
   var inp = getEl('opf-rx-model'); if (inp) inp.value = s;
   rxCfg().model = s;
   rxCacheSave();
-  var st = getEl('opf-rx-statusline');
+  var st = getEl('opf-set-status') || getEl('opf-rx-statusline');
   if (st) st.textContent = '已选模型：' + s + (rxTransportUsable() ? '（传输配置完整，可生成）' : '（' + rxTransportWhy() + '）');
   toast('已选模型：' + s);
 }
@@ -1120,7 +1134,7 @@ function rxRememberModel(name) {
 async function rxDoFetchModels(btn) {
   var old = btn ? btn.textContent : '';
   if (btn) { btn.disabled = true; btn.textContent = '获取中…'; }
-  var st = getEl('opf-rx-statusline');
+  var st = getEl('opf-set-status') || getEl('opf-rx-statusline');
   try {
     var r = await rxFetchModels();
     rxFillModelList(r.list);
