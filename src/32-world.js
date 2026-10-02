@@ -304,7 +304,14 @@ var SIZE_CSS = [
   ".opf-tx-status:hover{background:rgba(255,77,94,.26);color:#fff}",
   ".opf-tx-status.opf-tx-stream{color:#baf7cc;background:rgba(60,210,120,.14);border-color:rgba(120,230,150,.42)}",
   // ===== ① 开局预设 =====
-  "#opf-root{width:480px!important;font-size:15px!important}",
+  "#opf-root{font-size:15px!important}",
+  // ① 页在全屏壳里由 SHELL_CSS 的 #opf-shell #opf-root{width:100%} 铺满；
+  // 宽屏下内容走左右两栏（左＝需求与选项，右＝创作步骤与 JSON），窄屏自动叠成一栏。
+  "#opf-page-preset #opf-body{display:grid!important;grid-template-columns:minmax(300px,380px) minmax(0,1fr)!important;gap:14px 22px!important;align-items:start;max-width:1680px!important;margin:0 auto;width:100%;padding:16px 20px 20px!important;overflow:visible!important;min-height:0!important}",
+  "#opf-page-preset .opf-col{display:flex;flex-direction:column;gap:10px;min-width:0}",
+  "#opf-page-preset #opf-memo{grid-column:1/-1}",
+  "@media (max-width:920px){#opf-page-preset #opf-body{grid-template-columns:minmax(0,1fr)!important}}",
+  "#opf-page-preset #opf-actions{position:sticky!important;bottom:0;z-index:6;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}",
   "#opf-title{font-size:16px!important}",
   ".opf-sec-label{font-size:13px!important;letter-spacing:1px!important}",
   "#opf-demand{font-size:14px!important;min-height:60px!important}",
