@@ -632,4 +632,7 @@ function rxSyncTransportUi() {
         ? (why ? '⚠ ' + why : '配置完整，可生成；建议先点「🩺 连通性自检」确认能连通')
         : (why ? '⚠ ' + why : '配置完整，可生成；适用于有 CORS 头的自建/本地接口'));
   }
+  // 顶栏「传输：X」chip 和这里是同一份配置，必须跟着一起刷新——
+  // 否则会出现「设置页选了真流式、顶栏却还写着酒馆主 API」的不一致。
+  try { renderTxStatus(); } catch (e) { opfErr('rxSyncTransportUi -> renderTxStatus', e); }
 }

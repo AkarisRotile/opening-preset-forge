@@ -1662,6 +1662,9 @@ function rxCacheSave() {
     // cfg 也要存：它是**全插件共用的生成传输**（①③⑧ 的分段写同样读它），
     // 从前只存草稿不存 cfg，刷新酒馆后反代地址/模型名就没了，共用配置会形同虚设。
     lsSet(LS_RX_KEY, { core: ST.rx.core, coreName: ST.rx.coreName, items: ST.rx.items, cfg: ST.rx.cfg });
+    // 配置任何一处变了（传输/地址/密钥/模型/直连项）都从这里过——顺手刷新顶栏「传输：X」chip，
+    // 免得出现"设置页选真流式、顶栏还写酒馆主 API"这种两边不一致。
+    try { renderTxStatus(); } catch (e) { opfErr('rxCacheSave -> renderTxStatus', e); }
   }, 500);
 }
 function rxCacheRestore() {

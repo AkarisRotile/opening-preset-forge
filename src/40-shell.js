@@ -17,8 +17,18 @@ var PAGE_DEFS = [
 // v1.17.0：导航按**任务**分组，不再是一排扁平数字标签。
 // 「② 世界书」是全局参考、「⚙ 设置」是全局配置——它们属于顶部 chrome，不属于这一层。
 // world / settings 仍是 PAGE_DEFS 里的页（容器照建），只是不进左侧导航。
+//
+// v1.17.1：①③④ 三条流水线收进**同一个「分段创作」入口**（虚拟项 id="create"），
+// 页内再用类型切换器换页。**三条流水线的提示词/分段/产出校验一行都不动**——
+// 它们本来就各自按 id 独立工作，这里只是换了个外壳呈现方式。
+var CREATE_TYPES = [
+  { id: "preset",  label: "① 开局预设" },
+  { id: "char",    label: "③ 二创角色" },
+  { id: "destiny", label: "④ 命定系统" }
+];
+function isCreateType(id) { for (var i = 0; i < CREATE_TYPES.length; i++) if (CREATE_TYPES[i].id === id) return true; return false; }
 var NAV_GROUPS = [
-  { title: "创作", items: ["preset", "char", "destiny"] },
+  { title: "创作", items: ["create"] },
   { title: "单件", items: ["regex", "refine", "atelier"] },
   { title: "对话", items: ["shixian"] }
 ];
@@ -33,6 +43,24 @@ var SHELL_CSS2 = [
   "#opf-nav .opf-tab.active{background:linear-gradient(90deg,rgba(255,77,94,.30),rgba(255,77,94,.05));color:#fff;border-color:rgba(255,150,165,.45);box-shadow:inset 3px 0 0 #ff4d5e}",
   ".opf-chrome-btn{flex:none;border:1px solid rgba(255,122,138,.3);background:rgba(255,235,238,.06);color:#ffc9cf;border-radius:8px;padding:7px 11px;font-size:12.5px;cursor:pointer;white-space:nowrap}",
   ".opf-chrome-btn:hover{background:rgba(255,77,94,.22);color:#fff}",
+  // 「分段创作」的类型切换子栏（只在创作页显示）
+  "#opf-subbar{flex:none;display:flex;align-items:center;gap:6px;padding:8px 14px;background:rgba(30,5,12,.55);border-bottom:1px solid rgba(255,122,138,.16);overflow-x:auto;scrollbar-width:thin}",
+  ".opf-subbar-label{flex:none;font-size:11.5px;letter-spacing:2px;color:rgba(255,170,180,.55);text-transform:uppercase;margin-right:4px}",
+  ".opf-subtab{flex:none;border:1px solid rgba(255,122,138,.26);background:rgba(255,235,238,.05);color:#ffc9cf;border-radius:999px;padding:6px 13px;font-size:12.5px;cursor:pointer;white-space:nowrap;transition:background .14s ease,color .14s ease}",
+  ".opf-subtab:hover{background:rgba(255,77,94,.18);color:#fff}",
+  ".opf-subtab.active{background:linear-gradient(180deg,rgba(255,77,94,.32),rgba(255,77,94,.12));color:#fff;border-color:rgba(255,150,165,.6)}",
+  // 侧栏工程（草稿）列表
+  "#opf-projlist{flex:none;display:flex;flex-direction:column;gap:2px;padding:0 4px 8px 16px}",
+  ".opf-proj-head{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:11px;color:rgba(255,170,180,.5);padding:4px 4px 4px 0}",
+  ".opf-proj-add{flex:none;border:1px solid rgba(255,122,138,.3);background:rgba(255,235,238,.06);color:#ffc9cf;border-radius:6px;padding:0 7px;font-size:12px;line-height:1.7;cursor:pointer}",
+  ".opf-proj-add:hover{background:rgba(255,77,94,.25);color:#fff}",
+  ".opf-proj-row{display:flex;align-items:center;gap:4px;border-radius:6px;padding:4px 6px;cursor:pointer;font-size:12.5px;color:rgba(255,226,230,.8)}",
+  ".opf-proj-row:hover{background:rgba(255,235,238,.08)}",
+  ".opf-proj-row.active{background:rgba(255,77,94,.18);color:#fff;box-shadow:inset 2px 0 0 #ff4d5e}",
+  ".opf-proj-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
+  ".opf-proj-del{flex:none;border:none;background:transparent;color:rgba(255,160,170,.55);cursor:pointer;font-size:11px;padding:0 3px;border-radius:4px;line-height:1.6}",
+  ".opf-proj-del:hover{color:#fff;background:rgba(255,77,94,.3)}",
+  ".opf-proj-empty{font-size:11.5px;color:rgba(255,200,208,.45);padding:2px 0 2px 2px}",
   // 分段创作页（①③④）统一模板：左控制 / 右产出。用两类选择器压过 .opf-char-wrap 的单栏定义。
   ".opf-char-wrap.opf-2col{display:grid;grid-template-columns:minmax(300px,380px) minmax(0,1fr);gap:14px 22px;max-width:1680px;align-items:start}",
   ".opf-char-wrap.opf-2col .opf-col{display:flex;flex-direction:column;gap:8px;min-width:0}",
@@ -64,6 +92,18 @@ function buildShell(){
   head.appendChild(title); head.appendChild(tx); head.appendChild(wbtn); head.appendChild(gear); head.appendChild(close);
   shell.appendChild(head);
 
+  // ---- 类型切换子栏：只在「分段创作」的三种类型页显示 ----
+  var subbar = document.createElement("div"); subbar.id = "opf-subbar"; subbar.style.display = "none";
+  var slabel = document.createElement("span"); slabel.className = "opf-subbar-label"; slabel.textContent = "分段创作";
+  subbar.appendChild(slabel);
+  CREATE_TYPES.forEach(function (ct) {
+    var b = document.createElement("button"); b.type = "button"; b.id = "opf-subtab-" + ct.id; b.className = "opf-subtab";
+    b.textContent = ct.label; b.title = "切到" + ct.label;
+    b.addEventListener("click", function () { switchPage(ct.id); });
+    subbar.appendChild(b);
+  });
+  shell.appendChild(subbar);
+
   // ---- 主体：左侧分组导航 + 右侧内容区 ----
   var bodyWrap = document.createElement("div"); bodyWrap.id = "opf-shell-body";
   var nav = document.createElement("nav"); nav.id = "opf-nav";
@@ -71,11 +111,15 @@ function buildShell(){
   NAV_GROUPS.forEach(function (g) {
     var gt = document.createElement("div"); gt.className = "opf-nav-group"; gt.textContent = g.title; nav.appendChild(gt);
     g.items.forEach(function (id) {
-      var p = byId[id]; if (!p) return;
+      var p = byId[id];
+      // "create" 是虚拟项（不在 PAGE_DEFS 里）：代表 ①③④ 三种类型共用的入口
+      var label = p ? p.label : (id === "create" ? "分段创作" : id);
       var t = document.createElement("button"); t.type = "button"; t.id = "opf-tab-" + id; t.className = "opf-tab";
-      t.textContent = p.label; t.title = p.label;
+      t.textContent = label; t.title = p ? label : (label + "（开局预设 / 二创角色 / 命定系统）");
       t.addEventListener("click", function () { switchPage(id); });
       nav.appendChild(t);
+      // 「分段创作」下面挂工程（草稿）列表：一个类型一份列表
+      if (id === "create") { var pl = document.createElement("div"); pl.id = "opf-projlist"; nav.appendChild(pl); }
     });
   });
   bodyWrap.appendChild(nav);
@@ -123,6 +167,7 @@ function buildShell(){
   try { bindCharPage(); } catch (e) { opfErr("char page", e); }
   try { bindDestinyPage(); } catch (e) { opfErr("destiny page", e); }
   try { bindRxPage(); } catch (e) { opfErr("regex page", e); }
+  try { bindSettingsExtra(); } catch (e) { opfErr("settings extra", e); }
   try { bindShxPage(); } catch (e) { opfErr("shixian page", e); }
   try { bindRefinePage(); } catch (e) { opfErr("refine page", e); }
   try { bindAtelierPage(); } catch (e) { opfErr("atelier page", e); }
@@ -131,12 +176,30 @@ function buildShell(){
 }
 function switchPage(id, force){
   var s = getSettings();
+  // "create" 是虚拟入口：落到上次用的那种创作类型上
+  if (id === "create") id = isCreateType(s.createType) ? s.createType : "preset";
   if (!force && s.activePage === id) return;
-  s.activePage = id; saveSettings();
+  s.activePage = id;
+  if (isCreateType(id)) s.createType = id;   // 记住类型，下次进「分段创作」直接回到它
+  saveSettings();
   var pages = getEl("opf-pages"); if (!pages) return;
   [].forEach.call(pages.children, function (d) { d.classList.toggle("active", d.id === "opf-page-" + id); });
+  // 左侧导航高亮：虚拟项 create 在任一创作类型页都保持高亮
   var nav = getEl("opf-nav");
-  if (nav) [].forEach.call(nav.children, function (t) { t.classList.toggle("active", t.id === "opf-tab-" + id); });
+  if (nav) [].forEach.call(nav.children, function (t) {
+    var tid = String(t.id || "").replace(/^opf-tab-/, "");
+    t.classList.toggle("active", (t.id === "opf-tab-" + id) || (tid === "create" && isCreateType(id)));
+  });
+  // 类型切换子栏：只在创作页显示，并标出当前类型
+  var sb = getEl("opf-subbar");
+  if (sb) {
+    sb.style.display = isCreateType(id) ? "" : "none";
+    CREATE_TYPES.forEach(function (ct) {
+      var b = getEl("opf-subtab-" + ct.id);
+      if (b) b.classList.toggle("active", ct.id === id);
+    });
+  }
+  try { renderProjList(); } catch (e) { opfErr("renderProjList", e); }
   if (id === "world") { try { buildWorldSide(); renderWorldSide(); } catch (e) {} }
   if (id === "char") { try { renderCharPage(); } catch (e) {} }
   if (id === "destiny") { try { renderDestinyPage(); } catch (e) {} }

@@ -244,12 +244,11 @@ async function runMemoSummarize() {
   MEMO.busy = true;
   renderMemoStatus('⏳ 正在总结…');
   try {
-    var resp = await c.generateRaw({
-      prompt: [
-        { role: 'system', content: req.system },
-        { role: 'user', content: req.user }
-      ]
-    });
+    // 统一走 callModel：与分段/交火/封装/精修同一套传输（由 ⚙ 设置页决定），不再绕过
+    var resp = await callModel([
+      { role: 'system', content: req.system },
+      { role: 'user', content: req.user }
+    ]);
     var text = cleanMemoText(resp);
     if (text) {
       MEMO.summary = clampMemoText(text, ms.maxChars);

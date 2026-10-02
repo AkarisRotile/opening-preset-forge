@@ -38,7 +38,8 @@ var DEFAULT_SETTINGS = {
   activePage: 'preset',      // 全屏壳当前页：preset | world | char | p4..p6
   modelNote: '',             // 附加一句给模型的叮嘱
   segAutoRetry: false,       // 分段写超时自动重roll（仅分段写阶段触发）
-  retryTimeoutSec: 180       // 分段写单段超过该秒数无响应则重roll
+  retryTimeoutSec: 180,      // 分段写单段超过该秒数无响应则重roll
+  createType: 'preset'       // 「分段创作」当前类型：preset | char | destiny
 };
 
 // ---------------- 始弦人设（唯一真源 · 原版预设原文，一字不改） ----------------
@@ -166,6 +167,7 @@ var ST = {
   running: false,
   stopReq: false,
   abortCtl: null,      // 当前在途流式请求的 AbortController（手动停止时 abort 它）
+  stopWaiters: [],     // 在途非流式请求的"停止开关"（手动停止时 reject 它们，立即结束等待）
   msgs: null,          // 当前分步会话的消息数组
   results: {},         // phaseId -> 文本
   status: {},          // phaseId -> 'wait'|'run'|'ok'|'err'
@@ -503,7 +505,26 @@ function opfEjsLastStat(label) {
   } catch (e) { return { inCount: 0, outCount: 0, lastAt: 0 }; }
 }
 
+// 统一 AI 调用入口：**所有**生成（分段、交火、封装、精修、建议、聊天、正则、精修核心）
+// 都从这里过。配了真流式就走流式（绕开 Cloudflare 100 秒墙 / 524），并接入手动停止；
+// 否则退化为原来的非流式 generateRaw。
+// 这样"只改了生成、没改封装/交火"这类漏网不会再发生——一处改，处处生效。
 async function callModel(msgs, extraOpts) {
+  if (genStreamReady()) {
+    var ctl = newAbortCtl();
+    ST.abortCtl = ctl;
+    var maxT = (extraOpts && extraOpts.responseLength) ? Number(extraOpts.responseLength) : GEN_MAX_OUTPUT_TOKENS;
+    var res;
+    try {
+      res = await genStreamCall(msgs, null, { maxTokens: maxT, maxMs: 600000, idleMs: 300000, signal: ctl.signal });
+    } finally {
+      ST.abortCtl = null;
+    }
+    if (isStop() || (res && res.aborted)) throw new Error('已停止');
+    var txt = (res && typeof res.text === 'string') ? res.text : '';
+    if (!String(txt).trim()) throw new Error('模型返回空（可能被中转截断或安全策略拦下），可重试。');
+    return txt;
+  }
   var c = getCtx();
   if (!c || typeof c.generateRaw !== 'function') {
     throw new Error('generateRaw 不可用（SillyTavern 版本过旧或未就绪）。请升级到支持 getContext().generateRaw 的版本。');
@@ -538,19 +559,31 @@ async function abortRawWait() {
   try { await th.triggerSlash('/abort'); return true; } catch (e) { opfErr('abortRawWait', e); return false; }
 }
 
-// 带超时的分段调用：只包超时，不在这里重试（重试由 callModelSeg 这层做，便于归并提示与状态）。
+// 带超时的分段调用：同时赛跑「主 API」「墙钟超时」「手动停止」三者，谁先到算谁。
+// 之前只赛跑前两者——手动停止若 /abort 没真打断 generateRaw，就只能傻等到超时时间。
 async function callModelWithTimeout(msgs, timeoutMs) {
   var timer = null;
-  var settle = function () { if (timer) { clearTimeout(timer); timer = null; } };
+  var waiter = { reject: null };
+  var stopP = new Promise(function (_, reject) { waiter.reject = reject; });
+  ST.stopWaiters = ST.stopWaiters || [];
+  ST.stopWaiters.push(waiter);
+  var callP = callModel(msgs);
+  callP.catch(function () {});                 // 主请求若晚于停止才失败，别抛未处理拒绝
+  var settle = function () {
+    if (timer) { clearTimeout(timer); timer = null; }
+    var i = (ST.stopWaiters || []).indexOf(waiter);
+    if (i >= 0) ST.stopWaiters.splice(i, 1);
+  };
   try {
     var result = await Promise.race([
-      callModel(msgs),
+      callP,
       new Promise(function (_, reject) {
         timer = setTimeout(function () {
           timer = null;
           reject(new Error('OPF_SEG_TIMEOUT:' + timeoutMs));
         }, timeoutMs);
-      })
+      }),
+      stopP
     ]);
     settle();
     return result;
@@ -558,6 +591,12 @@ async function callModelWithTimeout(msgs, timeoutMs) {
     settle();
     throw e;
   }
+}
+// 手动停止时：把在途非流式请求的等待全部立刻 reject（不等墙钟）
+function releaseStopWaiters() {
+  var list = ST.stopWaiters || [];
+  ST.stopWaiters = [];
+  list.forEach(function (w) { try { w.reject(new Error('已停止')); } catch (e) {} });
 }
 
 // ---------------- 生成传输：分段写可走「真流式」，从根上绕开 Cloudflare 100 秒墙 ----------------
@@ -687,6 +726,7 @@ function stopGeneration() {
   if (ST.stopReq) return true;
   ST.stopReq = true;
   var cut = [];
+  releaseStopWaiters();                             // 立刻结束在途非流式请求的等待（不等墙钟）
   try { if (ST.abortCtl && typeof ST.abortCtl.abort === 'function') { ST.abortCtl.abort(); cut.push('流式'); } } catch (e) { opfErr('stop: abort stream', e); }
   try { abortRawWait().then(function (ok) { if (ok) opfLog('已发送 /abort'); }); cut.push('主 API'); } catch (e) { opfErr('stop: /abort', e); }
   // 立刻把按钮/状态切到"停止中"，让界面马上有反应（真正的收尾在各自 finally 里）
@@ -981,7 +1021,7 @@ function getEl(id){return document.getElementById(id);}
 
 //@module 30-preset-ui — ① 开局预设：页面 UI + 分步管线 + 每步精修 + 重新汇总
 var OPF_CSS = "#opf-root,#opf-launcher{box-sizing:border-box;font-family:'Noto Sans SC','Microsoft YaHei',sans-serif;letter-spacing:.3px}#opf-root *,#opf-launcher *{box-sizing:border-box}#opf-launcher{position:fixed;right:6px;top:42%;z-index:2147480001;width:38px;height:38px;border-radius:12px 6px 6px 12px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#ffd9de;background:linear-gradient(160deg,rgba(74,10,20,.92),rgba(24,3,8,.88));border:1px solid rgba(255,106,122,.28);box-shadow:0 0 6px rgba(255,77,94,.55),0 0 18px rgba(200,16,46,.35);font-size:18px;transition:transform .18s ease,box-shadow .18s ease;user-select:none}#opf-launcher:hover{transform:scale(1.08);box-shadow:0 0 6px rgba(255,77,94,.55),0 0 18px rgba(200,16,46,.35),0 0 24px rgba(255,77,94,.5)}#opf-launcher .opf-la-dot{position:absolute;top:-3px;right:-3px;width:10px;height:10px;border-radius:50%;background:#39d353;border:1px solid rgba(0,0,0,.5);display:none}#opf-launcher.running .opf-la-dot{display:block;animation:opfPulse 1s infinite}@keyframes opfPulse{0%,100%{opacity:1}50%{opacity:.25}}#opf-root{position:fixed;z-index:2147480000;width:392px;max-width:calc(100vw - 18px);max-height:min(760px,92vh);display:flex;flex-direction:column;border-radius:14px;color:#fdeef0;overflow:hidden;background:linear-gradient(180deg,rgba(46,6,14,.92) 0%,rgba(30,4,10,.90) 45%,rgba(16,2,6,.94) 100%);border:1px solid rgba(255,122,138,.34);box-shadow:0 0 0 1px rgba(0,0,0,.35),0 10px 34px rgba(0,0,0,.55),inset 0 0 42px rgba(255,60,80,.05),0 0 22px rgba(255,77,94,.22);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);transition:opacity .16s ease,transform .16s ease}#opf-root::before{content:'';position:absolute;inset:0 0 auto 0;height:2px;background:linear-gradient(90deg,transparent,#ff4d5e 18%,#ffd9a8 50%,#c8102e 82%,transparent);box-shadow:0 0 12px rgba(255,90,100,.8);opacity:.9}#opf-root.opf-hidden{opacity:0;pointer-events:none;transform:translateY(6px) scale(.98)}#opf-head{display:flex;align-items:center;gap:6px;padding:8px 10px 7px 12px;cursor:move;user-select:none;background:linear-gradient(90deg,rgba(255,200,210,.10),rgba(200,16,46,.06) 55%,rgba(255,200,210,.04));border-bottom:1px solid rgba(255,122,138,.18)}#opf-title{font-weight:700;font-size:13px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#ffd9de;text-shadow:0 0 8px rgba(255,77,94,.65)}#opf-title .s{color:#ffb7be;font-size:11px;font-weight:500;margin-left:6px}.opf-ico-btn{border:1px solid transparent;background:rgba(255,255,255,.04);color:#ff8a95;border-radius:7px;cursor:pointer;width:24px;height:22px;font-size:12px;line-height:1;transition:all .14s ease}.opf-ico-btn:hover{background:rgba(255,77,94,.18);color:#fff;border-color:rgba(255,106,122,.28);box-shadow:0 0 4px rgba(255,77,94,.35),0 0 12px rgba(200,16,46,.22)}#opf-body{overflow-y:auto;display:flex;flex-direction:column;min-height:0}#opf-meta{display:flex;flex-wrap:wrap;gap:4px 8px;padding:6px 12px;font-size:11px;color:rgba(255,230,234,.72);background:rgba(255,255,255,.02);border-bottom:1px dashed rgba(255,122,138,.16)}#opf-meta .tag{padding:1px 6px;border-radius:20px;font-size:10px;background:rgba(255,77,94,.12);border:1px solid rgba(255,122,138,.25);color:#ffc9ce}#opf-meta .tag.ok{color:#a5f0c0;border-color:rgba(120,255,170,.35);background:rgba(60,160,90,.14)}#opf-meta .tag.err{color:#ffd0a3;border-color:rgba(255,170,90,.4);background:rgba(200,110,40,.14)}.opf-sec{padding:8px 12px 6px}.opf-sec-label{font-size:10px;letter-spacing:2px;color:rgba(255,170,180,.62);margin-bottom:6px;text-transform:uppercase;display:flex;align-items:center;gap:6px}.opf-sec-label::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(255,120,135,.35),transparent)}#opf-demand{width:100%;resize:vertical;min-height:44px;max-height:120px;border-radius:9px;padding:7px 9px;color:#ffeef1;font-size:12px;line-height:1.5;background:rgba(10,2,5,.55);border:1px solid rgba(255,122,138,.25);outline:none;transition:border-color .15s ease,box-shadow .15s ease}#opf-demand:focus{border-color:rgba(255,110,125,.6);box-shadow:0 0 10px rgba(255,77,94,.25)}#opf-demand::placeholder{color:rgba(255,210,216,.35)}.opf-opts{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:4px 12px 6px}.opf-opt{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:rgba(255,226,230,.78);cursor:pointer}.opf-opt input{accent-color:#ff4d5e;cursor:pointer}.opf-num{width:54px;background:rgba(10,2,5,.55);color:#ffeef1;border:1px solid rgba(255,122,138,.25);border-radius:6px;padding:2px 5px;font-size:11px}#opf-pname{width:150px;background:rgba(10,2,5,.55);color:#ffeef1;border:1px solid rgba(255,122,138,.25);border-radius:6px;padding:2px 6px;font-size:11px}.opf-steps{padding:2px 12px 6px;display:flex;flex-direction:column;gap:6px;overflow-y:auto;max-height:290px}.opf-step{border-radius:10px;border:1px solid rgba(255,122,138,.18);background:rgba(255,235,238,.035);transition:background .15s ease,border-color .15s ease,box-shadow .15s ease}.opf-step[data-st=run]{background:rgba(255,90,105,.10);border-color:rgba(255,120,135,.5);box-shadow:0 0 4px rgba(255,77,94,.35),0 0 12px rgba(200,16,46,.22)}.opf-step[data-st=ok]{background:rgba(120,230,160,.05);border-color:rgba(140,255,180,.25)}.opf-step[data-st=err]{border-color:rgba(255,150,90,.55)}.opf-step-head{display:flex;align-items:center;gap:7px;padding:6px 8px;cursor:pointer}.opf-idx{width:17px;height:17px;border-radius:6px 2px 6px 2px;flex:none;font-size:10px;font-weight:700;color:#ffd7dc;display:inline-flex;align-items:center;justify-content:center;background:linear-gradient(140deg,rgba(200,16,46,.55),rgba(80,10,22,.65));border:1px solid rgba(255,120,135,.35);box-shadow:0 0 6px rgba(255,77,94,.25)}.opf-dot{width:14px;font-size:11px;text-align:center;color:#8e6670;flex:none}.opf-step[data-st=run] .opf-dot{color:#ff8a95;animation:opfPulse 1s infinite}.opf-step[data-st=ok] .opf-dot{color:#7fe6a0}.opf-step[data-st=err] .opf-dot{color:#ffb066}.opf-step-title{flex:1;font-size:12px;color:#ffe9ec}.opf-step-sub{font-size:10px;color:rgba(255,200,208,.45)}.opf-step-act{border:none;background:rgba(255,255,255,.05);color:#ffc0c8;cursor:pointer;border-radius:6px;padding:2px 7px;font-size:10px;transition:all .14s ease}.opf-step-act:hover{background:rgba(255,77,94,.2);color:#fff;box-shadow:0 0 4px rgba(255,77,94,.35),0 0 12px rgba(200,16,46,.22)}.opf-step-body{display:none;padding:4px 9px 8px 30px;font-size:11px;line-height:1.55;color:rgba(255,226,230,.82)}.opf-step.open .opf-step-body{display:block}.opf-step-body pre{white-space:pre-wrap;word-break:break-word;margin:0;font-family:inherit}.opf-out{padding:2px 12px 8px}#opf-json-out{max-height:170px;overflow:auto;margin:0;padding:8px 10px;border-radius:9px;font-size:10.5px;line-height:1.5;white-space:pre-wrap;word-break:break-word;color:#ffd9de;background:rgba(8,1,4,.72);border:1px solid rgba(255,122,138,.22);box-shadow:inset 0 0 24px rgba(255,60,80,.05)}#opf-actions{display:flex;gap:6px;padding:8px 12px 10px;background:linear-gradient(0deg,rgba(200,16,46,.10),rgba(200,16,46,.02));border-top:1px solid rgba(255,122,138,.18)}.opf-btn{flex:1;cursor:pointer;border-radius:8px;border:1px solid transparent;font-size:12px;padding:7px 4px;color:#fff;letter-spacing:1px;transition:all .15s ease}.opf-btn:hover{filter:brightness(1.12)}.opf-btn:disabled{opacity:.45;cursor:not-allowed;filter:none}.opf-btn.primary{background:linear-gradient(135deg,rgba(255,110,120,.92),rgba(190,16,42,.96));border-color:rgba(255,180,190,.5);box-shadow:0 0 6px rgba(255,77,94,.55),0 0 18px rgba(200,16,46,.35);text-shadow:0 0 6px rgba(255,255,255,.4)}.opf-btn.ghost{background:rgba(255,235,238,.06);border-color:rgba(255,122,138,.25);color:#ffd5da}.opf-btn.ghost:hover{background:rgba(255,90,105,.14)}@media (max-width:640px){#opf-root{width:calc(100vw - 14px);left:7px !important;right:auto !important}}";
-var OPF_HTML = "<div id=\"opf-body\"><div class=\"opf-col opf-col-a\"><div id=\"opf-meta\"></div><div class=\"opf-sec\"><div class=\"opf-sec-label\">开局需求</div><textarea id=\"opf-demand\" placeholder=\"例如：给一位从迷雾森林走出、想在瓦伦蒂亚城谋生的流浪剑士配齐开局（1级、偏好近战、带一只契约伙伴……）\"></textarea></div><div class=\"opf-opts\"><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-card\"> 带角色卡</label><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-world\"> 带世界书</label><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-const\"> 仅常驻</label><label class=\"opf-opt\">注入上限<input type=\"number\" id=\"opf-cap\" class=\"opf-num\" min=\"2000\" max=\"200000\" step=\"1000\"></label><label class=\"opf-opt\">名称<input id=\"opf-pname\" value=\"【自定义开局】\" title=\"开局预设名称（导出 name 字段与文件名）\"></label></div><div class=\"opf-opts\"><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-quick\"> 快出模式(单次)</label><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-meta\"> 导出含文件元数据</label><button class=\"opf-step-act\" id=\"opf-wload\" type=\"button\">导入世界书文件</button><button class=\"opf-step-act\" id=\"opf-wclear\" type=\"button\">清世界书</button></div><div class=\"opf-opts\"><label class=\"opf-opt\" title=\"仅分段写阶段触发：开局预设的创作分段与二创角色的分段；单次快出/汇总/精修/交火梳理不触发\"><input type=\"checkbox\" id=\"opf-ck-segretry\"> 分段超时自动重roll</label><label class=\"opf-opt\" title=\"分段写单段超过该秒数无响应即自动重roll（每段最多3次）\">超时阈值<input type=\"number\" id=\"opf-retrytimeout\" class=\"opf-num\" min=\"15\" max=\"3600\" step=\"15\"> 秒</label></div></div><div class=\"opf-col opf-col-b\"><div class=\"opf-sec\"><div class=\"opf-sec-label\">创作步骤</div><div class=\"opf-steps\" id=\"opf-steps\"></div></div><div class=\"opf-out\"><div class=\"opf-sec-label\">预设 JSON</div><pre id=\"opf-json-out\">尚未生成</pre></div></div></div><div id=\"opf-actions\"><button class=\"opf-btn primary\" id=\"opf-btn-run\">▶ 生成初稿</button><button class=\"opf-btn ghost\" id=\"opf-btn-quick\">⚡ 快速初稿</button><button class=\"opf-btn ghost\" id=\"opf-btn-save\">⬇ 导出 .preset.json</button><button class=\"opf-btn ghost\" id=\"opf-btn-copy\">⧉ 复制</button></div>";
+var OPF_HTML = "<div id=\"opf-body\"><div class=\"opf-col opf-col-a\"><div id=\"opf-meta\"></div><div class=\"opf-sec\"><div class=\"opf-sec-label\">开局需求</div><textarea id=\"opf-demand\" placeholder=\"例如：给一位从迷雾森林走出、想在瓦伦蒂亚城谋生的流浪剑士配齐开局（1级、偏好近战、带一只契约伙伴……）\"></textarea></div><div class=\"opf-opts\"><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-card\"> 带角色卡</label><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-world\"> 带世界书</label><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-const\"> 仅常驻</label><label class=\"opf-opt\">注入上限<input type=\"number\" id=\"opf-cap\" class=\"opf-num\" min=\"2000\" max=\"200000\" step=\"1000\"></label><label class=\"opf-opt\">名称<input id=\"opf-pname\" value=\"【自定义开局】\" title=\"开局预设名称（导出 name 字段与文件名）\"></label></div><div class=\"opf-opts\"><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-quick\"> 快出模式(单次)</label><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-meta\"> 导出含文件元数据</label><button class=\"opf-step-act\" id=\"opf-wload\" type=\"button\">导入世界书文件</button><button class=\"opf-step-act\" id=\"opf-wclear\" type=\"button\">清世界书</button></div></div><div class=\"opf-col opf-col-b\"><div class=\"opf-sec\"><div class=\"opf-sec-label\">创作步骤</div><div class=\"opf-steps\" id=\"opf-steps\"></div></div><div class=\"opf-out\"><div class=\"opf-sec-label\">预设 JSON</div><pre id=\"opf-json-out\">尚未生成</pre></div></div></div><div id=\"opf-actions\"><button class=\"opf-btn primary\" id=\"opf-btn-run\">▶ 生成初稿</button><button class=\"opf-btn ghost\" id=\"opf-btn-quick\">⚡ 快速初稿</button><button class=\"opf-btn ghost\" id=\"opf-btn-save\">⬇ 导出 .preset.json</button><button class=\"opf-btn ghost\" id=\"opf-btn-copy\">⧉ 复制</button></div>";
 
 function injectStyle(){ if (getEl(NS + "_css")) return; var st = document.createElement("style"); st.id = NS + "_css"; st.textContent = OPF_CSS; document.head.appendChild(st); var st2 = document.createElement("style"); st2.id = NS + "_css_extra"; st2.textContent = EXTRA_CSS; document.head.appendChild(st2); }
 function launcher(){
@@ -1085,8 +1125,6 @@ function bindPanel(root){
   root.querySelector("#opf-ck-const").addEventListener("change", syncFromControl);
   root.querySelector("#opf-ck-quick").addEventListener("change", syncFromControl);
   root.querySelector("#opf-ck-meta").addEventListener("change", syncFromControl);
-  root.querySelector("#opf-ck-segretry").addEventListener("change", syncFromControl);
-  root.querySelector("#opf-retrytimeout").addEventListener("change", syncFromControl);
   root.querySelector("#opf-cap").addEventListener("change", syncFromControl);
   root.querySelector("#opf-pname").addEventListener("change", syncFromControl);
   var fi = document.createElement("input"); fi.type = "file"; fi.accept = ".json,application/json"; ST.fileInput = fi;
@@ -1105,9 +1143,6 @@ function syncFromControl(){
   s.metaMode = getEl("opf-ck-meta").checked ? "full" : "core";
   var cap = parseInt(getEl("opf-cap").value, 10);
   s.capChars = isNaN(cap) ? 30000 : clamp(cap, 2000, 200000);
-  s.segAutoRetry = getEl("opf-ck-segretry").checked;
-  var rt = parseInt(getEl("opf-retrytimeout").value, 10);
-  s.retryTimeoutSec = isNaN(rt) ? 180 : clamp(rt, 15, 3600);
   s.lastName = getEl("opf-pname").value;
   saveSettings(); renderMetaStatus();
 }
@@ -1119,8 +1154,6 @@ function syncFromSettings(){
   getEl("opf-ck-quick").checked = !!s.quickMode;
   getEl("opf-ck-meta").checked = s.metaMode !== "core";
   getEl("opf-cap").value = s.capChars;
-  getEl("opf-ck-segretry").checked = !!s.segAutoRetry;
-  getEl("opf-retrytimeout").value = s.retryTimeoutSec || 180;
   if (s.lastName) getEl("opf-pname").value = s.lastName;
   renderMetaStatus();
   renderTxStatus();
@@ -1402,7 +1435,21 @@ function addWorkflowUI(root){
 }
 
 //@module 31-settings — ⚙ 设置：生成传输 / API / 模型（全插件唯一配置入口）
-var SETTINGS_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">⚙ 生成传输 · 全插件共用</div><div class="opf-dim">在这里配置 API 与模型；①③④⑤⑥⑦⑧ 的生成统一走这一套，改一次全局生效。</div><div class="opf-shx-cfg"><label class="opf-opt">生成传输<select id="opf-rx-transport" class="opf-ref-input"><option value="st">酒馆主 API（零配置·推荐）</option><option value="server">经酒馆服务端转发 + 流式（需自填反代）</option><option value="direct">浏览器直连 + 流式（需自填接口）</option></select></label><span class="opf-dim" id="opf-rx-txnote"></span></div><div class="opf-shx-cfg" id="opf-rx-cfg-server" style="display:none"><button type="button" class="opf-btn ghost" id="opf-rx-pulltavern">📋 用酒馆的反代设置</button><label class="opf-opt">协议源<select id="opf-rx-source" class="opf-ref-input"><option value="makersuite">Google AI Studio (makersuite)</option><option value="vertexai">Vertex AI (vertexai)</option></select></label><label class="opf-opt">中转/反代地址<input id="opf-rx-reverse" class="opf-ref-input" placeholder="https://你的中转域名"></label><label class="opf-opt">代理密码/密钥<input id="opf-rx-proxypass" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">模型名<input id="opf-rx-model" class="opf-ref-input" list="opf-rx-modellist" placeholder="点右侧按钮获取；也可直接手填，填过会记住"><datalist id="opf-rx-modellist"></datalist></label><button type="button" class="opf-btn ghost" id="opf-rx-models">🔌 获取模型列表</button></div><div class="opf-shx-cfg" id="opf-rx-cfg-direct" style="display:none"><label class="opf-opt">直连协议<select id="opf-rx-proto" class="opf-ref-input"><option value="openai">OpenAI 兼容 (/chat/completions)</option><option value="gemini">Google 原生 (:streamGenerateContent)</option></select></label><label class="opf-opt">直连地址<input id="opf-rx-base" class="opf-ref-input" placeholder="https://api.example.com/v1"></label><label class="opf-opt">直连密钥<input id="opf-rx-key" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">直连模型<input id="opf-rx-chatmodel" class="opf-ref-input" placeholder="留空则用上面的模型名"></label></div><div class="opf-dim" id="opf-set-status">就绪</div><div id="opf-rx-modelall-wrap" style="display:none"><div class="opf-sec-label">全部模型<span class="opf-dim" id="opf-rx-modelall-note"></span></div><div class="opf-dim">datalist 只在聚焦输入框时才弹、浏览器还会自己截断条数，所以这里给一份常驻清单：一条不省，点一条即选中。</div><div id="opf-rx-modelall" style="max-height:200px;overflow:auto;border:1px solid rgba(255,122,138,.25);border-radius:8px;padding:5px;background:rgba(10,2,5,.35)"></div></div></div>';
+var SETTINGS_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">⚙ 生成传输 · 全插件共用</div><div class="opf-dim">在这里配置 API 与模型；①③④⑤⑥⑦⑧ 的生成统一走这一套，改一次全局生效。</div><div class="opf-shx-cfg"><label class="opf-opt">生成传输<select id="opf-rx-transport" class="opf-ref-input"><option value="st">酒馆主 API（零配置·推荐）</option><option value="server">经酒馆服务端转发 + 流式（需自填反代）</option><option value="direct">浏览器直连 + 流式（需自填接口）</option></select></label><span class="opf-dim" id="opf-rx-txnote"></span></div><div class="opf-shx-cfg" id="opf-rx-cfg-server" style="display:none"><button type="button" class="opf-btn ghost" id="opf-rx-pulltavern">📋 用酒馆的反代设置</button><label class="opf-opt">协议源<select id="opf-rx-source" class="opf-ref-input"><option value="makersuite">Google AI Studio (makersuite)</option><option value="vertexai">Vertex AI (vertexai)</option></select></label><label class="opf-opt">中转/反代地址<input id="opf-rx-reverse" class="opf-ref-input" placeholder="https://你的中转域名"></label><label class="opf-opt">代理密码/密钥<input id="opf-rx-proxypass" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">模型名<input id="opf-rx-model" class="opf-ref-input" list="opf-rx-modellist" placeholder="点右侧按钮获取；也可直接手填，填过会记住"><datalist id="opf-rx-modellist"></datalist></label><button type="button" class="opf-btn ghost" id="opf-rx-models">🔌 获取模型列表</button></div><div class="opf-shx-cfg" id="opf-rx-cfg-direct" style="display:none"><label class="opf-opt">直连协议<select id="opf-rx-proto" class="opf-ref-input"><option value="openai">OpenAI 兼容 (/chat/completions)</option><option value="gemini">Google 原生 (:streamGenerateContent)</option></select></label><label class="opf-opt">直连地址<input id="opf-rx-base" class="opf-ref-input" placeholder="https://api.example.com/v1"></label><label class="opf-opt">直连密钥<input id="opf-rx-key" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">直连模型<input id="opf-rx-chatmodel" class="opf-ref-input" placeholder="留空则用上面的模型名"></label></div><div class="opf-dim" id="opf-set-status">就绪</div><div id="opf-rx-modelall-wrap" style="display:none"><div class="opf-sec-label">全部模型<span class="opf-dim" id="opf-rx-modelall-note"></span></div><div class="opf-dim">datalist 只在聚焦输入框时才弹、浏览器还会自己截断条数，所以这里给一份常驻清单：一条不省，点一条即选中。</div><div id="opf-rx-modelall" style="max-height:200px;overflow:auto;border:1px solid rgba(255,122,138,.25);border-radius:8px;padding:5px;background:rgba(10,2,5,.35)"></div></div><div class="opf-sec"><div class="opf-sec-label">生成设置</div><div class="opf-opts"><label class="opf-opt" title="仅分段写阶段触发（开局预设的创作分段与二创角色的分段；单次快出/汇总/精修/交火梳理不触发）"><input type="checkbox" id="opf-ck-segretry"> 分段超时自动重roll</label><label class="opf-opt" title="分段写单段超过该秒数无响应即自动重roll（每段最多3次）">超时阈值 <input type="number" id="opf-retrytimeout" class="opf-num" min="15" max="3600" step="15"> 秒</label></div></div></div>';
+
+// 生成设置（自动重roll + 超时阈值）绑定与回填——这些控件现在住在 ⚙ 设置页
+function bindSettingsExtra() {
+  var cb = getEl('opf-ck-segretry');
+  if (cb) cb.addEventListener('change', function () { getSettings().segAutoRetry = !!cb.checked; saveSettings(); });
+  var rt = getEl('opf-retrytimeout');
+  if (rt) rt.addEventListener('change', function () { var v = parseInt(rt.value, 10); getSettings().retryTimeoutSec = isNaN(v) ? 180 : clamp(v, 15, 3600); saveSettings(); });
+  syncSettingsExtra();
+}
+function syncSettingsExtra() {
+  var s = getSettings();
+  var cb = getEl('opf-ck-segretry'); if (cb) cb.checked = !!s.segAutoRetry;
+  var rt = getEl('opf-retrytimeout'); if (rt) rt.value = s.retryTimeoutSec || 180;
+}
 
 //@module 32-world — ② 世界书：左缘勾选侧栏 + 分类/搜索 + 尺寸 CSS
 // ============ 世界书左缘侧栏（懒加载独立浮层，不碰主窗口布局） ============
@@ -2013,12 +2060,11 @@ async function runMemoSummarize() {
   MEMO.busy = true;
   renderMemoStatus('⏳ 正在总结…');
   try {
-    var resp = await c.generateRaw({
-      prompt: [
-        { role: 'system', content: req.system },
-        { role: 'user', content: req.user }
-      ]
-    });
+    // 统一走 callModel：与分段/交火/封装/精修同一套传输（由 ⚙ 设置页决定），不再绕过
+    var resp = await callModel([
+      { role: 'system', content: req.system },
+      { role: 'user', content: req.user }
+    ]);
     var text = cleanMemoText(resp);
     if (text) {
       MEMO.summary = clampMemoText(text, ms.maxChars);
@@ -2316,6 +2362,263 @@ function addMemoUI(root) {
   renderMemoSummary();
 }
 
+//@module 36-projects — 工程列表：①③④ 三条流水线各可保存多份草稿
+// ============================================================================
+// 解决「一次只能开一个草稿」：想同时弄两个角色、或对照两个开局，原本做不到。
+//
+// 设计取舍（重要）：
+//  · **一个工程 = 一份草稿**，类型（preset/char/destiny）由它所在的列表决定。
+//  · 这里只做「快照 ↔ 恢复」的搬运，**完全不碰三条流水线的业务逻辑**——
+//    它们的提示词、分段、产出校验一行都没动，仍然各自按 id 独立工作。
+//  · 每个类型各有一份列表与一个「当前工程」，切类型不会互相顶掉。
+//  · 持久化用 localStorage（单键整体存取），带体积告警但不拦。
+// ============================================================================
+var LS_PROJ_KEY = NS + "_projects_v1";
+var PROJ_MAX = 4.0 * 1024 * 1024;          // 序列化上限（字节），超了只告警
+var PROJ_TYPES = ["preset", "char", "destiny"];
+var PROJ_TYPE_LABEL = { preset: "开局预设", char: "二创角色", destiny: "命定系统" };
+
+function projState() {
+  if (!ST.proj) {
+    ST.proj = {};
+    PROJ_TYPES.forEach(function (t) { ST.proj[t] = { list: [], active: null }; });
+    var saved = lsGet(LS_PROJ_KEY);
+    if (saved && typeof saved === "object") {
+      PROJ_TYPES.forEach(function (t) {
+        var g = saved[t];
+        if (g && typeof g === "object") {
+          ST.proj[t].list = Array.isArray(g.list) ? g.list : [];
+          ST.proj[t].active = typeof g.active === "string" ? g.active : null;
+        }
+      });
+    }
+  }
+  return ST.proj;
+}
+function projGroup(type) {
+  var s = projState();
+  if (!s[type]) s[type] = { list: [], active: null };
+  return s[type];
+}
+function projPersist() {
+  try {
+    var txt = JSON.stringify(projState());
+    if (txt.length > PROJ_MAX) opfLog("工程缓存偏大：" + Math.round(txt.length / 1024) + "KB（localStorage 可能吃紧）");
+    lsSet(LS_PROJ_KEY, projState());
+  } catch (e) { opfErr("projPersist", e); }
+}
+function projNewId() { return "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+function projVal(id) { var el = getEl(id); return el && typeof el.value === "string" ? el.value : ""; }
+function projSetVal(id, v) { var el = getEl(id); if (el) el.value = v == null ? "" : String(v); }
+function projClone(o) { try { return JSON.parse(JSON.stringify(o == null ? null : o)); } catch (e) { return null; } }
+
+// ---------------- 快照 / 恢复（只搬状态，不碰逻辑） ----------------
+function projSnap(type) {
+  if (type === "preset") {
+    return {
+      results: projClone(ST.results) || {},
+      status: projClone(ST.status) || {},
+      finalJson: projClone(ST.finalJson),
+      finalText: ST.finalText || "",
+      demand: projVal("opf-demand"),
+      pname: projVal("opf-pname")
+    };
+  }
+  if (type === "char") { try { charInit(); } catch (e) {} return { char: projClone(ST.char) || {} }; }
+  if (type === "destiny") { try { destInit(); } catch (e) {} return { dest: projClone(ST.dest) || {} }; }
+  return {};
+}
+function projApply(type, data) {
+  data = data || {};
+  if (type === "preset") {
+    ST.results = projClone(data.results) || {};
+    ST.status = projClone(data.status) || {};
+    ST.finalJson = projClone(data.finalJson) || null;
+    ST.finalText = data.finalText || "";
+    ST.msgs = null;                        // 会话上下文不持久化；「重跑该步」会按 ST.results 重建
+    projSetVal("opf-demand", data.demand || "");
+    projSetVal("opf-pname", data.pname || "【自定义开局】");
+    try { renderSteps(); } catch (e) { opfErr("projApply preset renderSteps", e); }
+    try { renderJsonOut(ST.finalJson, ST.finalJson ? validatePreset(ST.finalJson) : []); } catch (e) {}
+    try { renderMetaStatus(); } catch (e) {}
+    return;
+  }
+  if (type === "char") {
+    ST.char = projClone(data.char) || { demand: "", ref: "", segs: {}, status: {}, report: "", out: "", outNote: [], name: "", _inited: false };
+    ST.char.outNote = ST.char.outNote || [];
+    projSetVal("opf-char-demand", ST.char.demand || "");
+    projSetVal("opf-char-ref", ST.char.ref || "");
+    try { renderCharSteps(); renderCharPage(); } catch (e) { opfErr("projApply char", e); }
+    return;
+  }
+  if (type === "destiny") {
+    ST.dest = projClone(data.dest) || { demand: "", ref: "", author: "", segs: {}, status: {}, report: "", out: "", body: "", meta: "", outNote: [], ejs: false, _inited: false };
+    projSetVal("opf-dest-demand", ST.dest.demand || "");
+    projSetVal("opf-dest-ref", ST.dest.ref || "");
+    projSetVal("opf-dest-author", ST.dest.author || "");
+    var ecb = getEl("opf-dest-ejs"); if (ecb) ecb.checked = !!ST.dest.ejs;
+    try { renderDestSteps(); renderDestinyPage(); } catch (e) { opfErr("projApply destiny", e); }
+    return;
+  }
+}
+
+// ---------------- 增删改查 ----------------
+function projActive(type) {
+  var g = projGroup(type);
+  for (var i = 0; i < g.list.length; i++) if (g.list[i].id === g.active) return g.list[i];
+  return null;
+}
+function projDefaultName(type) { return (PROJ_TYPE_LABEL[type] || "草稿") + " " + (projGroup(type).list.length + 1); }
+function projHasContent(type) {
+  if (type === "preset") { var d = projSnap("preset"); return !!(d.results && Object.keys(d.results).length) || !!d.finalJson || !!(d.demand && d.demand.trim()); }
+  if (type === "char") return !!(ST.char && ST.char.segs && Object.keys(ST.char.segs).length);
+  if (type === "destiny") return !!(ST.dest && ST.dest.segs && Object.keys(ST.dest.segs).length);
+  return false;
+}
+// 把当前运行时状态写回「当前工程」；还没有工程就先建一个
+function projCommit(type, opts) {
+  type = type || currentPage();
+  if (PROJ_TYPES.indexOf(type) < 0) return null;
+  var g = projGroup(type);
+  var cur = projActive(type);
+  if (!cur) {
+    cur = { id: projNewId(), name: projDefaultName(type), updatedAt: Date.now(), data: {} };
+    g.list.unshift(cur); g.active = cur.id;
+  }
+  cur.data = projSnap(type);
+  if (!opts || opts.touch !== false) cur.updatedAt = Date.now();
+  return cur;
+}
+// 切到某个工程：先把当前工程存档，再恢复目标
+function projOpen(type, id) {
+  var g = projGroup(type);
+  if (g.active && g.active !== id) projCommit(type);
+  var p = null;
+  for (var i = 0; i < g.list.length; i++) if (g.list[i].id === id) p = g.list[i];
+  if (!p) return false;
+  g.active = p.id;
+  projApply(type, p.data);
+  projPersist(); renderProjList();
+  try { switchPage(type); } catch (e) {}
+  return true;
+}
+function projCreate(type, name) {
+  type = (PROJ_TYPES.indexOf(type) >= 0) ? type : (isCreateType(currentPage()) ? currentPage() : "preset");
+  projCommit(type);                        // 先存当前工程，别丢
+  var g = projGroup(type);
+  var p = { id: projNewId(), name: String(name || "").trim() || projDefaultName(type), updatedAt: Date.now(), data: {} };
+  g.list.unshift(p); g.active = p.id;
+  projApply(type, {});                     // 空白草稿
+  projPersist(); renderProjList();
+  try { switchPage(type); } catch (e) {}
+  toast("已新建：" + p.name);
+  return p;
+}
+function projDelete(type, id) {
+  var g = projGroup(type);
+  var idx = -1; for (var i = 0; i < g.list.length; i++) if (g.list[i].id === id) idx = i;
+  if (idx < 0) return false;
+  var wasActive = g.active === id;
+  g.list.splice(idx, 1);
+  if (wasActive) {
+    g.active = g.list.length ? g.list[0].id : null;
+    projApply(type, g.active ? projActive(type).data : {});
+  }
+  projPersist(); renderProjList();
+  return true;
+}
+function projRename(type, id, name) {
+  var g = projGroup(type);
+  for (var i = 0; i < g.list.length; i++) {
+    if (g.list[i].id === id) {
+      var n = String(name == null ? "" : name).trim();
+      if (n) { g.list[i].name = n; g.list[i].updatedAt = Date.now(); }
+    }
+  }
+  projPersist(); renderProjList();
+}
+
+// ---------------- 侧栏列表 UI ----------------
+function projShownType() {
+  if (isCreateType(currentPage())) return currentPage();
+  var t = getSettings().createType;
+  return isCreateType(t) ? t : "preset";
+}
+function renderProjList() {
+  var box = getEl("opf-projlist"); if (!box) return;
+  box.textContent = "";
+  if (!isCreateType(currentPage())) { box.style.display = "none"; return; }
+  box.style.display = "";
+  var type = projShownType();
+  var g = projGroup(type);
+  var head = document.createElement("div"); head.className = "opf-proj-head";
+  var lab = document.createElement("span"); lab.textContent = PROJ_TYPE_LABEL[type] + " 草稿";
+  var add = document.createElement("button"); add.type = "button"; add.id = "opf-proj-add"; add.className = "opf-proj-add";
+  add.textContent = "＋"; add.title = "新建一份" + PROJ_TYPE_LABEL[type] + "草稿";
+  add.addEventListener("click", function (ev) { ev.stopPropagation(); projCreate(type); });
+  head.appendChild(lab); head.appendChild(add); box.appendChild(head);
+  if (!g.list.length) {
+    var empty = document.createElement("div"); empty.className = "opf-proj-empty"; empty.textContent = "还没有草稿，点 ＋ 新建";
+    box.appendChild(empty); return;
+  }
+  g.list.forEach(function (p) {
+    var row = document.createElement("div");
+    row.className = "opf-proj-row" + (p.id === g.active ? " active" : "");
+    row.title = p.name + "（双击重命名）";
+    var nm = document.createElement("span"); nm.className = "opf-proj-name"; nm.textContent = p.name;
+    var del = document.createElement("button"); del.type = "button"; del.className = "opf-proj-del"; del.textContent = "✕"; del.title = "删除这份草稿";
+    del.addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      var yes = true;
+      try { yes = window.confirm("删除草稿「" + p.name + "」？不可撤销。"); } catch (e) {}
+      if (yes) projDelete(type, p.id);
+    });
+    row.appendChild(nm); row.appendChild(del);
+    row.addEventListener("click", function () { projOpen(type, p.id); });
+    row.addEventListener("dblclick", function () {
+      var n = null;
+      try { n = window.prompt("重命名草稿", p.name); } catch (e) {}
+      if (n != null) projRename(type, p.id, n);
+    });
+    box.appendChild(row);
+  });
+}
+
+// ---------------- 自动存档 ----------------
+// 不往三条流水线里塞钩子（那要动它们的内部），改成低频轮询：
+// 每 2.5 秒把「当前类型」的运行时状态与工程里存着的对比，变了才写。
+function projTick() {
+  try {
+    var t = currentPage();
+    if (!isCreateType(t)) return;
+    var g = projGroup(t);
+    var cur = projActive(t);
+    if (!cur) { projCommit(t); renderProjList(); projPersist(); return; }
+    var snap = projSnap(t);
+    if (JSON.stringify(snap) !== JSON.stringify(cur.data || {})) {
+      cur.data = snap; cur.updatedAt = Date.now();
+      projPersist(); renderProjList();
+    }
+  } catch (e) { opfErr("projTick", e); }
+}
+function projAutosaveStart() {
+  if (projAutosaveStart._t) return;
+  projAutosaveStart._t = setInterval(projTick, 2500);
+}
+// 首次启用：把三个类型「当前已有的那份草稿」各收成一个工程，不丢东西
+function projBootstrap() {
+  PROJ_TYPES.forEach(function (t) {
+    var g = projGroup(t);
+    if (g.list.length) return;
+    var had = false;
+    try { had = projHasContent(t); } catch (e) {}
+    projCommit(t, { touch: false });
+    var cur = projActive(t);
+    if (cur) cur.name = had ? (PROJ_TYPE_LABEL[t] + " · 现有草稿") : projDefaultName(t);
+  });
+  projPersist();
+}
+
 //@module 40-shell — 分页外壳（PAGE_DEFS/建壳/切页）+ 本地缓存
 // ============================================================================
 // v1.7.0 全屏分页壳 + 本地缓存 + 二创角色工坊
@@ -2335,8 +2638,18 @@ var PAGE_DEFS = [
 // v1.17.0：导航按**任务**分组，不再是一排扁平数字标签。
 // 「② 世界书」是全局参考、「⚙ 设置」是全局配置——它们属于顶部 chrome，不属于这一层。
 // world / settings 仍是 PAGE_DEFS 里的页（容器照建），只是不进左侧导航。
+//
+// v1.17.1：①③④ 三条流水线收进**同一个「分段创作」入口**（虚拟项 id="create"），
+// 页内再用类型切换器换页。**三条流水线的提示词/分段/产出校验一行都不动**——
+// 它们本来就各自按 id 独立工作，这里只是换了个外壳呈现方式。
+var CREATE_TYPES = [
+  { id: "preset",  label: "① 开局预设" },
+  { id: "char",    label: "③ 二创角色" },
+  { id: "destiny", label: "④ 命定系统" }
+];
+function isCreateType(id) { for (var i = 0; i < CREATE_TYPES.length; i++) if (CREATE_TYPES[i].id === id) return true; return false; }
 var NAV_GROUPS = [
-  { title: "创作", items: ["preset", "char", "destiny"] },
+  { title: "创作", items: ["create"] },
   { title: "单件", items: ["regex", "refine", "atelier"] },
   { title: "对话", items: ["shixian"] }
 ];
@@ -2351,6 +2664,24 @@ var SHELL_CSS2 = [
   "#opf-nav .opf-tab.active{background:linear-gradient(90deg,rgba(255,77,94,.30),rgba(255,77,94,.05));color:#fff;border-color:rgba(255,150,165,.45);box-shadow:inset 3px 0 0 #ff4d5e}",
   ".opf-chrome-btn{flex:none;border:1px solid rgba(255,122,138,.3);background:rgba(255,235,238,.06);color:#ffc9cf;border-radius:8px;padding:7px 11px;font-size:12.5px;cursor:pointer;white-space:nowrap}",
   ".opf-chrome-btn:hover{background:rgba(255,77,94,.22);color:#fff}",
+  // 「分段创作」的类型切换子栏（只在创作页显示）
+  "#opf-subbar{flex:none;display:flex;align-items:center;gap:6px;padding:8px 14px;background:rgba(30,5,12,.55);border-bottom:1px solid rgba(255,122,138,.16);overflow-x:auto;scrollbar-width:thin}",
+  ".opf-subbar-label{flex:none;font-size:11.5px;letter-spacing:2px;color:rgba(255,170,180,.55);text-transform:uppercase;margin-right:4px}",
+  ".opf-subtab{flex:none;border:1px solid rgba(255,122,138,.26);background:rgba(255,235,238,.05);color:#ffc9cf;border-radius:999px;padding:6px 13px;font-size:12.5px;cursor:pointer;white-space:nowrap;transition:background .14s ease,color .14s ease}",
+  ".opf-subtab:hover{background:rgba(255,77,94,.18);color:#fff}",
+  ".opf-subtab.active{background:linear-gradient(180deg,rgba(255,77,94,.32),rgba(255,77,94,.12));color:#fff;border-color:rgba(255,150,165,.6)}",
+  // 侧栏工程（草稿）列表
+  "#opf-projlist{flex:none;display:flex;flex-direction:column;gap:2px;padding:0 4px 8px 16px}",
+  ".opf-proj-head{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:11px;color:rgba(255,170,180,.5);padding:4px 4px 4px 0}",
+  ".opf-proj-add{flex:none;border:1px solid rgba(255,122,138,.3);background:rgba(255,235,238,.06);color:#ffc9cf;border-radius:6px;padding:0 7px;font-size:12px;line-height:1.7;cursor:pointer}",
+  ".opf-proj-add:hover{background:rgba(255,77,94,.25);color:#fff}",
+  ".opf-proj-row{display:flex;align-items:center;gap:4px;border-radius:6px;padding:4px 6px;cursor:pointer;font-size:12.5px;color:rgba(255,226,230,.8)}",
+  ".opf-proj-row:hover{background:rgba(255,235,238,.08)}",
+  ".opf-proj-row.active{background:rgba(255,77,94,.18);color:#fff;box-shadow:inset 2px 0 0 #ff4d5e}",
+  ".opf-proj-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
+  ".opf-proj-del{flex:none;border:none;background:transparent;color:rgba(255,160,170,.55);cursor:pointer;font-size:11px;padding:0 3px;border-radius:4px;line-height:1.6}",
+  ".opf-proj-del:hover{color:#fff;background:rgba(255,77,94,.3)}",
+  ".opf-proj-empty{font-size:11.5px;color:rgba(255,200,208,.45);padding:2px 0 2px 2px}",
   // 分段创作页（①③④）统一模板：左控制 / 右产出。用两类选择器压过 .opf-char-wrap 的单栏定义。
   ".opf-char-wrap.opf-2col{display:grid;grid-template-columns:minmax(300px,380px) minmax(0,1fr);gap:14px 22px;max-width:1680px;align-items:start}",
   ".opf-char-wrap.opf-2col .opf-col{display:flex;flex-direction:column;gap:8px;min-width:0}",
@@ -2382,6 +2713,18 @@ function buildShell(){
   head.appendChild(title); head.appendChild(tx); head.appendChild(wbtn); head.appendChild(gear); head.appendChild(close);
   shell.appendChild(head);
 
+  // ---- 类型切换子栏：只在「分段创作」的三种类型页显示 ----
+  var subbar = document.createElement("div"); subbar.id = "opf-subbar"; subbar.style.display = "none";
+  var slabel = document.createElement("span"); slabel.className = "opf-subbar-label"; slabel.textContent = "分段创作";
+  subbar.appendChild(slabel);
+  CREATE_TYPES.forEach(function (ct) {
+    var b = document.createElement("button"); b.type = "button"; b.id = "opf-subtab-" + ct.id; b.className = "opf-subtab";
+    b.textContent = ct.label; b.title = "切到" + ct.label;
+    b.addEventListener("click", function () { switchPage(ct.id); });
+    subbar.appendChild(b);
+  });
+  shell.appendChild(subbar);
+
   // ---- 主体：左侧分组导航 + 右侧内容区 ----
   var bodyWrap = document.createElement("div"); bodyWrap.id = "opf-shell-body";
   var nav = document.createElement("nav"); nav.id = "opf-nav";
@@ -2389,11 +2732,15 @@ function buildShell(){
   NAV_GROUPS.forEach(function (g) {
     var gt = document.createElement("div"); gt.className = "opf-nav-group"; gt.textContent = g.title; nav.appendChild(gt);
     g.items.forEach(function (id) {
-      var p = byId[id]; if (!p) return;
+      var p = byId[id];
+      // "create" 是虚拟项（不在 PAGE_DEFS 里）：代表 ①③④ 三种类型共用的入口
+      var label = p ? p.label : (id === "create" ? "分段创作" : id);
       var t = document.createElement("button"); t.type = "button"; t.id = "opf-tab-" + id; t.className = "opf-tab";
-      t.textContent = p.label; t.title = p.label;
+      t.textContent = label; t.title = p ? label : (label + "（开局预设 / 二创角色 / 命定系统）");
       t.addEventListener("click", function () { switchPage(id); });
       nav.appendChild(t);
+      // 「分段创作」下面挂工程（草稿）列表：一个类型一份列表
+      if (id === "create") { var pl = document.createElement("div"); pl.id = "opf-projlist"; nav.appendChild(pl); }
     });
   });
   bodyWrap.appendChild(nav);
@@ -2441,6 +2788,7 @@ function buildShell(){
   try { bindCharPage(); } catch (e) { opfErr("char page", e); }
   try { bindDestinyPage(); } catch (e) { opfErr("destiny page", e); }
   try { bindRxPage(); } catch (e) { opfErr("regex page", e); }
+  try { bindSettingsExtra(); } catch (e) { opfErr("settings extra", e); }
   try { bindShxPage(); } catch (e) { opfErr("shixian page", e); }
   try { bindRefinePage(); } catch (e) { opfErr("refine page", e); }
   try { bindAtelierPage(); } catch (e) { opfErr("atelier page", e); }
@@ -2449,12 +2797,30 @@ function buildShell(){
 }
 function switchPage(id, force){
   var s = getSettings();
+  // "create" 是虚拟入口：落到上次用的那种创作类型上
+  if (id === "create") id = isCreateType(s.createType) ? s.createType : "preset";
   if (!force && s.activePage === id) return;
-  s.activePage = id; saveSettings();
+  s.activePage = id;
+  if (isCreateType(id)) s.createType = id;   // 记住类型，下次进「分段创作」直接回到它
+  saveSettings();
   var pages = getEl("opf-pages"); if (!pages) return;
   [].forEach.call(pages.children, function (d) { d.classList.toggle("active", d.id === "opf-page-" + id); });
+  // 左侧导航高亮：虚拟项 create 在任一创作类型页都保持高亮
   var nav = getEl("opf-nav");
-  if (nav) [].forEach.call(nav.children, function (t) { t.classList.toggle("active", t.id === "opf-tab-" + id); });
+  if (nav) [].forEach.call(nav.children, function (t) {
+    var tid = String(t.id || "").replace(/^opf-tab-/, "");
+    t.classList.toggle("active", (t.id === "opf-tab-" + id) || (tid === "create" && isCreateType(id)));
+  });
+  // 类型切换子栏：只在创作页显示，并标出当前类型
+  var sb = getEl("opf-subbar");
+  if (sb) {
+    sb.style.display = isCreateType(id) ? "" : "none";
+    CREATE_TYPES.forEach(function (ct) {
+      var b = getEl("opf-subtab-" + ct.id);
+      if (b) b.classList.toggle("active", ct.id === id);
+    });
+  }
+  try { renderProjList(); } catch (e) { opfErr("renderProjList", e); }
   if (id === "world") { try { buildWorldSide(); renderWorldSide(); } catch (e) {} }
   if (id === "char") { try { renderCharPage(); } catch (e) {} }
   if (id === "destiny") { try { renderDestinyPage(); } catch (e) {} }
@@ -2823,7 +3189,7 @@ async function runCharLinkage(){
     var reportUser = "【交火梳理·第一步：整体审查】\n下面是各分段的审阅稿（每段截取前1800字，供查矛盾用）。请按下面的联动链条逐链检查，找出互相矛盾、脱节、数值/品质/命名不合规之处。\n\n[分段审阅稿]\n" + all + "\n\n输出要求（只输出报告，禁止输出任何段落正文，禁止使用<<<SEG:标记）：\n1. 逐条链给一句结论（✓一致 / ⚠问题+理由）。\n2. 最后列“改动清单”：每段一条，写清改哪段、为什么；没有问题的段写“无”。\n3. 改动清单不得要求恢复或新增 类型/消耗/标签 字段（武器/装备/道具/技能规范为 名称/品质/叙述 三段式）。\n4. 报告里不要重写设定内容，只说问题与改法。";
     var reportTask = charSystemContent() + '\n\n' + charUser0() + "\n\n[联动链条]\n" + CHAR_LINK_CHAIN + "\n\n[二创角色·规则约束]\n" + CHAR_RULES;
     var msgs = charMessages(reportTask, charDemand() + '\n\n' + reportUser);
-    var resp = await callModel(msgs);
+    var resp = await callModelSeg(msgs, "交火梳理·整体审查", function (note) { if (report) report.textContent = "交火梳理中… " + note; });
     ST.char.report = String(resp || "").trim() || "（报告为空）";
     if (report) report.textContent = ST.char.report;
     toast("审查报告完成，开始逐段应用联动修订…");
@@ -2838,7 +3204,7 @@ async function runCharLinkage(){
       CHAR_SEGS.forEach(function (s2) { if (s2.id !== seg.id && ST.char.segs[s2.id]) frozen += "\n\n【" + s2.title + "】\n" + String(ST.char.segs[s2.id]).slice(0, 1200); });
       var applyMsg = "【交火梳理·第二步：逐段应用修订——只改「" + seg.title + "」这一段】\n\n[梳理报告与改动清单]\n" + ST.char.report + "\n\n[本段现行内容]\n" + ST.char.segs[seg.id] + "\n\n[冻结区块（其它分段，原样保留，一个字都不许改）]\n" + frozen + "\n\n[修订规则]\n" + CHAR_RULES + "\n1. 只输出【" + seg.title + "】的修订后全文；若按报告本段无需改动，只回复“无改动”。\n2. 只做报告指出的联动性修改；不得推翻设定。报告“改动清单”里点名的矛盾/重复/写错的内容，**必须真的删掉或改掉**——旧内容不许留在原地与新内容并排（叠加＝没改）。\n3. 报告点名要删的就删，删完比原来短是正常的；除报告点名的部分外，不许删别的内容，也不许扩写新增。\n4. 武器/装备/道具/技能保持 名称/品质(中文)/叙述 三段式：禁止补回或新增 类型/消耗/标签 字段。\n5. 不生成任何开局预设内容（开局剧情/面板/伙伴/资产等）。";
       var m2 = charMessages(charSystemContent() + '\n\n[修订规则]\n' + CHAR_RULES, applyMsg);
-      var resp2 = await callModel(m2);
+      var resp2 = await callModelSeg(m2, "交火梳理·" + seg.title, function (note) { if (report) report.textContent = ST.char.report + "\n\n—— 正在修订「" + seg.title + "」：" + note; });
       var txt = String(resp2 || "").trim();
       if (txt && !/^无改动[。．.]*$/.test(txt)) { ST.char.segs[seg.id] = txt; changed++; renderCharSegOut(seg.id); }
       charSetSeg(seg.id, "ok");
@@ -3551,7 +3917,7 @@ async function runDestLinkage(){
     var all = destSegs().map(function (s) { return '<<<SEG:' + s.id + '>>>\n' + String(ST.dest.segs[s.id] || '').slice(0, 1800); }).join('\n\n');
     var reportMsg = '【交火梳理·第一步：整体审查】\n下面是各分段的审阅稿（每段截取前1800字，供查矛盾用）。请按下面的联动链条逐链检查，找出互相矛盾、脱节、数值/命名不合规之处。\n\n[联动链条]\n' + DEST_LINK_CHAIN + '\n\n[分段审阅稿]\n' + all + '\n\n[命定系统·规则约束]\n' + DEST_RULES + '\n\n输出要求（只输出报告，禁止输出任何段落正文，禁止使用<<<SEG:标记）：\n1. 逐条链给一句结论（✓一致 / ⚠问题+理由）。\n2. 最后列“改动清单”：每段一条，写清改哪段、为什么；没有问题的段写“无”。\n3. 报告里不要重写设定内容，只说问题与改法。\n4. 重点核对：包裹标签名与「系统名」是否一致、十条 setvar 是否齐全且顺序正确、缔结消耗七档是否齐全、核心名与语言标签是否与现有核心撞车、复活机制是否保留禁止机械降神的约束句。';
     var msgs = destMessages(destSystemContent() + '\n\n' + destUser0() + '\n\n[联动链条]\n' + DEST_LINK_CHAIN + '\n\n[命定系统·规则约束]\n' + DEST_RULES, destDemand() + '\n\n' + reportMsg);
-    var resp = await callModel(msgs);
+    var resp = await callModelSeg(msgs, "交火梳理·整体审查", function (note) { if (report) report.textContent = "交火梳理中… " + note; });
     ST.dest.report = String(resp || '').trim() || '（报告为空）';
     if (report) report.textContent = ST.dest.report;
     toast('审查报告完成，开始逐段应用联动修订…');
@@ -3565,7 +3931,7 @@ async function runDestLinkage(){
       destSegs().forEach(function (s2) { if (s2.id !== seg.id && ST.dest.segs[s2.id]) frozen += '\n\n【' + s2.title + '】\n' + String(ST.dest.segs[s2.id]).slice(0, 1200); });
       var applyMsg = '【交火梳理·第二步：逐段应用修订——只改「' + seg.title + '」这一段】\n\n[梳理报告与改动清单]\n' + ST.dest.report + '\n\n[本段现行内容]\n' + ST.dest.segs[seg.id] + '\n\n[冻结区块（其它分段，原样保留，一个字都不许改）]\n' + frozen + '\n\n[修订规则]\n' + DEST_RULES + '\n1. 只输出【' + seg.title + '】的修订后全文；若按报告本段无需改动，只回复“无改动”。\n2. 只做报告指出的联动性修改；不得推翻设定。报告“改动清单”里点名的矛盾/重复/写错的内容，**必须真的删掉或改掉**——旧内容不许留在原地与新内容并排（叠加＝没改）。\n3. 报告点名要删的就删，删完比原来短是正常的；除报告点名的部分外，不许删别的内容，也不许扩写新增。\n4. 不生成任何角色卡或开局预设内容。';
       var m2 = destMessages(destSystemContent() + '\n\n[修订规则]\n' + DEST_RULES, applyMsg);
-      var resp2 = await callModel(m2);
+      var resp2 = await callModelSeg(m2, "交火梳理·" + seg.title, function (note) { if (report) report.textContent = ST.dest.report + "\n\n—— 正在修订「" + seg.title + "」：" + note; });
       var txt = String(resp2 || '').trim();
       if (txt && !/^无改动[。．.]*$/.test(txt)) { ST.dest.segs[seg.id] = txt; changed++; renderDestSegOut(seg.id); }
       destSetSeg(seg.id, 'ok');
@@ -5682,6 +6048,9 @@ function rxSyncTransportUi() {
         ? (why ? '⚠ ' + why : '配置完整，可生成；建议先点「🩺 连通性自检」确认能连通')
         : (why ? '⚠ ' + why : '配置完整，可生成；适用于有 CORS 头的自建/本地接口'));
   }
+  // 顶栏「传输：X」chip 和这里是同一份配置，必须跟着一起刷新——
+  // 否则会出现「设置页选了真流式、顶栏却还写着酒馆主 API」的不一致。
+  try { renderTxStatus(); } catch (e) { opfErr('rxSyncTransportUi -> renderTxStatus', e); }
 }
 //@module 74-refine-ui — ⑦ 命定核心精修：补丁解析 + 界面与事件
 // ---------- 补丁解析：优先解析分块格式（对截断友好），兼容旧 JSON 格式 ----------
@@ -8035,6 +8404,9 @@ function rxCacheSave() {
     // cfg 也要存：它是**全插件共用的生成传输**（①③⑧ 的分段写同样读它），
     // 从前只存草稿不存 cfg，刷新酒馆后反代地址/模型名就没了，共用配置会形同虚设。
     lsSet(LS_RX_KEY, { core: ST.rx.core, coreName: ST.rx.coreName, items: ST.rx.items, cfg: ST.rx.cfg });
+    // 配置任何一处变了（传输/地址/密钥/模型/直连项）都从这里过——顺手刷新顶栏「传输：X」chip，
+    // 免得出现"设置页选真流式、顶栏还写酒馆主 API"这种两边不一致。
+    try { renderTxStatus(); } catch (e) { opfErr('rxCacheSave -> renderTxStatus', e); }
   }, 500);
 }
 function rxCacheRestore() {
@@ -10550,6 +10922,10 @@ function boot(){
   try { rxCacheRestore(); } catch (e) { opfErr("rxCacheRestore", e); }
   try { shxInit(); shxLoadCfgToUi(); } catch (e) { opfErr("shxInit", e); }
   initMemo();
+  // 工程列表：必须在三条流水线的草稿恢复之后引导，否则会把空状态当成"现有草稿"
+  try { projBootstrap(); } catch (e) { opfErr("projBootstrap", e); }
+  try { renderProjList(); } catch (e) { opfErr("renderProjList", e); }
+  try { projAutosaveStart(); } catch (e) { opfErr("projAutosaveStart", e); }
   opfLog("loaded. context ready:", !!getCtx());
 }
 function tryBoot(tryCount){

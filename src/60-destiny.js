@@ -612,7 +612,7 @@ async function runDestLinkage(){
     var all = destSegs().map(function (s) { return '<<<SEG:' + s.id + '>>>\n' + String(ST.dest.segs[s.id] || '').slice(0, 1800); }).join('\n\n');
     var reportMsg = '【交火梳理·第一步：整体审查】\n下面是各分段的审阅稿（每段截取前1800字，供查矛盾用）。请按下面的联动链条逐链检查，找出互相矛盾、脱节、数值/命名不合规之处。\n\n[联动链条]\n' + DEST_LINK_CHAIN + '\n\n[分段审阅稿]\n' + all + '\n\n[命定系统·规则约束]\n' + DEST_RULES + '\n\n输出要求（只输出报告，禁止输出任何段落正文，禁止使用<<<SEG:标记）：\n1. 逐条链给一句结论（✓一致 / ⚠问题+理由）。\n2. 最后列“改动清单”：每段一条，写清改哪段、为什么；没有问题的段写“无”。\n3. 报告里不要重写设定内容，只说问题与改法。\n4. 重点核对：包裹标签名与「系统名」是否一致、十条 setvar 是否齐全且顺序正确、缔结消耗七档是否齐全、核心名与语言标签是否与现有核心撞车、复活机制是否保留禁止机械降神的约束句。';
     var msgs = destMessages(destSystemContent() + '\n\n' + destUser0() + '\n\n[联动链条]\n' + DEST_LINK_CHAIN + '\n\n[命定系统·规则约束]\n' + DEST_RULES, destDemand() + '\n\n' + reportMsg);
-    var resp = await callModel(msgs);
+    var resp = await callModelSeg(msgs, "交火梳理·整体审查", function (note) { if (report) report.textContent = "交火梳理中… " + note; });
     ST.dest.report = String(resp || '').trim() || '（报告为空）';
     if (report) report.textContent = ST.dest.report;
     toast('审查报告完成，开始逐段应用联动修订…');
@@ -626,7 +626,7 @@ async function runDestLinkage(){
       destSegs().forEach(function (s2) { if (s2.id !== seg.id && ST.dest.segs[s2.id]) frozen += '\n\n【' + s2.title + '】\n' + String(ST.dest.segs[s2.id]).slice(0, 1200); });
       var applyMsg = '【交火梳理·第二步：逐段应用修订——只改「' + seg.title + '」这一段】\n\n[梳理报告与改动清单]\n' + ST.dest.report + '\n\n[本段现行内容]\n' + ST.dest.segs[seg.id] + '\n\n[冻结区块（其它分段，原样保留，一个字都不许改）]\n' + frozen + '\n\n[修订规则]\n' + DEST_RULES + '\n1. 只输出【' + seg.title + '】的修订后全文；若按报告本段无需改动，只回复“无改动”。\n2. 只做报告指出的联动性修改；不得推翻设定。报告“改动清单”里点名的矛盾/重复/写错的内容，**必须真的删掉或改掉**——旧内容不许留在原地与新内容并排（叠加＝没改）。\n3. 报告点名要删的就删，删完比原来短是正常的；除报告点名的部分外，不许删别的内容，也不许扩写新增。\n4. 不生成任何角色卡或开局预设内容。';
       var m2 = destMessages(destSystemContent() + '\n\n[修订规则]\n' + DEST_RULES, applyMsg);
-      var resp2 = await callModel(m2);
+      var resp2 = await callModelSeg(m2, "交火梳理·" + seg.title, function (note) { if (report) report.textContent = ST.dest.report + "\n\n—— 正在修订「" + seg.title + "」：" + note; });
       var txt = String(resp2 || '').trim();
       if (txt && !/^无改动[。．.]*$/.test(txt)) { ST.dest.segs[seg.id] = txt; changed++; renderDestSegOut(seg.id); }
       destSetSeg(seg.id, 'ok');

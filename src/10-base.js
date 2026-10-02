@@ -21,7 +21,8 @@ var DEFAULT_SETTINGS = {
   activePage: 'preset',      // 全屏壳当前页：preset | world | char | p4..p6
   modelNote: '',             // 附加一句给模型的叮嘱
   segAutoRetry: false,       // 分段写超时自动重roll（仅分段写阶段触发）
-  retryTimeoutSec: 180       // 分段写单段超过该秒数无响应则重roll
+  retryTimeoutSec: 180,      // 分段写单段超过该秒数无响应则重roll
+  createType: 'preset'       // 「分段创作」当前类型：preset | char | destiny
 };
 
 // ---------------- 始弦人设（唯一真源 · 原版预设原文，一字不改） ----------------
@@ -149,6 +150,7 @@ var ST = {
   running: false,
   stopReq: false,
   abortCtl: null,      // 当前在途流式请求的 AbortController（手动停止时 abort 它）
+  stopWaiters: [],     // 在途非流式请求的"停止开关"（手动停止时 reject 它们，立即结束等待）
   msgs: null,          // 当前分步会话的消息数组
   results: {},         // phaseId -> 文本
   status: {},          // phaseId -> 'wait'|'run'|'ok'|'err'
@@ -486,7 +488,26 @@ function opfEjsLastStat(label) {
   } catch (e) { return { inCount: 0, outCount: 0, lastAt: 0 }; }
 }
 
+// 统一 AI 调用入口：**所有**生成（分段、交火、封装、精修、建议、聊天、正则、精修核心）
+// 都从这里过。配了真流式就走流式（绕开 Cloudflare 100 秒墙 / 524），并接入手动停止；
+// 否则退化为原来的非流式 generateRaw。
+// 这样"只改了生成、没改封装/交火"这类漏网不会再发生——一处改，处处生效。
 async function callModel(msgs, extraOpts) {
+  if (genStreamReady()) {
+    var ctl = newAbortCtl();
+    ST.abortCtl = ctl;
+    var maxT = (extraOpts && extraOpts.responseLength) ? Number(extraOpts.responseLength) : GEN_MAX_OUTPUT_TOKENS;
+    var res;
+    try {
+      res = await genStreamCall(msgs, null, { maxTokens: maxT, maxMs: 600000, idleMs: 300000, signal: ctl.signal });
+    } finally {
+      ST.abortCtl = null;
+    }
+    if (isStop() || (res && res.aborted)) throw new Error('已停止');
+    var txt = (res && typeof res.text === 'string') ? res.text : '';
+    if (!String(txt).trim()) throw new Error('模型返回空（可能被中转截断或安全策略拦下），可重试。');
+    return txt;
+  }
   var c = getCtx();
   if (!c || typeof c.generateRaw !== 'function') {
     throw new Error('generateRaw 不可用（SillyTavern 版本过旧或未就绪）。请升级到支持 getContext().generateRaw 的版本。');
@@ -521,19 +542,31 @@ async function abortRawWait() {
   try { await th.triggerSlash('/abort'); return true; } catch (e) { opfErr('abortRawWait', e); return false; }
 }
 
-// 带超时的分段调用：只包超时，不在这里重试（重试由 callModelSeg 这层做，便于归并提示与状态）。
+// 带超时的分段调用：同时赛跑「主 API」「墙钟超时」「手动停止」三者，谁先到算谁。
+// 之前只赛跑前两者——手动停止若 /abort 没真打断 generateRaw，就只能傻等到超时时间。
 async function callModelWithTimeout(msgs, timeoutMs) {
   var timer = null;
-  var settle = function () { if (timer) { clearTimeout(timer); timer = null; } };
+  var waiter = { reject: null };
+  var stopP = new Promise(function (_, reject) { waiter.reject = reject; });
+  ST.stopWaiters = ST.stopWaiters || [];
+  ST.stopWaiters.push(waiter);
+  var callP = callModel(msgs);
+  callP.catch(function () {});                 // 主请求若晚于停止才失败，别抛未处理拒绝
+  var settle = function () {
+    if (timer) { clearTimeout(timer); timer = null; }
+    var i = (ST.stopWaiters || []).indexOf(waiter);
+    if (i >= 0) ST.stopWaiters.splice(i, 1);
+  };
   try {
     var result = await Promise.race([
-      callModel(msgs),
+      callP,
       new Promise(function (_, reject) {
         timer = setTimeout(function () {
           timer = null;
           reject(new Error('OPF_SEG_TIMEOUT:' + timeoutMs));
         }, timeoutMs);
-      })
+      }),
+      stopP
     ]);
     settle();
     return result;
@@ -541,6 +574,12 @@ async function callModelWithTimeout(msgs, timeoutMs) {
     settle();
     throw e;
   }
+}
+// 手动停止时：把在途非流式请求的等待全部立刻 reject（不等墙钟）
+function releaseStopWaiters() {
+  var list = ST.stopWaiters || [];
+  ST.stopWaiters = [];
+  list.forEach(function (w) { try { w.reject(new Error('已停止')); } catch (e) {} });
 }
 
 // ---------------- 生成传输：分段写可走「真流式」，从根上绕开 Cloudflare 100 秒墙 ----------------
@@ -670,6 +709,7 @@ function stopGeneration() {
   if (ST.stopReq) return true;
   ST.stopReq = true;
   var cut = [];
+  releaseStopWaiters();                             // 立刻结束在途非流式请求的等待（不等墙钟）
   try { if (ST.abortCtl && typeof ST.abortCtl.abort === 'function') { ST.abortCtl.abort(); cut.push('流式'); } } catch (e) { opfErr('stop: abort stream', e); }
   try { abortRawWait().then(function (ok) { if (ok) opfLog('已发送 /abort'); }); cut.push('主 API'); } catch (e) { opfErr('stop: /abort', e); }
   // 立刻把按钮/状态切到"停止中"，让界面马上有反应（真正的收尾在各自 finally 里）
