@@ -291,7 +291,7 @@ async function shxSend() {
   shxRenderMsgs();
   await shxPut('messages', { id: userMsg.id, role: 'user', text: text, ts: userMsg.ts, archived: false });
 
-  ST.running = true; renderRunButtons();
+  ST.running = true; ST.stopReq = false; renderRunButtons();
   var status = getEl('opf-shx-status'); if (status) status.textContent = '她在翻书…';
   try {
     var mem = await shxBuildMemoryBlock(text);
@@ -329,7 +329,7 @@ async function shxCompress(silent) {
   var feed = toCompress.map(function (m) { return (m.role === 'user' ? (String(cfg.userName || '').trim() || '旅人') : cfg.herName) + '：' + m.text; }).join('\n');
   var ask = '把下面这段你与{{user}}的对话压缩成「记忆条目」，供以后检索。只输出 JSON，不要解释：\n'
     + '{"标题":"≤20字","要点":["≤40字，最多6条"],"关键词":["3~8个"],"情绪":"一句话"}';
-  ST.running = true; renderRunButtons();
+  ST.running = true; ST.stopReq = false; renderRunButtons();
   try {
     // 内部工具调用（记忆压缩）也走同一套头部顺序，但不带世界书正文，避免白烧上下文
     var resp = await callModel(sxMessages(ask, '[对话]\n' + feed.slice(0, 12000), null, SHX_PAGE_VOICE));

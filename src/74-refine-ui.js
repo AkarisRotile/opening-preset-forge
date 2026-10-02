@@ -73,7 +73,7 @@ var REFINE_HTML = '<div class="opf-char-wrap">'
   + '<textarea id="opf-rf-src" class="opf-char-input" style="min-height:120px" placeholder="把要修改的命定核心整份文本粘进来（YAML 正文 / 条目正文 / 从酒馆世界书复制出来的内容都行），或点下方「📂 打开文件」"></textarea>'
   + '<div class="opf-char-tools">'
   + '<label class="opf-btn ghost" style="margin:0">📂 打开文件<input type="file" id="opf-rf-file" accept=".yaml,.yml,.txt,.json,.md" style="display:none"></label>'
-  + '<button type="button" class="opf-btn ghost" id="opf-rf-fromdest">⬅ 从 ④ 页带入成品</button>'
+  + '<button type="button" class="opf-btn ghost" id="opf-rf-fromdest">⬅ 从命定系统页带入成品</button>'
   + '<button type="button" class="opf-btn ghost" id="opf-rf-clear">🗑 清空</button>'
   + '<button type="button" class="opf-btn ghost" id="opf-rf-srcchk">🔍 读一下文本框</button>'
   + '</div>'
@@ -256,7 +256,7 @@ async function refineAnalyze(){
   }
   refineInit(); ST.refine.src = src;
   if (!ST.refine.scan) ST.refine.scan = refineScan(src).text;
-  ST.running = true; renderRunButtons(); refineNote('① 整体分析中…（只读，不会改动任何内容）');
+  ST.running = true; ST.stopReq = false; renderRunButtons(); refineNote('① 整体分析中…（只读，不会改动任何内容）');
   try {
     var msg = '[待修改的二创核心（唯一的分析对象；下面的【世界设定参考】不是它的一部分）]\n'
       + '<<<二创核心原文\n' + refineForPrompt(src.slice(0, 60000)) + '\n二创核心原文结束>>>' + refineEjsEscNote(src)
@@ -330,7 +330,7 @@ async function refinePlan(){
   if (!src.trim()) { toast('先载入核心文本', 'warning'); return; }
   if (!req) { toast('先写下你的修改意见', 'warning'); return; }
   ST.refine.src = src; ST.refine.request = req;
-  ST.running = true; renderRunButtons(); refineNote('② 分析你的意见中…（仍然不会改动正文）');
+  ST.running = true; ST.stopReq = false; renderRunButtons(); refineNote('② 分析你的意见中…（仍然不会改动正文）');
   try {
     var msg = '[待修改的二创核心（唯一会被改动的对象）]\n<<<二创核心原文\n' + refineForPrompt(src.slice(0, 60000)) + '\n二创核心原文结束>>>' + refineEjsEscNote(src)
       + '\n\n[已完成的整体分析]\n' + (ST.refine.analysis || '（无，可先点①）')
@@ -393,7 +393,7 @@ async function refineSuggest(){
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
   var src = refineReadSrc();
   if (!src.trim()) { toast('先载入核心文本', 'warning'); return; }
-  ST.running = true; renderRunButtons();
+  ST.running = true; ST.stopReq = false; renderRunButtons();
   try {
     var msg = '[待修改的二创核心（只针对它提方向；不要提世界参考里的规则）]\n<<<二创核心原文\n' + refineForPrompt(src.slice(0, 60000)) + '\n二创核心原文结束>>>' + refineEjsEscNote(src)
       + '\n\n请给出 3~5 条**不破坏现有设计**的优化方向（每条一行、≤40字、具体可执行），例如补齐缺口、让某条规则更自洽、增加与既有功能的联动。不要输出正文，不要提"重写/重构"，也不要建议"补上世界规则里的某某"（那是参考资料，不属于这个核心）。';
@@ -424,7 +424,7 @@ async function refineApply(mode){
   var cur = steps[si] || null;
   var sizeCap = ST.refine.sizeCap || 1200;
   var stepLabel = steps.length ? ('第 ' + (si + 1) + '/' + steps.length + ' 步' + (cur && cur.title ? '（' + cur.title + '）' : '')) : '一步到位';
-  ST.running = true; renderRunButtons(); refineNote('③ ' + stepLabel + '：正在生成补丁（锚点 + 新内容）…');
+  ST.running = true; ST.stopReq = false; renderRunButtons(); refineNote('③ ' + stepLabel + '：正在生成补丁（锚点 + 新内容）…');
   try {
     var doneList = steps.slice(0, si).map(function (s, i) { return (i + 1) + '. [' + (s.done ? '已完成' : '未完成') + '] ' + (s.title || '') + '——' + (s.detail || ''); });
     // ③ 这一步要把整份工作稿交给模型（锚点必须来自这里，不能凭记忆）

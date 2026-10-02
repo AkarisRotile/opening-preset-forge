@@ -555,7 +555,7 @@ async function refineDestSeg(pid, dir){
   if (!dirT) dirT = '修正本段内部矛盾与格式问题，使其与其它段落一致；不新增设定。';
   var frozen = '';
   destSegs().forEach(function (s2) { if (s2.id !== pid && ST.dest.segs[s2.id]) frozen += '\n\n【' + s2.title + '】\n' + ST.dest.segs[s2.id]; });
-  ST.running = true; renderRunButtons(); destSetSeg(pid, 'run');
+  ST.running = true; ST.stopReq = false; renderRunButtons(); destSetSeg(pid, 'run');
   try {
     var msgs = destMessages();
     var msg = '【定点修改：只改「' + seg.title + '」这一段】\n\n[用户指令]\n' + dirT + '\n\n[本段现行内容]\n' + ST.dest.segs[pid] + '\n\n[冻结区块（其它分段原样保留，一个字都不许改；若发现其它段有问题，最多在结尾另起一行写“备注：建议检查XX段…”提示，不得代改）]\n' + frozen + '\n\n[命定系统·规则约束]\n' + DEST_RULES + '\n\n要求：只输出修改后的【' + seg.title + '】内容；修改严格限定在用户指令范围内，未要求的地方保持原样，不要顺手润色、扩写或重排。';
@@ -578,7 +578,7 @@ async function suggestDestDir(pid){
   var askTask = '请针对命定系统的【' + seg.title + '】这一段现有内容，给出 2-3 条只针对本段的修改方向。每条一行、≤50字、去掉编号外多余的话、直接可点；必须符合命定系统规则与联动一致性。\n[命定系统·规则约束]\n' + DEST_RULES;
   var askUser = '[需求]\n' + (ST.dest.demand || '(未填写)') + '\n[本段现有内容]\n' + cur;
   var msgs = destMessages(destSystemContent() + '\n\n' + destUser0() + '\n\n' + askTask, askUser);
-  ST.running = true; renderRunButtons();
+  ST.running = true; ST.stopReq = false; renderRunButtons();
   try {
     var resp = await callModel(msgs);
     var list = [];
@@ -663,7 +663,7 @@ function destReviewSegId(s){
 async function destAiReview(){
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
   if (!ST.dest || !ST.dest.body) { toast('请先点「🎁 脚本封装」（拼出正文后再检查）', 'warning'); return; }
-  ST.running = true; renderRunButtons();
+  ST.running = true; ST.stopReq = false; renderRunButtons();
   var box = getEl('opf-dest-review'), rb = getEl('opf-dest-reviewbox');
   if (box) box.textContent = '';
   if (rb) rb.textContent = '检查中…（只审校、不改写）';
@@ -747,7 +747,7 @@ async function finalizeDest(){
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
   var done = destSegs().filter(function (s) { return ST.dest.segs[s.id]; });
   if (!done.length) { toast('还没有任何分段内容，请先「分段初稿」', 'warning'); return; }
-  ST.running = true; renderRunButtons();
+  ST.running = true; ST.stopReq = false; renderRunButtons();
   var outEl = getEl('opf-dest-out'); if (outEl) outEl.textContent = '封装中…';
   var noteEl = getEl('opf-dest-outnote'); if (noteEl) noteEl.textContent = '';
   try {

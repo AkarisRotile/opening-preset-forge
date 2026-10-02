@@ -2,34 +2,47 @@
 // ============================================================================
 // v1.7.0 全屏分页壳 + 本地缓存 + 二创角色工坊
 // ============================================================================
+// 页 id → 显示名。**不带页码圆圈**（用户反馈圆圈数字不好看）。
 var PAGE_DEFS = [
-  { id: "preset", label: "① 开局预设" },
-  { id: "world",  label: "② 世界书" },
-  { id: "char",   label: "③ 二创角色" },
-  { id: "destiny",label: "④ 命定系统" },
-  { id: "regex",  label: "⑤ 正则工坊" },
-  { id: "shixian",label: "⑥ 与始弦聊天" },
-  { id: "refine", label: "⑦ 核心精修" },
-  { id: "atelier",label: "⑧ 造物工坊" },
-  { id: "settings", label: "⚙ 设置" },
-  { id: "p6",     label: "⑩ 更多功能", ph: true }
+  { id: "preset", label: "开局预设" },
+  { id: "world",  label: "世界书" },
+  { id: "char",   label: "二创角色" },
+  { id: "destiny",label: "命定系统" },
+  { id: "regex",  label: "正则工坊" },
+  { id: "shixian",label: "与始弦聊天" },
+  { id: "refine", label: "核心精修" },
+  { id: "atelier",label: "造物工坊" },
+  { id: "settings", label: "设置" },
+  { id: "p6",     label: "更多功能", ph: true }
 ];
-// v1.17.0：导航按**任务**分组，不再是一排扁平数字标签。
-// 「② 世界书」是全局参考、「⚙ 设置」是全局配置——它们属于顶部 chrome，不属于这一层。
-// world / settings 仍是 PAGE_DEFS 里的页（容器照建），只是不进左侧导航。
+// 世界书是全局参考、设置是全局配置——它们属于顶部 chrome，不进左侧导航。
+// world / settings 仍是 PAGE_DEFS 里的页（容器照建，函数照常工作）。
 //
-// v1.17.1：①③④ 三条流水线收进**同一个「分段创作」入口**（虚拟项 id="create"），
-// 页内再用类型切换器换页。**三条流水线的提示词/分段/产出校验一行都不动**——
-// 它们本来就各自按 id 独立工作，这里只是换了个外壳呈现方式。
+// 带工程草稿的三条创作流水线（工程列表按它判断"当前页能不能建草稿"）
 var CREATE_TYPES = [
-  { id: "preset",  label: "① 开局预设" },
-  { id: "char",    label: "③ 二创角色" },
-  { id: "destiny", label: "④ 命定系统" }
+  { id: "preset",  label: "开局预设" },
+  { id: "char",    label: "二创角色" },
+  { id: "destiny", label: "命定系统" }
 ];
 function isCreateType(id) { for (var i = 0; i < CREATE_TYPES.length; i++) if (CREATE_TYPES[i].id === id) return true; return false; }
+// 导航「领域」：一个导航入口 + **页内一层子标签**（子标签不进导航栏，点开该页才看得到）。
+//  - 分段创作：① 开局预设 / ③ 二创角色
+//  - 命定系统：命定核心 / 核心精修 / 正则工坊（后两个是服务命定系统的工具，收进页内）
+// 三条流水线与两个工具的提示词/分段/产出校验一行都不动，这里只换外壳呈现。
+var DOMAINS = [
+  { nav: "create", label: "分段创作", pages: ["preset", "char"],
+    tabs: [{ id: "preset", label: "开局预设" }, { id: "char", label: "二创角色" }] },
+  { nav: "destinyhub", label: "命定系统", pages: ["destiny", "refine", "regex"],
+    tabs: [{ id: "destiny", label: "命定核心" }, { id: "refine", label: "核心精修" }, { id: "regex", label: "正则工坊" }] }
+];
+function domainOfPage(id) { for (var i = 0; i < DOMAINS.length; i++) if (DOMAINS[i].pages.indexOf(id) >= 0) return DOMAINS[i]; return null; }
+function domainByNav(id) { for (var i = 0; i < DOMAINS.length; i++) if (DOMAINS[i].nav === id) return DOMAINS[i]; return null; }
+// 导航：带 title 的是分组标题；不带 title 的就是顶层单项。
+// 「命定系统」自成一项（核心精修/正则工坊 已在它页内，不再出现在导航栏）。
 var NAV_GROUPS = [
   { title: "创作", items: ["create"] },
-  { title: "单件", items: ["regex", "refine", "atelier"] },
+  { items: ["destinyhub"] },
+  { title: "造物", items: ["atelier"] },
   { title: "对话", items: ["shixian"] }
 ];
 // 外壳第二层样式（覆盖 SHELL_CSS 里那套横向标签）：左侧竖向分组导航 + 顶部 chrome。
@@ -92,16 +105,8 @@ function buildShell(){
   head.appendChild(title); head.appendChild(tx); head.appendChild(wbtn); head.appendChild(gear); head.appendChild(close);
   shell.appendChild(head);
 
-  // ---- 类型切换子栏：只在「分段创作」的三种类型页显示 ----
+  // ---- 页内子标签栏：内容按当前「领域」动态渲染（见 renderSubbar），不进导航栏 ----
   var subbar = document.createElement("div"); subbar.id = "opf-subbar"; subbar.style.display = "none";
-  var slabel = document.createElement("span"); slabel.className = "opf-subbar-label"; slabel.textContent = "分段创作";
-  subbar.appendChild(slabel);
-  CREATE_TYPES.forEach(function (ct) {
-    var b = document.createElement("button"); b.type = "button"; b.id = "opf-subtab-" + ct.id; b.className = "opf-subtab";
-    b.textContent = ct.label; b.title = "切到" + ct.label;
-    b.addEventListener("click", function () { switchPage(ct.id); });
-    subbar.appendChild(b);
-  });
   shell.appendChild(subbar);
 
   // ---- 主体：左侧分组导航 + 右侧内容区 ----
@@ -109,17 +114,19 @@ function buildShell(){
   var nav = document.createElement("nav"); nav.id = "opf-nav";
   var byId = {}; PAGE_DEFS.forEach(function (p) { byId[p.id] = p; });
   NAV_GROUPS.forEach(function (g) {
-    var gt = document.createElement("div"); gt.className = "opf-nav-group"; gt.textContent = g.title; nav.appendChild(gt);
+    // 带 title 的渲染分组标题；不带 title 的就是顶层单项（命定系统自成一项）
+    if (g.title) { var gt = document.createElement("div"); gt.className = "opf-nav-group"; gt.textContent = g.title; nav.appendChild(gt); }
     g.items.forEach(function (id) {
+      var d = domainByNav(id);           // 领域入口（create / destinyhub）
       var p = byId[id];
-      // "create" 是虚拟项（不在 PAGE_DEFS 里）：代表 ①③④ 三种类型共用的入口
-      var label = p ? p.label : (id === "create" ? "分段创作" : id);
+      var label = d ? d.label : (p ? p.label : id);
       var t = document.createElement("button"); t.type = "button"; t.id = "opf-tab-" + id; t.className = "opf-tab";
-      t.textContent = label; t.title = p ? label : (label + "（开局预设 / 二创角色 / 命定系统）");
+      t.textContent = label;
+      t.title = d ? (label + "（页内有子标签）") : label;
       t.addEventListener("click", function () { switchPage(id); });
       nav.appendChild(t);
       // 「分段创作」下面挂工程（草稿）列表：一个类型一份列表
-      if (id === "create") { var pl = document.createElement("div"); pl.id = "opf-projlist"; nav.appendChild(pl); }
+      if (d && d.nav === "create") { var pl = document.createElement("div"); pl.id = "opf-projlist"; nav.appendChild(pl); }
     });
   });
   bodyWrap.appendChild(nav);
@@ -174,31 +181,47 @@ function buildShell(){
   try { buildWorldSide(); } catch (e) { opfErr("buildWorldSide", e); }
   if (getSettings().visible) showPanel();
 }
+// 页内子标签栏：按当前页所属「领域」渲染；不在任何领域里的页就隐藏它。
+// 用重建的方式（而不是预先建好再显隐），因为两个领域的标签集不同。
+function renderSubbar(activeId) {
+  var sb = getEl("opf-subbar"); if (!sb) return;
+  sb.textContent = "";
+  var d = domainOfPage(activeId);
+  if (!d) { sb.style.display = "none"; return; }
+  sb.style.display = "";
+  var slabel = document.createElement("span"); slabel.className = "opf-subbar-label"; slabel.textContent = d.label;
+  sb.appendChild(slabel);
+  d.tabs.forEach(function (t) {
+    var b = document.createElement("button"); b.type = "button"; b.id = "opf-subtab-" + t.id;
+    b.className = "opf-subtab" + (t.id === activeId ? " active" : "");
+    b.textContent = t.label; b.title = "切到" + t.label;
+    b.addEventListener("click", function () { switchPage(t.id); });
+    sb.appendChild(b);
+  });
+}
 function switchPage(id, force){
   var s = getSettings();
-  // "create" 是虚拟入口：落到上次用的那种创作类型上
-  if (id === "create") id = isCreateType(s.createType) ? s.createType : "preset";
+  // 领域入口（create / destinyhub）→ 落到该领域上次用的子页
+  var dNav = domainByNav(id);
+  if (dNav) {
+    var remembered = (dNav.nav === "create") ? s.createType : s.destinyTab;
+    id = (dNav.pages.indexOf(remembered) >= 0) ? remembered : dNav.pages[0];
+  }
   if (!force && s.activePage === id) return;
   s.activePage = id;
-  if (isCreateType(id)) s.createType = id;   // 记住类型，下次进「分段创作」直接回到它
+  var dPage = domainOfPage(id);
+  if (dPage) { if (dPage.nav === "create") s.createType = id; else s.destinyTab = id; }  // 记住领域内的子页
   saveSettings();
   var pages = getEl("opf-pages"); if (!pages) return;
   [].forEach.call(pages.children, function (d) { d.classList.toggle("active", d.id === "opf-page-" + id); });
-  // 左侧导航高亮：虚拟项 create 在任一创作类型页都保持高亮
+  // 左侧导航高亮：领域入口在其任一子页都保持高亮
   var nav = getEl("opf-nav");
   if (nav) [].forEach.call(nav.children, function (t) {
     var tid = String(t.id || "").replace(/^opf-tab-/, "");
-    t.classList.toggle("active", (t.id === "opf-tab-" + id) || (tid === "create" && isCreateType(id)));
+    var dn = domainByNav(tid);
+    t.classList.toggle("active", (t.id === "opf-tab-" + id) || !!(dn && dn.pages.indexOf(id) >= 0));
   });
-  // 类型切换子栏：只在创作页显示，并标出当前类型
-  var sb = getEl("opf-subbar");
-  if (sb) {
-    sb.style.display = isCreateType(id) ? "" : "none";
-    CREATE_TYPES.forEach(function (ct) {
-      var b = getEl("opf-subtab-" + ct.id);
-      if (b) b.classList.toggle("active", ct.id === id);
-    });
-  }
+  renderSubbar(id);
   try { renderProjList(); } catch (e) { opfErr("renderProjList", e); }
   if (id === "world") { try { buildWorldSide(); renderWorldSide(); } catch (e) {} }
   if (id === "char") { try { renderCharPage(); } catch (e) {} }

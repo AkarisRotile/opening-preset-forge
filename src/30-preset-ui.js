@@ -336,7 +336,7 @@ async function refinePhase(pid, direction){
   if (!ST.results[pid]) { toast("该步还没有可精修的内容，请先“生成初稿”", "warning"); return; }
   var dir = (direction || "").trim();
   if (!dir) dir = "整体打磨：修正设定漏洞、提升与角色/背景的契合度与文笔，条目数量与格式保持不变。";
-  ST.running = true; setPhase(pid, "run"); renderRunButtons();
+  ST.running = true; ST.stopReq = false; setPhase(pid, "run"); renderRunButtons();
   try {
     var msgs = sxPresetMessages();
     for (var k = 0; k < idx; k++) {
@@ -372,7 +372,7 @@ async function suggestPhaseDirections(pid){
   var askUser = "[开局需求]\n" + demand + "\n[本栏现有内容]\n" + cur;
   var msgs = sxMessages(buildSystemContent() + '\n\n' + buildWorkNote() + '\n\n' + askTask, askUser);
   var old = ST.running;
-  ST.running = true; renderRunButtons();
+  ST.running = true; ST.stopReq = false; renderRunButtons();
   try {
     var resp = await callModel(msgs);
     var list = [];

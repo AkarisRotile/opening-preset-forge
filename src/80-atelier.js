@@ -1503,7 +1503,7 @@ async function atlDoGenerate() {
   var A = atlInit();
   if (!String(A.buf.req || '').trim() && !String(A.buf.ref || '').trim()) { atlStat(ATL_TIPS.needReq); toast('先写一句需求（或粘一段参考），再生成', 'warning'); return; }
   var wasBound = atlBoundItem();          // 生成＝造新的一条：成功后解绑，避免保存时覆盖上一条
-  ST.running = true; atlSetRunning(true);
+  ST.running = true; ST.stopReq = false; atlSetRunning(true);
   try {
     var msgs = atlMessages(atlSystem(A.buf.kind, 'gen'), atlGenPrompt());
     var raw = await atlCall(msgs, '生成');
@@ -1544,7 +1544,7 @@ async function atlDoFix() {
   if (!String(A.buf.yaml || '').trim()) { atlStat(ATL_TIPS.needReq); toast('还没有可改的产出：先生成一件，或把工作区里的条目「打开」进来', 'warning'); return; }
   if (!dir) { atlStat(ATL_TIPS.needDir); toast('先写一句改进要求，例如「品质降到优良、补一条反噬代价」', 'warning'); return; }
   var before = String(A.buf.yaml);
-  ST.running = true; atlSetRunning(true);
+  ST.running = true; ST.stopReq = false; atlSetRunning(true);
   try {
     var msgs = atlMessages(atlSystem(A.buf.kind, 'fix'), atlFixPrompt(dir));
     var raw = await atlCall(msgs, '改进');
@@ -1594,7 +1594,7 @@ async function atlDoSug() {
   var A = atlInit();
   if (!String(A.buf.yaml || '').trim()) { atlStat(ATL_TIPS.needReq); toast('先生成一件，或打开工作区里的条目，再要建议', 'warning'); return; }
   var box = atlEl('opf-atl-chips'); if (!box) return;
-  ST.running = true; atlSetRunning(true);
+  ST.running = true; ST.stopReq = false; atlSetRunning(true);
   try {
     var raw = await atlCall(atlMessages(null, atlSugPrompt()), '建议');
     var list = [];
@@ -1641,7 +1641,7 @@ async function atlDoCross() {
   }
   var useWb = !!(atlEl('opf-atl-usewb') && atlEl('opf-atl-usewb').checked);
   var A = atlInit();
-  ST.running = true; atlSetRunning(true);
+  ST.running = true; ST.stopReq = false; atlSetRunning(true);
   atlRenderCrossNote('running');
   atlProgressStart('交火分析');
   var box = atlEl('opf-atl-crossout');

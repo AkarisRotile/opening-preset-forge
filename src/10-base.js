@@ -22,7 +22,8 @@ var DEFAULT_SETTINGS = {
   modelNote: '',             // 附加一句给模型的叮嘱
   segAutoRetry: false,       // 分段写超时自动重roll（仅分段写阶段触发）
   retryTimeoutSec: 180,      // 分段写单段超过该秒数无响应则重roll
-  createType: 'preset'       // 「分段创作」当前类型：preset | char | destiny
+  createType: 'preset',      // 「分段创作」当前类型：preset | char
+  destinyTab: 'destiny'      // 「命定系统」页内当前子标签：destiny | refine | regex
 };
 
 // ---------------- 始弦人设（唯一真源 · 原版预设原文，一字不改） ----------------

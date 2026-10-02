@@ -204,7 +204,7 @@ async function refineCharSeg(pid, dir){
   if (!dirT) dirT = "修正本段内部矛盾与格式问题，使其与其它段落一致；不新增设定。";
   var frozen = "";
   CHAR_SEGS.forEach(function (s2) { if (s2.id !== pid && ST.char.segs[s2.id]) frozen += "\n\n【" + s2.title + "】\n" + ST.char.segs[s2.id]; });
-  ST.running = true; renderRunButtons(); charSetSeg(pid, "run");
+  ST.running = true; ST.stopReq = false; renderRunButtons(); charSetSeg(pid, "run");
   try {
     var msgs = charMessages(charSystemContent() + '\n\n' + charUser0(), charDemand());
     var msg = "【定点修改：只改「" + seg.title + "」这一段】\n\n[用户指令]\n" + dirT + "\n\n[本段现行内容]\n" + ST.char.segs[pid] + "\n\n[冻结区块（其它分段原样保留，一个字都不许改；若发现其它段有问题，最多在结尾另起一行写“备注：建议检查XX段…”提示，不得代改）]\n" + frozen + "\n\n[二创角色·规则约束]\n" + CHAR_RULES + "\n\n要求：只输出修改后的【" + seg.title + "】内容；修改严格限定在用户指令范围内，未要求的地方保持原样，不要顺手润色、扩写或重排。";
@@ -227,7 +227,7 @@ async function suggestCharDir(pid){
   var askTask = "请针对二创角色的【" + seg.title + "】这一段现有内容，给出 2-3 条只针对本段的修改方向。每条一行、≤50字、去掉编号外多余的话、直接可点；必须符合角色规则与联动一致性。\n[二创角色·规则约束]\n" + CHAR_RULES;
   var askUser = "[角色需求]\n" + demand + "\n[本段现有内容]\n" + cur;
   var msgs = charMessages(charSystemContent() + '\n\n' + charUser0() + '\n\n' + askTask, askUser);
-  ST.running = true; renderRunButtons();
+  ST.running = true; ST.stopReq = false; renderRunButtons();
   try {
     var resp = await callModel(msgs);
     var list = [];
@@ -300,7 +300,7 @@ async function finalizeChar(){
   if (ST.running) { toast("已有任务进行中（单线程）", "warning"); return; }
   var done = CHAR_SEGS.filter(function (s) { return ST.char.segs[s.id]; });
   if (!done.length) { toast("还没有角色稿件，请先「分段初稿」", "warning"); return; }
-  ST.running = true; renderRunButtons();
+  ST.running = true; ST.stopReq = false; renderRunButtons();
   var outEl = getEl("opf-char-out"); if (outEl) outEl.textContent = "封装中…";
   var noteEl = getEl("opf-char-outnote"); if (noteEl) noteEl.textContent = "";
   try {

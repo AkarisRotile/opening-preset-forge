@@ -61,10 +61,10 @@ function bindRxPage() {  rxInit();
 }
 function rxPullFromDestiny() {
   var body = ST.dest && (ST.dest.body || ST.dest.out);
-  if (!body) { toast('④ 页还没有最终稿件：请先在 ④ 页「最终封装」，或直接把核心全文粘进来', 'warning'); return; }
+  if (!body) { toast('命定系统页还没有最终稿件：请先在「最终封装」生成，或直接把核心全文粘进来', 'warning'); return; }
   var el = getEl('opf-rx-core'); if (el) el.value = body;
   ST.rx.core = body;
-  toast('已从 ④ 页带入条目正文，点「🔍 解析语言格式」继续');
+  toast('已从命定系统页带入条目正文，点「🔍 解析语言格式」继续');
   rxDoParse();
 }
 function rxCoreNameFromText(txt) {
@@ -89,7 +89,7 @@ async function rxDoParse() {
   if (!txt) { toast('请先粘贴核心全文（含语言格式节）', 'warning'); return; }
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
   ST.rx.core = txt;
-  ST.running = true; renderRunButtons();
+  ST.running = true; ST.stopReq = false; renderRunButtons();
   var box0 = getEl('opf-rx-parsed'); if (box0) box0.textContent = 'AI 解析中…（失败会自动回退到脚本解析）';
   var parsed = null, engine = 'ai', notes = [];
   try {
@@ -584,7 +584,7 @@ async function rxAutoFixAll() {
     return;
   }
   if (!window.confirm('本地能修的已经修完：\n' + (localLog.join('\n') || '（无）') + '\n\n还剩 ' + left.length + ' 项需要 AI 改写（如 $n 引用越界、mood 未分支、体量偏离、匹配不上范例）。现在让 AI 修吗？')) return;
-  ST.running = true; renderRunButtons();
+  ST.running = true; ST.stopReq = false; renderRunButtons();
   try {
     var byItem = [];
     left.forEach(function (x) { var g = byItem.filter(function (y) { return y.it === x.it; })[0]; if (g) g.list.push(x.is); else byItem.push({ it: x.it, list: [x.is] }); });
@@ -669,7 +669,7 @@ async function rxRefineItem(item, dir, scope) {
   var text = String(dir || '').trim();
   if (!text) { toast('先写一句修改要求，例如「边框改成金色、字号大一点、去掉动效」', 'warning'); return; }
   var f = rxItemFormat(item);
-  ST.running = true; renderRunButtons();
+  ST.running = true; ST.stopReq = false; renderRunButtons();
   var st = getEl('opf-rx-statusline');
   if (st) st.textContent = '按你的要求修改中…';
   try {
@@ -700,7 +700,7 @@ async function rxRefineItem(item, dir, scope) {
 async function rxSuggestItem(item, idx) {
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
   var box = getEl('opf-rx-chips-' + idx); if (!box) return;
-  ST.running = true; renderRunButtons();
+  ST.running = true; ST.stopReq = false; renderRunButtons();
   try {
     var ask = '下面是一个「对话美化正则」当前的 CSS 与骨架。请给出 2~3 条**只针对样式**的具体修改方向（每条一行、≤30字、直接可执行，例如"边框换成暗金色渐变"）。不要输出 CSS 本身。\n\n[当前 CSS]\n' + rxItemCss(item).slice(0, 2000) + '\n\n[骨架]\n' + rxSkeleton(item, rxItemFormat(item));
     var resp = await rxStreamCall(sxMessages(null, ask, null, RX_PAGE_VOICE_CSS), null, { phase: '建议', idleMs: 20000, maxMs: 90000, maxTokens: 1500 });
@@ -1490,7 +1490,7 @@ async function rxGenerate() {
   rxForceSt = !rxTransportUsable(cfgNow);
   if (rxForceSt) toast('当前「生成传输」配置不完整（' + rxTransportWhy(cfgNow) + '），本次改用酒馆主 API 生成；补全后可再试流式', 'warning');
   var streaming = !rxForceSt;
-  ST.running = true; renderRunButtons();
+  ST.running = true; ST.stopReq = false; renderRunButtons();
   rxLiveTick.last = 0;
   var log = [];
   var shrink = 1;
@@ -1622,7 +1622,7 @@ function rxDoCheck(showToast) {
         var b4 = document.createElement('button'); b4.type = 'button'; b4.className = 'opf-step-act'; b4.textContent = '✨ AI 修这条';
         b4.addEventListener('click', async function () {
           if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
-          ST.running = true; renderRunButtons();
+          ST.running = true; ST.stopReq = false; renderRunButtons();
           var stl = getEl('opf-rx-statusline'); if (stl) stl.textContent = 'AI 修复：' + x.issue.msg;
           try {
             var ch = await rxAutoFixAi(x.item, [x.issue]);

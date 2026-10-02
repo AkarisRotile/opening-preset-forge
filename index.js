@@ -39,7 +39,8 @@ var DEFAULT_SETTINGS = {
   modelNote: '',             // 附加一句给模型的叮嘱
   segAutoRetry: false,       // 分段写超时自动重roll（仅分段写阶段触发）
   retryTimeoutSec: 180,      // 分段写单段超过该秒数无响应则重roll
-  createType: 'preset'       // 「分段创作」当前类型：preset | char | destiny
+  createType: 'preset',      // 「分段创作」当前类型：preset | char
+  destinyTab: 'destiny'      // 「命定系统」页内当前子标签：destiny | refine | regex
 };
 
 // ---------------- 始弦人设（唯一真源 · 原版预设原文，一字不改） ----------------
@@ -1357,7 +1358,7 @@ async function refinePhase(pid, direction){
   if (!ST.results[pid]) { toast("该步还没有可精修的内容，请先“生成初稿”", "warning"); return; }
   var dir = (direction || "").trim();
   if (!dir) dir = "整体打磨：修正设定漏洞、提升与角色/背景的契合度与文笔，条目数量与格式保持不变。";
-  ST.running = true; setPhase(pid, "run"); renderRunButtons();
+  ST.running = true; ST.stopReq = false; setPhase(pid, "run"); renderRunButtons();
   try {
     var msgs = sxPresetMessages();
     for (var k = 0; k < idx; k++) {
@@ -1393,7 +1394,7 @@ async function suggestPhaseDirections(pid){
   var askUser = "[开局需求]\n" + demand + "\n[本栏现有内容]\n" + cur;
   var msgs = sxMessages(buildSystemContent() + '\n\n' + buildWorkNote() + '\n\n' + askTask, askUser);
   var old = ST.running;
-  ST.running = true; renderRunButtons();
+  ST.running = true; ST.stopReq = false; renderRunButtons();
   try {
     var resp = await callModel(msgs);
     var list = [];
@@ -1435,7 +1436,7 @@ function addWorkflowUI(root){
 }
 
 //@module 31-settings — ⚙ 设置：生成传输 / API / 模型（全插件唯一配置入口）
-var SETTINGS_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">⚙ 生成传输 · 全插件共用</div><div class="opf-dim">在这里配置 API 与模型；①③④⑤⑥⑦⑧ 的生成统一走这一套，改一次全局生效。</div><div class="opf-shx-cfg"><label class="opf-opt">生成传输<select id="opf-rx-transport" class="opf-ref-input"><option value="st">酒馆主 API（零配置·推荐）</option><option value="server">经酒馆服务端转发 + 流式（需自填反代）</option><option value="direct">浏览器直连 + 流式（需自填接口）</option></select></label><span class="opf-dim" id="opf-rx-txnote"></span></div><div class="opf-shx-cfg" id="opf-rx-cfg-server" style="display:none"><button type="button" class="opf-btn ghost" id="opf-rx-pulltavern">📋 用酒馆的反代设置</button><label class="opf-opt">协议源<select id="opf-rx-source" class="opf-ref-input"><option value="makersuite">Google AI Studio (makersuite)</option><option value="vertexai">Vertex AI (vertexai)</option></select></label><label class="opf-opt">中转/反代地址<input id="opf-rx-reverse" class="opf-ref-input" placeholder="https://你的中转域名"></label><label class="opf-opt">代理密码/密钥<input id="opf-rx-proxypass" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">模型名<input id="opf-rx-model" class="opf-ref-input" list="opf-rx-modellist" placeholder="点右侧按钮获取；也可直接手填，填过会记住"><datalist id="opf-rx-modellist"></datalist></label><button type="button" class="opf-btn ghost" id="opf-rx-models">🔌 获取模型列表</button></div><div class="opf-shx-cfg" id="opf-rx-cfg-direct" style="display:none"><label class="opf-opt">直连协议<select id="opf-rx-proto" class="opf-ref-input"><option value="openai">OpenAI 兼容 (/chat/completions)</option><option value="gemini">Google 原生 (:streamGenerateContent)</option></select></label><label class="opf-opt">直连地址<input id="opf-rx-base" class="opf-ref-input" placeholder="https://api.example.com/v1"></label><label class="opf-opt">直连密钥<input id="opf-rx-key" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">直连模型<input id="opf-rx-chatmodel" class="opf-ref-input" placeholder="留空则用上面的模型名"></label></div><div class="opf-dim" id="opf-set-status">就绪</div><div id="opf-rx-modelall-wrap" style="display:none"><div class="opf-sec-label">全部模型<span class="opf-dim" id="opf-rx-modelall-note"></span></div><div class="opf-dim">datalist 只在聚焦输入框时才弹、浏览器还会自己截断条数，所以这里给一份常驻清单：一条不省，点一条即选中。</div><div id="opf-rx-modelall" style="max-height:200px;overflow:auto;border:1px solid rgba(255,122,138,.25);border-radius:8px;padding:5px;background:rgba(10,2,5,.35)"></div></div><div class="opf-sec"><div class="opf-sec-label">生成设置</div><div class="opf-opts"><label class="opf-opt" title="仅分段写阶段触发（开局预设的创作分段与二创角色的分段；单次快出/汇总/精修/交火梳理不触发）"><input type="checkbox" id="opf-ck-segretry"> 分段超时自动重roll</label><label class="opf-opt" title="分段写单段超过该秒数无响应即自动重roll（每段最多3次）">超时阈值 <input type="number" id="opf-retrytimeout" class="opf-num" min="15" max="3600" step="15"> 秒</label></div></div></div>';
+var SETTINGS_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">⚙ 生成传输 · 全插件共用</div><div class="opf-dim">在这里配置 API 与模型；各页的生成统一走这一套，改一次全局生效。</div><div class="opf-shx-cfg"><label class="opf-opt">生成传输<select id="opf-rx-transport" class="opf-ref-input"><option value="st">酒馆主 API（零配置·推荐）</option><option value="server">经酒馆服务端转发 + 流式（需自填反代）</option><option value="direct">浏览器直连 + 流式（需自填接口）</option></select></label><span class="opf-dim" id="opf-rx-txnote"></span></div><div class="opf-shx-cfg" id="opf-rx-cfg-server" style="display:none"><button type="button" class="opf-btn ghost" id="opf-rx-pulltavern">📋 用酒馆的反代设置</button><label class="opf-opt">协议源<select id="opf-rx-source" class="opf-ref-input"><option value="makersuite">Google AI Studio (makersuite)</option><option value="vertexai">Vertex AI (vertexai)</option></select></label><label class="opf-opt">中转/反代地址<input id="opf-rx-reverse" class="opf-ref-input" placeholder="https://你的中转域名"></label><label class="opf-opt">代理密码/密钥<input id="opf-rx-proxypass" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">模型名<input id="opf-rx-model" class="opf-ref-input" list="opf-rx-modellist" placeholder="点右侧按钮获取；也可直接手填，填过会记住"><datalist id="opf-rx-modellist"></datalist></label><button type="button" class="opf-btn ghost" id="opf-rx-models">🔌 获取模型列表</button></div><div class="opf-shx-cfg" id="opf-rx-cfg-direct" style="display:none"><label class="opf-opt">直连协议<select id="opf-rx-proto" class="opf-ref-input"><option value="openai">OpenAI 兼容 (/chat/completions)</option><option value="gemini">Google 原生 (:streamGenerateContent)</option></select></label><label class="opf-opt">直连地址<input id="opf-rx-base" class="opf-ref-input" placeholder="https://api.example.com/v1"></label><label class="opf-opt">直连密钥<input id="opf-rx-key" class="opf-ref-input" type="password" placeholder="只存在本机"></label><label class="opf-opt">直连模型<input id="opf-rx-chatmodel" class="opf-ref-input" placeholder="留空则用上面的模型名"></label></div><div class="opf-dim" id="opf-set-status">就绪</div><div id="opf-rx-modelall-wrap" style="display:none"><div class="opf-sec-label">全部模型<span class="opf-dim" id="opf-rx-modelall-note"></span></div><div class="opf-dim">datalist 只在聚焦输入框时才弹、浏览器还会自己截断条数，所以这里给一份常驻清单：一条不省，点一条即选中。</div><div id="opf-rx-modelall" style="max-height:200px;overflow:auto;border:1px solid rgba(255,122,138,.25);border-radius:8px;padding:5px;background:rgba(10,2,5,.35)"></div></div><div class="opf-sec"><div class="opf-sec-label">生成设置</div><div class="opf-opts"><label class="opf-opt" title="仅分段写阶段触发（开局预设的创作分段与二创角色的分段；单次快出/汇总/精修/交火梳理不触发）"><input type="checkbox" id="opf-ck-segretry"> 分段超时自动重roll</label><label class="opf-opt" title="分段写单段超过该秒数无响应即自动重roll（每段最多3次）">超时阈值 <input type="number" id="opf-retrytimeout" class="opf-num" min="15" max="3600" step="15"> 秒</label></div></div></div>';
 
 // 生成设置（自动重roll + 超时阈值）绑定与回填——这些控件现在住在 ⚙ 设置页
 function bindSettingsExtra() {
@@ -2623,34 +2624,47 @@ function projBootstrap() {
 // ============================================================================
 // v1.7.0 全屏分页壳 + 本地缓存 + 二创角色工坊
 // ============================================================================
+// 页 id → 显示名。**不带页码圆圈**（用户反馈圆圈数字不好看）。
 var PAGE_DEFS = [
-  { id: "preset", label: "① 开局预设" },
-  { id: "world",  label: "② 世界书" },
-  { id: "char",   label: "③ 二创角色" },
-  { id: "destiny",label: "④ 命定系统" },
-  { id: "regex",  label: "⑤ 正则工坊" },
-  { id: "shixian",label: "⑥ 与始弦聊天" },
-  { id: "refine", label: "⑦ 核心精修" },
-  { id: "atelier",label: "⑧ 造物工坊" },
-  { id: "settings", label: "⚙ 设置" },
-  { id: "p6",     label: "⑩ 更多功能", ph: true }
+  { id: "preset", label: "开局预设" },
+  { id: "world",  label: "世界书" },
+  { id: "char",   label: "二创角色" },
+  { id: "destiny",label: "命定系统" },
+  { id: "regex",  label: "正则工坊" },
+  { id: "shixian",label: "与始弦聊天" },
+  { id: "refine", label: "核心精修" },
+  { id: "atelier",label: "造物工坊" },
+  { id: "settings", label: "设置" },
+  { id: "p6",     label: "更多功能", ph: true }
 ];
-// v1.17.0：导航按**任务**分组，不再是一排扁平数字标签。
-// 「② 世界书」是全局参考、「⚙ 设置」是全局配置——它们属于顶部 chrome，不属于这一层。
-// world / settings 仍是 PAGE_DEFS 里的页（容器照建），只是不进左侧导航。
+// 世界书是全局参考、设置是全局配置——它们属于顶部 chrome，不进左侧导航。
+// world / settings 仍是 PAGE_DEFS 里的页（容器照建，函数照常工作）。
 //
-// v1.17.1：①③④ 三条流水线收进**同一个「分段创作」入口**（虚拟项 id="create"），
-// 页内再用类型切换器换页。**三条流水线的提示词/分段/产出校验一行都不动**——
-// 它们本来就各自按 id 独立工作，这里只是换了个外壳呈现方式。
+// 带工程草稿的三条创作流水线（工程列表按它判断"当前页能不能建草稿"）
 var CREATE_TYPES = [
-  { id: "preset",  label: "① 开局预设" },
-  { id: "char",    label: "③ 二创角色" },
-  { id: "destiny", label: "④ 命定系统" }
+  { id: "preset",  label: "开局预设" },
+  { id: "char",    label: "二创角色" },
+  { id: "destiny", label: "命定系统" }
 ];
 function isCreateType(id) { for (var i = 0; i < CREATE_TYPES.length; i++) if (CREATE_TYPES[i].id === id) return true; return false; }
+// 导航「领域」：一个导航入口 + **页内一层子标签**（子标签不进导航栏，点开该页才看得到）。
+//  - 分段创作：① 开局预设 / ③ 二创角色
+//  - 命定系统：命定核心 / 核心精修 / 正则工坊（后两个是服务命定系统的工具，收进页内）
+// 三条流水线与两个工具的提示词/分段/产出校验一行都不动，这里只换外壳呈现。
+var DOMAINS = [
+  { nav: "create", label: "分段创作", pages: ["preset", "char"],
+    tabs: [{ id: "preset", label: "开局预设" }, { id: "char", label: "二创角色" }] },
+  { nav: "destinyhub", label: "命定系统", pages: ["destiny", "refine", "regex"],
+    tabs: [{ id: "destiny", label: "命定核心" }, { id: "refine", label: "核心精修" }, { id: "regex", label: "正则工坊" }] }
+];
+function domainOfPage(id) { for (var i = 0; i < DOMAINS.length; i++) if (DOMAINS[i].pages.indexOf(id) >= 0) return DOMAINS[i]; return null; }
+function domainByNav(id) { for (var i = 0; i < DOMAINS.length; i++) if (DOMAINS[i].nav === id) return DOMAINS[i]; return null; }
+// 导航：带 title 的是分组标题；不带 title 的就是顶层单项。
+// 「命定系统」自成一项（核心精修/正则工坊 已在它页内，不再出现在导航栏）。
 var NAV_GROUPS = [
   { title: "创作", items: ["create"] },
-  { title: "单件", items: ["regex", "refine", "atelier"] },
+  { items: ["destinyhub"] },
+  { title: "造物", items: ["atelier"] },
   { title: "对话", items: ["shixian"] }
 ];
 // 外壳第二层样式（覆盖 SHELL_CSS 里那套横向标签）：左侧竖向分组导航 + 顶部 chrome。
@@ -2713,16 +2727,8 @@ function buildShell(){
   head.appendChild(title); head.appendChild(tx); head.appendChild(wbtn); head.appendChild(gear); head.appendChild(close);
   shell.appendChild(head);
 
-  // ---- 类型切换子栏：只在「分段创作」的三种类型页显示 ----
+  // ---- 页内子标签栏：内容按当前「领域」动态渲染（见 renderSubbar），不进导航栏 ----
   var subbar = document.createElement("div"); subbar.id = "opf-subbar"; subbar.style.display = "none";
-  var slabel = document.createElement("span"); slabel.className = "opf-subbar-label"; slabel.textContent = "分段创作";
-  subbar.appendChild(slabel);
-  CREATE_TYPES.forEach(function (ct) {
-    var b = document.createElement("button"); b.type = "button"; b.id = "opf-subtab-" + ct.id; b.className = "opf-subtab";
-    b.textContent = ct.label; b.title = "切到" + ct.label;
-    b.addEventListener("click", function () { switchPage(ct.id); });
-    subbar.appendChild(b);
-  });
   shell.appendChild(subbar);
 
   // ---- 主体：左侧分组导航 + 右侧内容区 ----
@@ -2730,17 +2736,19 @@ function buildShell(){
   var nav = document.createElement("nav"); nav.id = "opf-nav";
   var byId = {}; PAGE_DEFS.forEach(function (p) { byId[p.id] = p; });
   NAV_GROUPS.forEach(function (g) {
-    var gt = document.createElement("div"); gt.className = "opf-nav-group"; gt.textContent = g.title; nav.appendChild(gt);
+    // 带 title 的渲染分组标题；不带 title 的就是顶层单项（命定系统自成一项）
+    if (g.title) { var gt = document.createElement("div"); gt.className = "opf-nav-group"; gt.textContent = g.title; nav.appendChild(gt); }
     g.items.forEach(function (id) {
+      var d = domainByNav(id);           // 领域入口（create / destinyhub）
       var p = byId[id];
-      // "create" 是虚拟项（不在 PAGE_DEFS 里）：代表 ①③④ 三种类型共用的入口
-      var label = p ? p.label : (id === "create" ? "分段创作" : id);
+      var label = d ? d.label : (p ? p.label : id);
       var t = document.createElement("button"); t.type = "button"; t.id = "opf-tab-" + id; t.className = "opf-tab";
-      t.textContent = label; t.title = p ? label : (label + "（开局预设 / 二创角色 / 命定系统）");
+      t.textContent = label;
+      t.title = d ? (label + "（页内有子标签）") : label;
       t.addEventListener("click", function () { switchPage(id); });
       nav.appendChild(t);
       // 「分段创作」下面挂工程（草稿）列表：一个类型一份列表
-      if (id === "create") { var pl = document.createElement("div"); pl.id = "opf-projlist"; nav.appendChild(pl); }
+      if (d && d.nav === "create") { var pl = document.createElement("div"); pl.id = "opf-projlist"; nav.appendChild(pl); }
     });
   });
   bodyWrap.appendChild(nav);
@@ -2795,31 +2803,47 @@ function buildShell(){
   try { buildWorldSide(); } catch (e) { opfErr("buildWorldSide", e); }
   if (getSettings().visible) showPanel();
 }
+// 页内子标签栏：按当前页所属「领域」渲染；不在任何领域里的页就隐藏它。
+// 用重建的方式（而不是预先建好再显隐），因为两个领域的标签集不同。
+function renderSubbar(activeId) {
+  var sb = getEl("opf-subbar"); if (!sb) return;
+  sb.textContent = "";
+  var d = domainOfPage(activeId);
+  if (!d) { sb.style.display = "none"; return; }
+  sb.style.display = "";
+  var slabel = document.createElement("span"); slabel.className = "opf-subbar-label"; slabel.textContent = d.label;
+  sb.appendChild(slabel);
+  d.tabs.forEach(function (t) {
+    var b = document.createElement("button"); b.type = "button"; b.id = "opf-subtab-" + t.id;
+    b.className = "opf-subtab" + (t.id === activeId ? " active" : "");
+    b.textContent = t.label; b.title = "切到" + t.label;
+    b.addEventListener("click", function () { switchPage(t.id); });
+    sb.appendChild(b);
+  });
+}
 function switchPage(id, force){
   var s = getSettings();
-  // "create" 是虚拟入口：落到上次用的那种创作类型上
-  if (id === "create") id = isCreateType(s.createType) ? s.createType : "preset";
+  // 领域入口（create / destinyhub）→ 落到该领域上次用的子页
+  var dNav = domainByNav(id);
+  if (dNav) {
+    var remembered = (dNav.nav === "create") ? s.createType : s.destinyTab;
+    id = (dNav.pages.indexOf(remembered) >= 0) ? remembered : dNav.pages[0];
+  }
   if (!force && s.activePage === id) return;
   s.activePage = id;
-  if (isCreateType(id)) s.createType = id;   // 记住类型，下次进「分段创作」直接回到它
+  var dPage = domainOfPage(id);
+  if (dPage) { if (dPage.nav === "create") s.createType = id; else s.destinyTab = id; }  // 记住领域内的子页
   saveSettings();
   var pages = getEl("opf-pages"); if (!pages) return;
   [].forEach.call(pages.children, function (d) { d.classList.toggle("active", d.id === "opf-page-" + id); });
-  // 左侧导航高亮：虚拟项 create 在任一创作类型页都保持高亮
+  // 左侧导航高亮：领域入口在其任一子页都保持高亮
   var nav = getEl("opf-nav");
   if (nav) [].forEach.call(nav.children, function (t) {
     var tid = String(t.id || "").replace(/^opf-tab-/, "");
-    t.classList.toggle("active", (t.id === "opf-tab-" + id) || (tid === "create" && isCreateType(id)));
+    var dn = domainByNav(tid);
+    t.classList.toggle("active", (t.id === "opf-tab-" + id) || !!(dn && dn.pages.indexOf(id) >= 0));
   });
-  // 类型切换子栏：只在创作页显示，并标出当前类型
-  var sb = getEl("opf-subbar");
-  if (sb) {
-    sb.style.display = isCreateType(id) ? "" : "none";
-    CREATE_TYPES.forEach(function (ct) {
-      var b = getEl("opf-subtab-" + ct.id);
-      if (b) b.classList.toggle("active", ct.id === id);
-    });
-  }
+  renderSubbar(id);
   try { renderProjList(); } catch (e) { opfErr("renderProjList", e); }
   if (id === "world") { try { buildWorldSide(); renderWorldSide(); } catch (e) {} }
   if (id === "char") { try { renderCharPage(); } catch (e) {} }
@@ -3130,7 +3154,7 @@ async function refineCharSeg(pid, dir){
   if (!dirT) dirT = "修正本段内部矛盾与格式问题，使其与其它段落一致；不新增设定。";
   var frozen = "";
   CHAR_SEGS.forEach(function (s2) { if (s2.id !== pid && ST.char.segs[s2.id]) frozen += "\n\n【" + s2.title + "】\n" + ST.char.segs[s2.id]; });
-  ST.running = true; renderRunButtons(); charSetSeg(pid, "run");
+  ST.running = true; ST.stopReq = false; renderRunButtons(); charSetSeg(pid, "run");
   try {
     var msgs = charMessages(charSystemContent() + '\n\n' + charUser0(), charDemand());
     var msg = "【定点修改：只改「" + seg.title + "」这一段】\n\n[用户指令]\n" + dirT + "\n\n[本段现行内容]\n" + ST.char.segs[pid] + "\n\n[冻结区块（其它分段原样保留，一个字都不许改；若发现其它段有问题，最多在结尾另起一行写“备注：建议检查XX段…”提示，不得代改）]\n" + frozen + "\n\n[二创角色·规则约束]\n" + CHAR_RULES + "\n\n要求：只输出修改后的【" + seg.title + "】内容；修改严格限定在用户指令范围内，未要求的地方保持原样，不要顺手润色、扩写或重排。";
@@ -3153,7 +3177,7 @@ async function suggestCharDir(pid){
   var askTask = "请针对二创角色的【" + seg.title + "】这一段现有内容，给出 2-3 条只针对本段的修改方向。每条一行、≤50字、去掉编号外多余的话、直接可点；必须符合角色规则与联动一致性。\n[二创角色·规则约束]\n" + CHAR_RULES;
   var askUser = "[角色需求]\n" + demand + "\n[本段现有内容]\n" + cur;
   var msgs = charMessages(charSystemContent() + '\n\n' + charUser0() + '\n\n' + askTask, askUser);
-  ST.running = true; renderRunButtons();
+  ST.running = true; ST.stopReq = false; renderRunButtons();
   try {
     var resp = await callModel(msgs);
     var list = [];
@@ -3226,7 +3250,7 @@ async function finalizeChar(){
   if (ST.running) { toast("已有任务进行中（单线程）", "warning"); return; }
   var done = CHAR_SEGS.filter(function (s) { return ST.char.segs[s.id]; });
   if (!done.length) { toast("还没有角色稿件，请先「分段初稿」", "warning"); return; }
-  ST.running = true; renderRunButtons();
+  ST.running = true; ST.stopReq = false; renderRunButtons();
   var outEl = getEl("opf-char-out"); if (outEl) outEl.textContent = "封装中…";
   var noteEl = getEl("opf-char-outnote"); if (noteEl) noteEl.textContent = "";
   try {
@@ -3860,7 +3884,7 @@ async function refineDestSeg(pid, dir){
   if (!dirT) dirT = '修正本段内部矛盾与格式问题，使其与其它段落一致；不新增设定。';
   var frozen = '';
   destSegs().forEach(function (s2) { if (s2.id !== pid && ST.dest.segs[s2.id]) frozen += '\n\n【' + s2.title + '】\n' + ST.dest.segs[s2.id]; });
-  ST.running = true; renderRunButtons(); destSetSeg(pid, 'run');
+  ST.running = true; ST.stopReq = false; renderRunButtons(); destSetSeg(pid, 'run');
   try {
     var msgs = destMessages();
     var msg = '【定点修改：只改「' + seg.title + '」这一段】\n\n[用户指令]\n' + dirT + '\n\n[本段现行内容]\n' + ST.dest.segs[pid] + '\n\n[冻结区块（其它分段原样保留，一个字都不许改；若发现其它段有问题，最多在结尾另起一行写“备注：建议检查XX段…”提示，不得代改）]\n' + frozen + '\n\n[命定系统·规则约束]\n' + DEST_RULES + '\n\n要求：只输出修改后的【' + seg.title + '】内容；修改严格限定在用户指令范围内，未要求的地方保持原样，不要顺手润色、扩写或重排。';
@@ -3883,7 +3907,7 @@ async function suggestDestDir(pid){
   var askTask = '请针对命定系统的【' + seg.title + '】这一段现有内容，给出 2-3 条只针对本段的修改方向。每条一行、≤50字、去掉编号外多余的话、直接可点；必须符合命定系统规则与联动一致性。\n[命定系统·规则约束]\n' + DEST_RULES;
   var askUser = '[需求]\n' + (ST.dest.demand || '(未填写)') + '\n[本段现有内容]\n' + cur;
   var msgs = destMessages(destSystemContent() + '\n\n' + destUser0() + '\n\n' + askTask, askUser);
-  ST.running = true; renderRunButtons();
+  ST.running = true; ST.stopReq = false; renderRunButtons();
   try {
     var resp = await callModel(msgs);
     var list = [];
@@ -3968,7 +3992,7 @@ function destReviewSegId(s){
 async function destAiReview(){
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
   if (!ST.dest || !ST.dest.body) { toast('请先点「🎁 脚本封装」（拼出正文后再检查）', 'warning'); return; }
-  ST.running = true; renderRunButtons();
+  ST.running = true; ST.stopReq = false; renderRunButtons();
   var box = getEl('opf-dest-review'), rb = getEl('opf-dest-reviewbox');
   if (box) box.textContent = '';
   if (rb) rb.textContent = '检查中…（只审校、不改写）';
@@ -4052,7 +4076,7 @@ async function finalizeDest(){
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
   var done = destSegs().filter(function (s) { return ST.dest.segs[s.id]; });
   if (!done.length) { toast('还没有任何分段内容，请先「分段初稿」', 'warning'); return; }
-  ST.running = true; renderRunButtons();
+  ST.running = true; ST.stopReq = false; renderRunButtons();
   var outEl = getEl('opf-dest-out'); if (outEl) outEl.textContent = '封装中…';
   var noteEl = getEl('opf-dest-outnote'); if (noteEl) noteEl.textContent = '';
   try {
@@ -6029,7 +6053,7 @@ function rxExtractHtml(text) {
   return (end > start ? t.slice(start + 1, end) : t.slice(start + 1)).replace(/^\n+/, '').replace(/\s+$/, '');
 }
 // ---------- 页面 ----------
-var RX_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">✦ 正则工坊 · 命定系统对话美化</div><div class="opf-dim">贴核心 → 解析 → 生成 → 自检 → 导出。</div><textarea id="opf-rx-core" class="opf-char-input" placeholder="把命定系统核心条目全文粘在这里（必须含「语言格式」节）"></textarea><div class="opf-char-tools"><button type="button" class="opf-btn ghost" id="opf-rx-pull">⬅ 从 ④ 页带入</button><button type="button" class="opf-btn primary" id="opf-rx-parse">🔍 解析语言格式（AI）</button><button type="button" class="opf-btn ghost" id="opf-rx-parse2">⚙ 脚本解析（离线）</button><button type="button" class="opf-btn ghost" id="opf-rx-gen">🎨 生成替换体</button><button type="button" class="opf-btn ghost" id="opf-rx-check">🔎 自检</button><button type="button" class="opf-btn ghost" id="opf-rx-fix">🔧 自动修复</button><button type="button" class="opf-btn ghost" id="opf-rx-copy1">⧉ 复制单条 JSON</button><button type="button" class="opf-btn ghost" id="opf-rx-copyall">⧉ 复制 JSON 数组</button><button type="button" class="opf-btn ghost" id="opf-rx-new">🗑 清空</button><button type="button" class="opf-btn ghost" id="opf-rx-ping">🩺 连通性自检</button><button type="button" class="opf-btn ghost" id="opf-rx-last">📄 上次返回</button></div><pre id="opf-rx-lastraw" class="opf-box opf-char-report" style="display:none">尚未调用</pre><div class="opf-dim" id="opf-rx-statusline">就绪</div><div class="opf-sec"><div class="opf-sec-label">语言格式解析结果（只读核对）</div><pre id="opf-rx-parsed" class="opf-box opf-char-report">尚未解析</pre></div><div id="opf-rx-items"></div><div class="opf-sec"><div class="opf-sec-label">自检</div><pre id="opf-rx-issues" class="opf-box opf-char-report">尚未自检</pre></div></div>';
+var RX_HTML = '<div class="opf-char-wrap"><div class="opf-sec-label">✦ 正则工坊 · 命定系统对话美化</div><div class="opf-dim">贴核心 → 解析 → 生成 → 自检 → 导出。</div><textarea id="opf-rx-core" class="opf-char-input" placeholder="把命定系统核心条目全文粘在这里（必须含「语言格式」节）"></textarea><div class="opf-char-tools"><button type="button" class="opf-btn ghost" id="opf-rx-pull">⬅ 从命定系统页带入</button><button type="button" class="opf-btn primary" id="opf-rx-parse">🔍 解析语言格式（AI）</button><button type="button" class="opf-btn ghost" id="opf-rx-parse2">⚙ 脚本解析（离线）</button><button type="button" class="opf-btn ghost" id="opf-rx-gen">🎨 生成替换体</button><button type="button" class="opf-btn ghost" id="opf-rx-check">🔎 自检</button><button type="button" class="opf-btn ghost" id="opf-rx-fix">🔧 自动修复</button><button type="button" class="opf-btn ghost" id="opf-rx-copy1">⧉ 复制单条 JSON</button><button type="button" class="opf-btn ghost" id="opf-rx-copyall">⧉ 复制 JSON 数组</button><button type="button" class="opf-btn ghost" id="opf-rx-new">🗑 清空</button><button type="button" class="opf-btn ghost" id="opf-rx-ping">🩺 连通性自检</button><button type="button" class="opf-btn ghost" id="opf-rx-last">📄 上次返回</button></div><pre id="opf-rx-lastraw" class="opf-box opf-char-report" style="display:none">尚未调用</pre><div class="opf-dim" id="opf-rx-statusline">就绪</div><div class="opf-sec"><div class="opf-sec-label">语言格式解析结果（只读核对）</div><pre id="opf-rx-parsed" class="opf-box opf-char-report">尚未解析</pre></div><div id="opf-rx-items"></div><div class="opf-sec"><div class="opf-sec-label">自检</div><pre id="opf-rx-issues" class="opf-box opf-char-report">尚未自检</pre></div></div>';
 
 function rxInit() {
   ST.rx = ST.rx || { core: '', coreName: '', parsed: null, items: [], _inited: false };
@@ -6127,7 +6151,7 @@ var REFINE_HTML = '<div class="opf-char-wrap">'
   + '<textarea id="opf-rf-src" class="opf-char-input" style="min-height:120px" placeholder="把要修改的命定核心整份文本粘进来（YAML 正文 / 条目正文 / 从酒馆世界书复制出来的内容都行），或点下方「📂 打开文件」"></textarea>'
   + '<div class="opf-char-tools">'
   + '<label class="opf-btn ghost" style="margin:0">📂 打开文件<input type="file" id="opf-rf-file" accept=".yaml,.yml,.txt,.json,.md" style="display:none"></label>'
-  + '<button type="button" class="opf-btn ghost" id="opf-rf-fromdest">⬅ 从 ④ 页带入成品</button>'
+  + '<button type="button" class="opf-btn ghost" id="opf-rf-fromdest">⬅ 从命定系统页带入成品</button>'
   + '<button type="button" class="opf-btn ghost" id="opf-rf-clear">🗑 清空</button>'
   + '<button type="button" class="opf-btn ghost" id="opf-rf-srcchk">🔍 读一下文本框</button>'
   + '</div>'
@@ -6310,7 +6334,7 @@ async function refineAnalyze(){
   }
   refineInit(); ST.refine.src = src;
   if (!ST.refine.scan) ST.refine.scan = refineScan(src).text;
-  ST.running = true; renderRunButtons(); refineNote('① 整体分析中…（只读，不会改动任何内容）');
+  ST.running = true; ST.stopReq = false; renderRunButtons(); refineNote('① 整体分析中…（只读，不会改动任何内容）');
   try {
     var msg = '[待修改的二创核心（唯一的分析对象；下面的【世界设定参考】不是它的一部分）]\n'
       + '<<<二创核心原文\n' + refineForPrompt(src.slice(0, 60000)) + '\n二创核心原文结束>>>' + refineEjsEscNote(src)
@@ -6384,7 +6408,7 @@ async function refinePlan(){
   if (!src.trim()) { toast('先载入核心文本', 'warning'); return; }
   if (!req) { toast('先写下你的修改意见', 'warning'); return; }
   ST.refine.src = src; ST.refine.request = req;
-  ST.running = true; renderRunButtons(); refineNote('② 分析你的意见中…（仍然不会改动正文）');
+  ST.running = true; ST.stopReq = false; renderRunButtons(); refineNote('② 分析你的意见中…（仍然不会改动正文）');
   try {
     var msg = '[待修改的二创核心（唯一会被改动的对象）]\n<<<二创核心原文\n' + refineForPrompt(src.slice(0, 60000)) + '\n二创核心原文结束>>>' + refineEjsEscNote(src)
       + '\n\n[已完成的整体分析]\n' + (ST.refine.analysis || '（无，可先点①）')
@@ -6447,7 +6471,7 @@ async function refineSuggest(){
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
   var src = refineReadSrc();
   if (!src.trim()) { toast('先载入核心文本', 'warning'); return; }
-  ST.running = true; renderRunButtons();
+  ST.running = true; ST.stopReq = false; renderRunButtons();
   try {
     var msg = '[待修改的二创核心（只针对它提方向；不要提世界参考里的规则）]\n<<<二创核心原文\n' + refineForPrompt(src.slice(0, 60000)) + '\n二创核心原文结束>>>' + refineEjsEscNote(src)
       + '\n\n请给出 3~5 条**不破坏现有设计**的优化方向（每条一行、≤40字、具体可执行），例如补齐缺口、让某条规则更自洽、增加与既有功能的联动。不要输出正文，不要提"重写/重构"，也不要建议"补上世界规则里的某某"（那是参考资料，不属于这个核心）。';
@@ -6478,7 +6502,7 @@ async function refineApply(mode){
   var cur = steps[si] || null;
   var sizeCap = ST.refine.sizeCap || 1200;
   var stepLabel = steps.length ? ('第 ' + (si + 1) + '/' + steps.length + ' 步' + (cur && cur.title ? '（' + cur.title + '）' : '')) : '一步到位';
-  ST.running = true; renderRunButtons(); refineNote('③ ' + stepLabel + '：正在生成补丁（锚点 + 新内容）…');
+  ST.running = true; ST.stopReq = false; renderRunButtons(); refineNote('③ ' + stepLabel + '：正在生成补丁（锚点 + 新内容）…');
   try {
     var doneList = steps.slice(0, si).map(function (s, i) { return (i + 1) + '. [' + (s.done ? '已完成' : '未完成') + '] ' + (s.title || '') + '——' + (s.detail || ''); });
     // ③ 这一步要把整份工作稿交给模型（锚点必须来自这里，不能凭记忆）
@@ -6803,10 +6827,10 @@ function bindRxPage() {  rxInit();
 }
 function rxPullFromDestiny() {
   var body = ST.dest && (ST.dest.body || ST.dest.out);
-  if (!body) { toast('④ 页还没有最终稿件：请先在 ④ 页「最终封装」，或直接把核心全文粘进来', 'warning'); return; }
+  if (!body) { toast('命定系统页还没有最终稿件：请先在「最终封装」生成，或直接把核心全文粘进来', 'warning'); return; }
   var el = getEl('opf-rx-core'); if (el) el.value = body;
   ST.rx.core = body;
-  toast('已从 ④ 页带入条目正文，点「🔍 解析语言格式」继续');
+  toast('已从命定系统页带入条目正文，点「🔍 解析语言格式」继续');
   rxDoParse();
 }
 function rxCoreNameFromText(txt) {
@@ -6831,7 +6855,7 @@ async function rxDoParse() {
   if (!txt) { toast('请先粘贴核心全文（含语言格式节）', 'warning'); return; }
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
   ST.rx.core = txt;
-  ST.running = true; renderRunButtons();
+  ST.running = true; ST.stopReq = false; renderRunButtons();
   var box0 = getEl('opf-rx-parsed'); if (box0) box0.textContent = 'AI 解析中…（失败会自动回退到脚本解析）';
   var parsed = null, engine = 'ai', notes = [];
   try {
@@ -7326,7 +7350,7 @@ async function rxAutoFixAll() {
     return;
   }
   if (!window.confirm('本地能修的已经修完：\n' + (localLog.join('\n') || '（无）') + '\n\n还剩 ' + left.length + ' 项需要 AI 改写（如 $n 引用越界、mood 未分支、体量偏离、匹配不上范例）。现在让 AI 修吗？')) return;
-  ST.running = true; renderRunButtons();
+  ST.running = true; ST.stopReq = false; renderRunButtons();
   try {
     var byItem = [];
     left.forEach(function (x) { var g = byItem.filter(function (y) { return y.it === x.it; })[0]; if (g) g.list.push(x.is); else byItem.push({ it: x.it, list: [x.is] }); });
@@ -7411,7 +7435,7 @@ async function rxRefineItem(item, dir, scope) {
   var text = String(dir || '').trim();
   if (!text) { toast('先写一句修改要求，例如「边框改成金色、字号大一点、去掉动效」', 'warning'); return; }
   var f = rxItemFormat(item);
-  ST.running = true; renderRunButtons();
+  ST.running = true; ST.stopReq = false; renderRunButtons();
   var st = getEl('opf-rx-statusline');
   if (st) st.textContent = '按你的要求修改中…';
   try {
@@ -7442,7 +7466,7 @@ async function rxRefineItem(item, dir, scope) {
 async function rxSuggestItem(item, idx) {
   if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
   var box = getEl('opf-rx-chips-' + idx); if (!box) return;
-  ST.running = true; renderRunButtons();
+  ST.running = true; ST.stopReq = false; renderRunButtons();
   try {
     var ask = '下面是一个「对话美化正则」当前的 CSS 与骨架。请给出 2~3 条**只针对样式**的具体修改方向（每条一行、≤30字、直接可执行，例如"边框换成暗金色渐变"）。不要输出 CSS 本身。\n\n[当前 CSS]\n' + rxItemCss(item).slice(0, 2000) + '\n\n[骨架]\n' + rxSkeleton(item, rxItemFormat(item));
     var resp = await rxStreamCall(sxMessages(null, ask, null, RX_PAGE_VOICE_CSS), null, { phase: '建议', idleMs: 20000, maxMs: 90000, maxTokens: 1500 });
@@ -8232,7 +8256,7 @@ async function rxGenerate() {
   rxForceSt = !rxTransportUsable(cfgNow);
   if (rxForceSt) toast('当前「生成传输」配置不完整（' + rxTransportWhy(cfgNow) + '），本次改用酒馆主 API 生成；补全后可再试流式', 'warning');
   var streaming = !rxForceSt;
-  ST.running = true; renderRunButtons();
+  ST.running = true; ST.stopReq = false; renderRunButtons();
   rxLiveTick.last = 0;
   var log = [];
   var shrink = 1;
@@ -8364,7 +8388,7 @@ function rxDoCheck(showToast) {
         var b4 = document.createElement('button'); b4.type = 'button'; b4.className = 'opf-step-act'; b4.textContent = '✨ AI 修这条';
         b4.addEventListener('click', async function () {
           if (ST.running) { toast('已有任务进行中（单线程）', 'warning'); return; }
-          ST.running = true; renderRunButtons();
+          ST.running = true; ST.stopReq = false; renderRunButtons();
           var stl = getEl('opf-rx-statusline'); if (stl) stl.textContent = 'AI 修复：' + x.issue.msg;
           try {
             var ch = await rxAutoFixAi(x.item, [x.issue]);
@@ -10096,7 +10120,7 @@ async function atlDoGenerate() {
   var A = atlInit();
   if (!String(A.buf.req || '').trim() && !String(A.buf.ref || '').trim()) { atlStat(ATL_TIPS.needReq); toast('先写一句需求（或粘一段参考），再生成', 'warning'); return; }
   var wasBound = atlBoundItem();          // 生成＝造新的一条：成功后解绑，避免保存时覆盖上一条
-  ST.running = true; atlSetRunning(true);
+  ST.running = true; ST.stopReq = false; atlSetRunning(true);
   try {
     var msgs = atlMessages(atlSystem(A.buf.kind, 'gen'), atlGenPrompt());
     var raw = await atlCall(msgs, '生成');
@@ -10137,7 +10161,7 @@ async function atlDoFix() {
   if (!String(A.buf.yaml || '').trim()) { atlStat(ATL_TIPS.needReq); toast('还没有可改的产出：先生成一件，或把工作区里的条目「打开」进来', 'warning'); return; }
   if (!dir) { atlStat(ATL_TIPS.needDir); toast('先写一句改进要求，例如「品质降到优良、补一条反噬代价」', 'warning'); return; }
   var before = String(A.buf.yaml);
-  ST.running = true; atlSetRunning(true);
+  ST.running = true; ST.stopReq = false; atlSetRunning(true);
   try {
     var msgs = atlMessages(atlSystem(A.buf.kind, 'fix'), atlFixPrompt(dir));
     var raw = await atlCall(msgs, '改进');
@@ -10187,7 +10211,7 @@ async function atlDoSug() {
   var A = atlInit();
   if (!String(A.buf.yaml || '').trim()) { atlStat(ATL_TIPS.needReq); toast('先生成一件，或打开工作区里的条目，再要建议', 'warning'); return; }
   var box = atlEl('opf-atl-chips'); if (!box) return;
-  ST.running = true; atlSetRunning(true);
+  ST.running = true; ST.stopReq = false; atlSetRunning(true);
   try {
     var raw = await atlCall(atlMessages(null, atlSugPrompt()), '建议');
     var list = [];
@@ -10234,7 +10258,7 @@ async function atlDoCross() {
   }
   var useWb = !!(atlEl('opf-atl-usewb') && atlEl('opf-atl-usewb').checked);
   var A = atlInit();
-  ST.running = true; atlSetRunning(true);
+  ST.running = true; ST.stopReq = false; atlSetRunning(true);
   atlRenderCrossNote('running');
   atlProgressStart('交火分析');
   var box = atlEl('opf-atl-crossout');
@@ -10714,7 +10738,7 @@ async function shxSend() {
   shxRenderMsgs();
   await shxPut('messages', { id: userMsg.id, role: 'user', text: text, ts: userMsg.ts, archived: false });
 
-  ST.running = true; renderRunButtons();
+  ST.running = true; ST.stopReq = false; renderRunButtons();
   var status = getEl('opf-shx-status'); if (status) status.textContent = '她在翻书…';
   try {
     var mem = await shxBuildMemoryBlock(text);
@@ -10752,7 +10776,7 @@ async function shxCompress(silent) {
   var feed = toCompress.map(function (m) { return (m.role === 'user' ? (String(cfg.userName || '').trim() || '旅人') : cfg.herName) + '：' + m.text; }).join('\n');
   var ask = '把下面这段你与{{user}}的对话压缩成「记忆条目」，供以后检索。只输出 JSON，不要解释：\n'
     + '{"标题":"≤20字","要点":["≤40字，最多6条"],"关键词":["3~8个"],"情绪":"一句话"}';
-  ST.running = true; renderRunButtons();
+  ST.running = true; ST.stopReq = false; renderRunButtons();
   try {
     // 内部工具调用（记忆压缩）也走同一套头部顺序，但不带世界书正文，避免白烧上下文
     var resp = await callModel(sxMessages(ask, '[对话]\n' + feed.slice(0, 12000), null, SHX_PAGE_VOICE));
