@@ -25,23 +25,19 @@ var CREATE_TYPES = [
   { id: "destiny", label: "命定系统" }
 ];
 function isCreateType(id) { for (var i = 0; i < CREATE_TYPES.length; i++) if (CREATE_TYPES[i].id === id) return true; return false; }
-// 导航「领域」：一个导航入口 + **页内一层子标签**（子标签不进导航栏，点开该页才看得到）。
-//  - 分段创作：① 开局预设 / ③ 二创角色
-//  - 命定系统：命定核心 / 核心精修 / 正则工坊（后两个是服务命定系统的工具，收进页内）
-// 三条流水线与两个工具的提示词/分段/产出校验一行都不动，这里只换外壳呈现。
+// 导航「领域」：**只有命定系统**需要页内一层子标签——
+// 它下面挂着两个服务它的工具（核心精修 = 改已有核心、正则工坊 = 美化核心对话样式），
+// 这两个不进导航栏，点开命定系统页才看得到。
+// 开局预设 / 二创角色 / 命定系统 是**三个并列的页面**（都在导航里，同级）。
 var DOMAINS = [
-  { nav: "create", label: "分段创作", pages: ["preset", "char"],
-    tabs: [{ id: "preset", label: "开局预设" }, { id: "char", label: "二创角色" }] },
-  { nav: "destinyhub", label: "命定系统", pages: ["destiny", "refine", "regex"],
+  { nav: "destinyhub", label: "命定系统", remember: "destinyTab", pages: ["destiny", "refine", "regex"],
     tabs: [{ id: "destiny", label: "命定核心" }, { id: "refine", label: "核心精修" }, { id: "regex", label: "正则工坊" }] }
 ];
 function domainOfPage(id) { for (var i = 0; i < DOMAINS.length; i++) if (DOMAINS[i].pages.indexOf(id) >= 0) return DOMAINS[i]; return null; }
 function domainByNav(id) { for (var i = 0; i < DOMAINS.length; i++) if (DOMAINS[i].nav === id) return DOMAINS[i]; return null; }
-// 导航：带 title 的是分组标题；不带 title 的就是顶层单项。
-// 「命定系统」自成一项（核心精修/正则工坊 已在它页内，不再出现在导航栏）。
+// 导航：带 title 的是分组标题。三条创作流水线并列在「创作」组里。
 var NAV_GROUPS = [
-  { title: "创作", items: ["create"] },
-  { items: ["destinyhub"] },
+  { title: "创作", items: ["preset", "char", "destinyhub"] },
   { title: "造物", items: ["atelier"] },
   { title: "对话", items: ["shixian"] }
 ];
@@ -62,6 +58,11 @@ var SHELL_CSS2 = [
   ".opf-subtab{flex:none;border:1px solid rgba(255,122,138,.26);background:rgba(255,235,238,.05);color:#ffc9cf;border-radius:999px;padding:6px 13px;font-size:12.5px;cursor:pointer;white-space:nowrap;transition:background .14s ease,color .14s ease}",
   ".opf-subtab:hover{background:rgba(255,77,94,.18);color:#fff}",
   ".opf-subtab.active{background:linear-gradient(180deg,rgba(255,77,94,.32),rgba(255,77,94,.12));color:#fff;border-color:rgba(255,150,165,.6)}",
+  // ③ 二创角色的可选结构维度（复选框胶囊）
+  ".opf-mod-wrap{display:flex;flex-wrap:wrap;gap:6px;padding:2px 0}",
+  ".opf-mod{font-size:12.5px!important;padding:4px 10px!important;border:1px solid rgba(255,122,138,.28);border-radius:999px;background:rgba(255,235,238,.05);color:#ffc9cf;cursor:pointer}",
+  ".opf-mod:hover{background:rgba(255,77,94,.16);color:#fff}",
+  ".opf-mod.on{background:rgba(255,77,94,.2);border-color:rgba(255,150,165,.6);color:#fff}",
   // 侧栏工程（草稿）列表
   "#opf-projlist{flex:none;display:flex;flex-direction:column;gap:2px;padding:0 4px 8px 16px}",
   ".opf-proj-head{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:11px;color:rgba(255,170,180,.5);padding:4px 4px 4px 0}",
@@ -117,7 +118,7 @@ function buildShell(){
     // 带 title 的渲染分组标题；不带 title 的就是顶层单项（命定系统自成一项）
     if (g.title) { var gt = document.createElement("div"); gt.className = "opf-nav-group"; gt.textContent = g.title; nav.appendChild(gt); }
     g.items.forEach(function (id) {
-      var d = domainByNav(id);           // 领域入口（create / destinyhub）
+      var d = domainByNav(id);           // 领域入口（destinyhub）
       var p = byId[id];
       var label = d ? d.label : (p ? p.label : id);
       var t = document.createElement("button"); t.type = "button"; t.id = "opf-tab-" + id; t.className = "opf-tab";
@@ -125,9 +126,9 @@ function buildShell(){
       t.title = d ? (label + "（页内有子标签）") : label;
       t.addEventListener("click", function () { switchPage(id); });
       nav.appendChild(t);
-      // 「分段创作」下面挂工程（草稿）列表：一个类型一份列表
-      if (d && d.nav === "create") { var pl = document.createElement("div"); pl.id = "opf-projlist"; nav.appendChild(pl); }
     });
+    // 工程（草稿）列表挂在「创作」组末尾：按当前创作页显示对应类型的草稿
+    if (g.title === "创作") { var pl = document.createElement("div"); pl.id = "opf-projlist"; nav.appendChild(pl); }
   });
   bodyWrap.appendChild(nav);
 
@@ -201,16 +202,16 @@ function renderSubbar(activeId) {
 }
 function switchPage(id, force){
   var s = getSettings();
-  // 领域入口（create / destinyhub）→ 落到该领域上次用的子页
+  // 领域入口（destinyhub）→ 落到该领域上次用的子页
   var dNav = domainByNav(id);
   if (dNav) {
-    var remembered = (dNav.nav === "create") ? s.createType : s.destinyTab;
+    var remembered = s[dNav.remember];
     id = (dNav.pages.indexOf(remembered) >= 0) ? remembered : dNav.pages[0];
   }
   if (!force && s.activePage === id) return;
   s.activePage = id;
   var dPage = domainOfPage(id);
-  if (dPage) { if (dPage.nav === "create") s.createType = id; else s.destinyTab = id; }  // 记住领域内的子页
+  if (dPage) s[dPage.remember] = id;   // 记住领域内的子页
   saveSettings();
   var pages = getEl("opf-pages"); if (!pages) return;
   [].forEach.call(pages.children, function (d) { d.classList.toggle("active", d.id === "opf-page-" + id); });

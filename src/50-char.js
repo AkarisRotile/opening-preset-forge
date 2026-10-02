@@ -26,9 +26,84 @@ var CHAR_SEG_PROMPTS = {
 var CHAR_LINK_CHAIN = "L1 背景经历→层级等级/身份职业：实力必须有来历，禁止“凭空强者”。\nL2 背景经历→性格码：重大事件塑造动机（关系/情绪/行动/冲突/意义），创伤或誓言落在具体经历。\nL3 种族+命名指导→姓名结构：命名规则与阶级格式必须匹配。\nL4 性格→外貌衣着：神情/配色/风格/破损与心境映射；身份与着装一致。\nL5 性格+层级→战斗方式：攻击技/动作技配比、风格、武器类型与性格互映射。\nL6 战斗方式+品质规则→技能装备道具：品质七等/词条上限合规；技能来源与经历呼应。\nL7 性格+背景→演绎语料：口头禅呼应经历、雷点呼应创伤、行为呼应动机。\n反向校验：技能/装备的来源必须在经历中有交代；登神长阶严格按等级档位；唯一品质仅在出处特殊时使用；五维与资源面板不写入角色条目，由游玩时按世界规则自行结算。";
 var CHAR_STYLE_RULES = "【用词与文风规范（分段、梳理与最终 YAML 的叙述文字全程遵守）】\n目标：写得像“会写的人”——具体、克制、直接。用事实和细节说话，不堆词、不喊口号、不向读者解释。\n1. 少用连词腔：能不用“而是/名为/被称为/取而代之”就不用，需要转折时直接换一句说。\n2. 控制程度副词：删掉“极其/极度/极为/无比”和“令人××”这类空转形容，用具体细节替代强度。\n3. 禁论文腔与口号词：像“底层逻辑/张力/解构/本质/主体性”这类术语一律换成日常语言；自由解放、压迫凝视、规训赋权之类的大词不进入人物描写。\n4. 禁比喻与类比：不写“像/如同/仿佛/犹如/好似”及其一切变体，不用“心湖/涟漪/深渊/浮木/手术刀/教科书”这类意象化说法；是什么就写什么。\n5. 禁网文腔：不写“冷笑/冷哼/嘴角勾起弧度/指节泛白/不容置疑/灭顶之灾”这类套路动作与成语堆砌；情绪用行为与台词呈现，不贴标签。\n6. 禁口号式评判：不写“征服/支配/弱肉强食/丛林法则/内卷”这类社达判词；写动机、写行动，不下评语。\n7. 不写语音提示：禁止“他的声音/她的语气/这番话/这句话”这类引导旁白，直接写台词与动作。\n8. 禁句式模板：禁止“不是A而是B”“没有A只有B”“并非A而是B”等否定-转折/排除-定义句式；禁止“名为X”命名句式；同一句式在一段里不出现第二遍。\n9. 少用括号解释、少用引号强调：人物说话像人，旁白像冷静的写作者。";
 var CHAR_YAML_SPEC = "【YAML 输出规范（二创角色最终稿件）】\n顶层唯一键为「角色卡」，必须是合法 YAML，按下面的字段顺序输出（中文键名固定，不要增删顶层字段；多行文本用 |- 块标量；列表用 - 或行内[]；所有内容与各分段一一对应）：\n\n角色卡:\n  名称: （定位与基础段的名字）\n  核心概念: （一句话定义）\n  特质: [标签1, 标签2, 标签3]\n  种族: （大类/亚种）\n  外貌年龄: （数字）\n  实龄: （数字或描述）\n  生命层级: （第X层级(名)）\n  等级: （Lv数字）\n  身份: [身份1, ...]\n  职业: [职业1, ...]\n  称号: （Lv≥13 才写，否则省略本行）\n  性格码: （五维动机码-稳定性码）\n  性格: |-\n    （性格与行为逻辑，多行）\n  喜好: [..]\n  厌恶: [..]\n  外貌: |-\n    （外貌特质，多行）\n  服装: |-\n    （衣物装饰，多行）\n  武器:\n    - 名称: ..\n      品质: （中文七等：普通/优良/稀有/史诗/传说/神话/唯一）\n      叙述: |-\n        （一段文字：先写效果，再写描述）\n  装备:\n    - 名称: ..\n      品质: ..\n      叙述: |-\n        ..\n  道具:\n    - 名称: ..\n      品质: ..\n      叙述: |-\n        ..\n  技能:\n    - 名称: ..\n      品质: ..\n      叙述: |-\n        （一段文字：先写效果，再写描述）\n  登神长阶: （无则写“无”）\n  过去: |-\n    （背景与经历，多行）\n  关系锚点: [..]\n  语料示例:\n    - \"..\"\n  行为参考:\n    - ..\n  禁忌:\n    - ..\n  提倡:\n    - ..\n\n规则：\n1. 只从分段内容转写，不新增、不删改、不扩写；缺失的段保留现有内容或写“无”。\n2. 缩进用两个空格，禁止制表符(Tab)；块标量 | 保留换行；含冒号/井号等特殊字符的字符串加引号。\n3. 武器/装备/道具/技能每项只有 名称/品质/叙述 三个字段，不写类型/消耗/标签；品质只写中文七等之一。\n4. 不写「面板」（五维/HP·MP·SP 由游玩时按世界规则结算），不写对user的态度（每位用户的设定不同）。\n5. 列表条数、数值、名称与分段一一对应。\n6. 用词与文风规范全程生效。\n7. 输出放在一个 ```yaml 代码块内；代码块内不允许出现注释或解释文字。";
-var CHAR_HTML = "<div class=\"opf-char-wrap opf-2col\"><div class=\"opf-col opf-col-a\"><div class=\"opf-sec-label\">✦ 二创角色工坊 · 分段式生成（产出世界书 DLC 角色条目）</div><div class=\"opf-dim\">分段写角色设定，产出世界书 DLC 条目。</div><textarea id=\"opf-char-demand\" class=\"opf-char-input\" placeholder=\"写谁？给出大致设定与需求（例：一位出身瓦伦蒂亚贫民区、靠街头格斗活下来的少女，性格倔强护短……）\"></textarea><textarea id=\"opf-char-ref\" class=\"opf-char-input\" placeholder=\"（可选）参考文本：已有设定/原型描述/世界书片段，将作为参考注入\"></textarea><div class=\"opf-char-tools\"><button type=\"button\" class=\"opf-btn primary\" id=\"opf-char-run\">▶ 分段初稿</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-link\">⚔ 交火梳理</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-final\">🎁 最终封装</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-new\">🗑 新角色</button></div></div><div class=\"opf-col opf-col-b\"><div id=\"opf-char-steps\"></div><div class=\"opf-sec\"><div class=\"opf-sec-label\">交火梳理报告</div><pre id=\"opf-char-report\" class=\"opf-box opf-char-report\">尚未梳理</pre></div><div class=\"opf-out\"><div class=\"opf-sec-label\">最终稿件（YAML 规范输出，可直接粘进世界书 DLC 条目）</div><div class=\"opf-dim\" id=\"opf-char-outnote\"></div><pre id=\"opf-char-out\" class=\"opf-box\">尚未封装</pre><div class=\"opf-char-copyrow\"><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-copy\">⧉ 复制最终稿件</button></div></div></div></div>";
+// ③ 二创角色的「可选结构维度」：勾中才注入对应分段提示词，并作为最终 YAML 里的额外字段。
+// seg = 挂到哪个分段（mind 性格 / story 背景）；prompt 注入该段；yamlField 插进 YAML 模板。
+var CHAR_MODULES = [
+  { id: "alignment", label: "阵营", seg: "mind",
+    desc: "DND 九宫格阵营 + 一句细化",
+    prompt: "追加【阵营】：用 DND 九宫格给出角色阵营（守序/中立/混乱 × 善良/中立/邪恶，九选一），并补一句该阵营在这个角色身上的具体表现。",
+    yamlField: "  阵营: （九宫格阵营 + 一句细化）" },
+  { id: "drives", label: "行为驱动力", seg: "mind",
+    desc: "2–4 条核心驱动力，每条一句",
+    prompt: "追加【行为驱动力】：列出 2–4 条驱动角色行动的核心驱动力，每条一句、具体不空泛。",
+    yamlField: "  驱动力: [..]" },
+  { id: "values", label: "价值观与信条", seg: "mind",
+    desc: "角色信守的信条 / 价值排序",
+    prompt: "追加【价值观与信条】：写角色信守的 1–3 条信条或价值排序。",
+    yamlField: "  价值观: [..]" },
+  { id: "fears", label: "恐惧与弱点", seg: "mind",
+    desc: "最怕什么、软肋在哪",
+    prompt: "追加【恐惧与弱点】：写角色最害怕 / 最无力应对的 1–3 件事，与性格呼应。",
+    yamlField: "  恐惧: [..]" },
+  { id: "goals", label: "短中长目标", seg: "story",
+    desc: "短期 / 中期 / 长期目标各一条",
+    prompt: "追加【目标】：分短期 / 中期 / 长期各写一条角色目标，与实力来历、现状呼应。",
+    yamlField: "  目标:\n    短期: ..\n    中期: ..\n    长期: .." },
+  { id: "desires", label: "欲望与所求", seg: "story",
+    desc: "角色内心真正想要的",
+    prompt: "追加【欲望与所求】：写角色内心真正想要的（可与明面目标不同）。",
+    yamlField: "  欲望: .." },
+  { id: "secrets", label: "秘密", seg: "story",
+    desc: "一件不为人知的秘密及其影响",
+    prompt: "追加【秘密】：写一件角色不为人知的秘密，并交代它如何影响角色。",
+    yamlField: "  秘密: .." },
+  { id: "arc", label: "成长弧线", seg: "story",
+    desc: "角色可能/应然的转变方向",
+    prompt: "追加【成长弧线】：写角色在故事中可能或应然的转变方向。",
+    yamlField: "  成长弧线: .." }
+];
+var CHAR_HTML = "<div class=\"opf-char-wrap opf-2col\"><div class=\"opf-col opf-col-a\"><div class=\"opf-sec-label\">✦ 二创角色工坊 · 分段式生成（产出世界书 DLC 角色条目）</div><div class=\"opf-dim\">分段写角色设定，产出世界书 DLC 条目。</div><textarea id=\"opf-char-demand\" class=\"opf-char-input\" placeholder=\"写谁？给出大致设定与需求（例：一位出身瓦伦蒂亚贫民区、靠街头格斗活下来的少女，性格倔强护短……）\"></textarea><textarea id=\"opf-char-ref\" class=\"opf-char-input\" placeholder=\"（可选）参考文本：已有设定/原型描述/世界书片段，将作为参考注入\"></textarea><div class=\"opf-sec\"><div class=\"opf-sec-label\">结构维度（可选）</div><div class=\"opf-dim\">勾选想要的结构维度，生成时写进对应分段、并作为最终 YAML 的额外字段。</div><div class=\"opf-mod-wrap\" id=\"opf-char-mods\"></div></div><div class=\"opf-char-tools\"><button type=\"button\" class=\"opf-btn primary\" id=\"opf-char-run\">▶ 分段初稿</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-link\">⚔ 交火梳理</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-final\">🎁 最终封装</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-new\">🗑 新角色</button></div></div><div class=\"opf-col opf-col-b\"><div id=\"opf-char-steps\"></div><div class=\"opf-sec\"><div class=\"opf-sec-label\">交火梳理报告</div><pre id=\"opf-char-report\" class=\"opf-box opf-char-report\">尚未梳理</pre></div><div class=\"opf-out\"><div class=\"opf-sec-label\">最终稿件（YAML 规范输出，可直接粘进世界书 DLC 条目）</div><div class=\"opf-dim\" id=\"opf-char-outnote\"></div><pre id=\"opf-char-out\" class=\"opf-box\">尚未封装</pre><div class=\"opf-char-copyrow\"><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-copy\">⧉ 复制最终稿件</button></div></div></div></div>";
 
 function charInit(){ ST.char = ST.char || { demand: "", ref: "", segs: {}, status: {}, report: "", out: "", outNote: [], name: "", _inited: false }; ST.char.outNote = ST.char.outNote || []; ST.charEls = ST.charEls || {}; }
+function charModulesOn() { return getSettings().charModules || []; }
+// 勾中的维度 → 追加到对应分段的提示词（分段生成时注入）
+function charModulePrompt(segId) {
+  var on = charModulesOn();
+  var parts = [];
+  CHAR_MODULES.forEach(function (m) { if (m.seg === segId && on.indexOf(m.id) >= 0) parts.push(m.prompt); });
+  return parts.length ? ("\n\n[本段追加的结构维度（逐一写全，别漏）]\n" + parts.join("\n")) : "";
+}
+// 勾中的维度 → 在写死的 YAML 模板里插入对应字段（最终封装时用）
+function charYamlSpecWithModules() {
+  var spec = CHAR_YAML_SPEC;
+  var on = charModulesOn();
+  var mind = [], story = [];
+  CHAR_MODULES.forEach(function (m) { if (on.indexOf(m.id) >= 0) (m.seg === "mind" ? mind : story).push(m.yamlField); });
+  if (mind.length) spec = spec.replace("\n  喜好: [..]", "\n" + mind.join("\n") + "\n  喜好: [..]");
+  if (story.length) spec = spec.replace("\n  关系锚点: [..]", "\n" + story.join("\n") + "\n  关系锚点: [..]");
+  return spec;
+}
+// 结构维度选择器（复选框胶囊）
+function renderCharMods() {
+  var box = getEl("opf-char-mods"); if (!box) return;
+  box.textContent = "";
+  var on = charModulesOn();
+  CHAR_MODULES.forEach(function (m) {
+    var lab = document.createElement("label");
+    lab.className = "opf-opt opf-mod" + (on.indexOf(m.id) >= 0 ? " on" : "");
+    lab.title = m.desc;
+    var cb = document.createElement("input"); cb.type = "checkbox"; cb.id = "opf-mod-" + m.id; cb.checked = on.indexOf(m.id) >= 0;
+    cb.addEventListener("change", function () {
+      var s = getSettings(); s.charModules = s.charModules || [];
+      var i = s.charModules.indexOf(m.id);
+      if (cb.checked && i < 0) s.charModules.push(m.id);
+      else if (!cb.checked && i >= 0) s.charModules.splice(i, 1);
+      saveSettings(); renderCharMods();
+    });
+    lab.appendChild(cb); lab.appendChild(document.createTextNode(" " + m.label));
+    box.appendChild(lab);
+  });
+}
 function bindCharPage(){
   charInit();
   var run = getEl("opf-char-run"); if (!run || run._b) return; run._b = true;
@@ -39,6 +114,7 @@ function bindCharPage(){
   getEl("opf-char-copy").addEventListener("click", function(){ copyCharOut(); });
   getEl("opf-char-demand").addEventListener("input", function(){ ST.char.demand = this.value; charDraftCacheSave(); });
   getEl("opf-char-ref").addEventListener("input", function(){ ST.char.ref = this.value; charDraftCacheSave(); });
+  renderCharMods();
   renderCharSteps();
   renderCharPage();
 }
@@ -148,7 +224,7 @@ async function runCharSeg(seg, msgs, idx){
   charSetSeg(seg.id, "run");
   var prev = "";
   for (var k = 0; k < idx; k++) { var ps = CHAR_SEGS[k]; if (ST.char.segs[ps.id]) prev += "\n\n【" + ps.title + "】\n" + ST.char.segs[ps.id]; }
-  var segTask = "【分段" + (idx + 1) + "/" + CHAR_SEGS.length + "：" + seg.title + "】\n" + macroFill(CHAR_SEG_PROMPTS[seg.id] || "") + (prev ? "\n\n[此前已定分段（既有设定，必须一致，禁止改动）]\n" + prev : "");
+  var segTask = "【分段" + (idx + 1) + "/" + CHAR_SEGS.length + "：" + seg.title + "】\n" + macroFill(CHAR_SEG_PROMPTS[seg.id] || "") + charModulePrompt(seg.id) + (prev ? "\n\n[此前已定分段（既有设定，必须一致，禁止改动）]\n" + prev : "");
   sxTurn(segTask, '按上面的分段要求，只完成「' + seg.title + '」这一段。').forEach(function (m) { msgs.push(m); });
   try {
     // 流式档下把接收进度实时写进本段结果区（非流式时不触发，行为不变）
@@ -306,7 +382,7 @@ async function finalizeChar(){
   try {
     var all = CHAR_SEGS.map(function (s) { return "【" + s.title + "】\n" + (ST.char.segs[s.id] || "（无）"); }).join("\n\n");
     var name = charNameGuess();
-    var msg = "【最终封装（YAML）】\n请以“始弦的魔法大典”的身份，把下面的分段内容整理为一份可直接用作世界书 DLC 角色条目的 YAML 文档。\n\n" + CHAR_YAML_SPEC + "\n\n角色名以「定位与基础」段为准；没有名字则「名称」写“未命名角色”。";
+    var msg = "【最终封装（YAML）】\n请以“始弦的魔法大典”的身份，把下面的分段内容整理为一份可直接用作世界书 DLC 角色条目的 YAML 文档。\n\n" + charYamlSpecWithModules() + "\n\n角色名以「定位与基础」段为准；没有名字则「名称」写“未命名角色”。";
     var msgs = charMessages(charSystemContent() + '\n\n' + msg, "[全部段落]\n" + all);
     var resp = await callModel(msgs);
     var y = extractYamlChar(resp);
