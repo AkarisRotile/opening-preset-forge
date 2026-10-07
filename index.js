@@ -1021,6 +1021,171 @@ function copyPreset() {
 // ============ UI wiring & boot ============
 function getEl(id){return document.getElementById(id);}
 
+//@module 20-seg-guard — 分段「AI 回复」落地前的判定与闸门（③ 二创角色 / ④ 命定系统 共用）
+// ============================================================================
+// 为什么有这一块（用户反馈的现网故障，v1.18.2 及更早）：
+//   ③ 页点「⚔ 交火梳理」后，模型回了一句
+//     「按照你的规则，对于这一段，我的回答是：无改动」
+//   而当时的落地判断是 /^无改动[。．.]*$/ —— 它要求**整条回复从头到尾只有这三个字**。
+//   多一个字、加一句前言、加个列表符号、加个括号后缀，正则就不匹配，
+//   于是这句客套话被当成「修订后的整段正文」写回分段，刚生成好的设定被整段覆盖。
+//   六段走的是同一条判断，模型只要一直这么答，六段会一起被清空；而分段草稿是
+//   单份快照 + 2.5 秒自动存档（50-char.js 的 charDraftCacheSave / 36-projects.js 的 projTick），
+//   没有历史版本 —— 用户找不回来。
+//
+// 这一块只做"写回之前"的三件守门事，**不动任何提示词语义**：
+//   ① opfIsNoChangeReply()  —— 认出"其实是在说本段无需改动"的各种说法（前言/装饰/后缀都算）；
+//   ② opfSegApplyGuard()    —— 写入闸门：空转 → 保留原文；偏短/丢结构 → 不静默落地，交用户裁决；
+//   ③ 快照 / 撤销工具        —— 进任何会改分段的操作前存一份，出事了能一键退回。
+//
+// 原则：**宁可保留原文（用户能重跑），也不要静默写坏（用户找不回来）。**
+// 与 ⑤ 正则工坊既有的"偏短裁决"同一惯例（76-regex-main.js 的 tooShort → window.confirm 默认保留原样）。
+
+// 「本段无需改动」的各种说法（含同义改写）
+var SEG_NOCHANGE_WORDS = /无改动|无需改动|不需要改动|不用改动|不必改动|无需修改|不需要修改|不用修改|不必修改|无需调整|不需调整|不用调整|无需变更|无变更|无需更动|保持原样|保持原状|维持原样|维持原状|维持不变|保持不变|原样保留/;
+
+// 本段「正文特征」：出现这些就说明回复里有真内容，绝不能当空转处理。
+// 注意第 3 条用例（"技能：无改动冷却的瞬发"）：光有关键词还不够，必须**关键词+冒号**才算字段行，
+// 否则会把一句正常设定误判成空转。
+function opfSegLooksLikeContent(t) {
+  var s = String(t == null ? '' : t);
+  if (/(名称|品质|叙述|类型|技能|装备|道具|外貌|服装|性格|背景|过去|语料|行为|禁忌|提倡|系统|核心|契约|概念|人设|功能|规则|槽|标签|开场白|范例)\s*[:：]/.test(s)) return true;
+  if (s.length > 200) return true;
+  if (/<<<SEG:/.test(s)) return true;
+  var lines = s.split(/\r?\n/).filter(function (l) { return String(l).trim(); });
+  return lines.length >= 4;
+}
+
+// 去掉装饰：代码围栏 / 行首列表符号与编号 / 全部空白 / markdown 强调与引号 / 常见标点。
+// 只用于"是不是只在说无改动"这一个判断，不参与落地文本。
+function opfSegStripDecor(t) {
+  return String(t == null ? '' : t)
+    .replace(/```[a-zA-Z]*/g, '')
+    .replace(/^[\s>*+\-•·—]+/gm, '')
+    .replace(/^\s*\d+[.、)]\s*/gm, '')
+    .replace(/[\s\u3000]+/g, '')
+    .replace(/[*_`~"'“”‘’「」『』《》〈〉【】\[\]()（）{}]/g, '')
+    .replace(/[。．.、,，;；:：!！?？—－–…·]/g, '');
+}
+
+// 模型是不是在说"本段无需改动"（＝不该覆盖原文）
+function opfIsNoChangeReply(text) {
+  var t = String(text == null ? '' : text).trim();
+  if (!t) return true;                                     // 空回复＝什么都没改，保留原文
+  var core = opfSegStripDecor(t);
+  if (!core) return true;                                  // 只剩装饰符号
+  // ① 剥掉装饰后，核心就是一句"无改动"（允许"本段/这一段/内容"等前缀混在里面）
+  if (core.length <= 14 && SEG_NOCHANGE_WORDS.test(core)) return true;
+  // ② 短回复里出现"无改动/不需要修改"之类，且通篇没有任何本段正文特征 → 也是空转
+  if (t.length <= 60 && SEG_NOCHANGE_WORDS.test(t) && !opfSegLooksLikeContent(t)) return true;
+  // ③ 只回了一个"无"（模型说"本段没有要改的"）
+  if (core.length <= 4 && /^(?:本段|该段|这一段|此段)?(?:无|没有|none|n\/a)$/i.test(core)) return true;
+  return false;
+}
+
+// 剥掉"按照…／我的回答是…／好的…"这类元说明行（只在整条回复里第一/第二行、且该行不含正文特征时才剥）。
+// 剥完如果什么都不剩，就原样返回，交给 opfIsNoChangeReply 去判空转。
+function opfSegStripReplyPreamble(text) {
+  var s = String(text == null ? '' : text).replace(/^\s+/, '');
+  var lines = s.split(/\r?\n/);
+  var drop = 0;
+  while (drop < lines.length && drop < 2) {
+    var ln = String(lines[drop]).trim();
+    if (!ln) { drop++; continue; }
+    if (ln.length > 60) break;
+    if (opfSegLooksLikeContent(ln)) break;
+    var meta = /^(?:好的|好[的嘞吧]?|明白|了解|收到|遵照|按照|依据|根据|依照|基于|综上|首先)/.test(ln)
+      || /(?:我的回答是|回答如下|以下是|下面是|如下所示|见下)(?:[：:]|$)/.test(ln);
+    if (!meta) break;
+    drop++;
+  }
+  if (!drop) return s;
+  var rest = lines.slice(drop).join('\n').replace(/^\s+/, '');
+  return rest.trim() ? rest : s;
+}
+
+// 没有 UI（或用户没表态）时：一律"保留原样"——绝不静默落地
+function opfSegConfirmAsk(msg) {
+  try { if (typeof window !== 'undefined' && typeof window.confirm === 'function') return !!window.confirm(msg); } catch (e) {}
+  return false;
+}
+
+// 本段原有小标题（【…】行）有没有被整段丢掉
+function opfSegStructureLoss(oldText, newText) {
+  var oldH = (String(oldText || '').match(/^[ \t]*【[^】]{1,20}】/gm) || []).length;
+  if (oldH < 2) return false;
+  var newH = (String(newText || '').match(/^[ \t]*【[^】]{1,20}】/gm) || []).length;
+  return newH === 0;
+}
+
+// 写入闸门。返回值：
+//   { action:'write', text }                      —— 可以写回（text 已剥掉前言）
+//   { action:'write', text, note }                —— 偏短但用户点了"替换"
+//   { action:'keep',  reason:'nochange' }         —— 模型说本段无需改动 / 空回复
+//   { action:'keep',  reason:'blocked', note }    —— 疑似不是正文，已保留原文
+// confirmFn 可注入（测试用）；默认走 window.confirm，没有 UI 时按"保留原样"处理。
+function opfSegApplyGuard(oldText, newText, label, confirmFn) {
+  var old = String(oldText == null ? '' : oldText);
+  var txt = opfSegStripReplyPreamble(String(newText == null ? '' : newText));
+  if (!txt || !txt.trim()) return { action: 'keep', reason: 'nochange' };
+  if (opfIsNoChangeReply(txt)) return { action: 'keep', reason: 'nochange' };
+  var minLen = Math.max(120, Math.floor(old.length * 0.3));
+  var loss = opfSegStructureLoss(old, txt);
+  if (old.length >= 200 && (txt.length < minLen || loss)) {
+    var pct = Math.round((1 - txt.length / Math.max(1, old.length)) * 100);
+    var note = '改后只有 ' + txt.length + ' 字，原 ' + old.length + ' 字（-' + pct + '%）'
+      + (loss ? '，且本段原有的小标题结构全丢了' : '')
+      + '，疑似只回了一句空转/说明而不是正文';
+    var ask = (typeof confirmFn === 'function') ? confirmFn : opfSegConfirmAsk;
+    var yes = false;
+    try { yes = !!ask(note + '。\n\n要用这次的结果替换「' + String(label || '本段') + '」吗？\n（点「取消」= 保留原文，稍后可重跑本段；点「确定」= 替换，之后可用「↩ 撤销上次改动」退回）'); } catch (e) { yes = false; }
+    if (!yes) return { action: 'keep', reason: 'blocked', note: note };
+    return { action: 'write', text: txt, note: note + '（你选择替换）' };
+  }
+  return { action: 'write', text: txt };
+}
+
+// 交火梳理完成后的统计行（两页共用同一口径，报告里必须说清"改写几段/无需改动几段/拦下几段"）
+function opfSegLinkSummary(changed, same, blockedCount, stopped) {
+  if (stopped) return '\n\n（已停止：修订应用中断）';
+  return '\n\n（修订应用完成：改写 ' + changed + ' 段，本段无需改动 ' + same + ' 段'
+    + (blockedCount ? '，拦下 ' + blockedCount + ' 段' : '') + '）';
+}
+
+// 被拦下的段落清单（挂进报告：绝不静默吞掉模型的回复，用户要能人工核对）
+function opfSegBlockedText(list) {
+  if (!list || !list.length) return '';
+  var out = ['⚠ 以下段落的 AI 回复疑似不是正文（已保留原文，未覆盖）：'];
+  list.forEach(function (b) {
+    out.push('【' + (b.title || '本段') + '】' + (b.note ? ' ' + b.note : ''));
+    var t = String(b.text == null ? '' : b.text);
+    out.push('模型原文：' + t.replace(/\s+/g, ' ').slice(0, 300) + (t.length > 300 ? '…' : ''));
+  });
+  out.push('要采用这些回复，请重新点「⚔ 交火梳理」，或用该段的「定点修改」按你的指令重写。');
+  return out.join('\n');
+}
+
+// ---------------- 快照 / 撤销（任何会改分段的操作之前先存一份） ----------------
+// 挂在 ST.char / ST.dest 上的小栈：session 级（localStorage 草稿只存正文，不存历史），
+// 最多留 SEG_UNDO_MAX 份，几十 KB 而已。
+var SEG_UNDO_MAX = 3;
+function segUndoClone(o) { try { return JSON.parse(JSON.stringify(o == null ? {} : o)); } catch (e) { return {}; } }
+function segUndoStack(holder) { if (!holder) return []; holder._undo = holder._undo || []; return holder._undo; }
+function segUndoPush(holder, label, segs) {
+  if (!holder) return;
+  var st = segUndoStack(holder);
+  st.push({ label: String(label || '改动'), at: Date.now(), segs: segUndoClone(segs) });
+  while (st.length > SEG_UNDO_MAX) st.shift();
+}
+function segUndoPop(holder) {
+  var st = segUndoStack(holder);
+  return st.length ? st.pop() : null;
+}
+function segUndoTop(holder) {
+  var st = segUndoStack(holder);
+  return st.length ? st[st.length - 1] : null;
+}
+
 //@module 30-preset-ui — ① 开局预设：页面 UI + 分步管线 + 每步精修 + 重新汇总
 var OPF_CSS = "#opf-root,#opf-launcher{box-sizing:border-box;font-family:'Noto Sans SC','Microsoft YaHei',sans-serif;letter-spacing:.3px}#opf-root *,#opf-launcher *{box-sizing:border-box}#opf-launcher{position:fixed;right:6px;top:42%;z-index:2147480001;width:38px;height:38px;border-radius:12px 6px 6px 12px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#ffd9de;background:linear-gradient(160deg,rgba(74,10,20,.92),rgba(24,3,8,.88));border:1px solid rgba(255,106,122,.28);box-shadow:0 0 6px rgba(255,77,94,.55),0 0 18px rgba(200,16,46,.35);font-size:18px;transition:transform .18s ease,box-shadow .18s ease;user-select:none}#opf-launcher:hover{transform:scale(1.08);box-shadow:0 0 6px rgba(255,77,94,.55),0 0 18px rgba(200,16,46,.35),0 0 24px rgba(255,77,94,.5)}#opf-launcher .opf-la-dot{position:absolute;top:-3px;right:-3px;width:10px;height:10px;border-radius:50%;background:#39d353;border:1px solid rgba(0,0,0,.5);display:none}#opf-launcher.running .opf-la-dot{display:block;animation:opfPulse 1s infinite}@keyframes opfPulse{0%,100%{opacity:1}50%{opacity:.25}}#opf-root{position:fixed;z-index:2147480000;width:392px;max-width:calc(100vw - 18px);max-height:min(760px,92vh);display:flex;flex-direction:column;border-radius:14px;color:#fdeef0;overflow:hidden;background:linear-gradient(180deg,rgba(46,6,14,.92) 0%,rgba(30,4,10,.90) 45%,rgba(16,2,6,.94) 100%);border:1px solid rgba(255,122,138,.34);box-shadow:0 0 0 1px rgba(0,0,0,.35),0 10px 34px rgba(0,0,0,.55),inset 0 0 42px rgba(255,60,80,.05),0 0 22px rgba(255,77,94,.22);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);transition:opacity .16s ease,transform .16s ease}#opf-root::before{content:'';position:absolute;inset:0 0 auto 0;height:2px;background:linear-gradient(90deg,transparent,#ff4d5e 18%,#ffd9a8 50%,#c8102e 82%,transparent);box-shadow:0 0 12px rgba(255,90,100,.8);opacity:.9}#opf-root.opf-hidden{opacity:0;pointer-events:none;transform:translateY(6px) scale(.98)}#opf-head{display:flex;align-items:center;gap:6px;padding:8px 10px 7px 12px;cursor:move;user-select:none;background:linear-gradient(90deg,rgba(255,200,210,.10),rgba(200,16,46,.06) 55%,rgba(255,200,210,.04));border-bottom:1px solid rgba(255,122,138,.18)}#opf-title{font-weight:700;font-size:13px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#ffd9de;text-shadow:0 0 8px rgba(255,77,94,.65)}#opf-title .s{color:#ffb7be;font-size:11px;font-weight:500;margin-left:6px}.opf-ico-btn{border:1px solid transparent;background:rgba(255,255,255,.04);color:#ff8a95;border-radius:7px;cursor:pointer;width:24px;height:22px;font-size:12px;line-height:1;transition:all .14s ease}.opf-ico-btn:hover{background:rgba(255,77,94,.18);color:#fff;border-color:rgba(255,106,122,.28);box-shadow:0 0 4px rgba(255,77,94,.35),0 0 12px rgba(200,16,46,.22)}#opf-body{overflow-y:auto;display:flex;flex-direction:column;min-height:0}#opf-meta{display:flex;flex-wrap:wrap;gap:4px 8px;padding:6px 12px;font-size:11px;color:rgba(255,230,234,.72);background:rgba(255,255,255,.02);border-bottom:1px dashed rgba(255,122,138,.16)}#opf-meta .tag{padding:1px 6px;border-radius:20px;font-size:10px;background:rgba(255,77,94,.12);border:1px solid rgba(255,122,138,.25);color:#ffc9ce}#opf-meta .tag.ok{color:#a5f0c0;border-color:rgba(120,255,170,.35);background:rgba(60,160,90,.14)}#opf-meta .tag.err{color:#ffd0a3;border-color:rgba(255,170,90,.4);background:rgba(200,110,40,.14)}.opf-sec{padding:8px 12px 6px}.opf-sec-label{font-size:10px;letter-spacing:2px;color:rgba(255,170,180,.62);margin-bottom:6px;text-transform:uppercase;display:flex;align-items:center;gap:6px}.opf-sec-label::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(255,120,135,.35),transparent)}#opf-demand{width:100%;resize:vertical;min-height:44px;max-height:120px;border-radius:9px;padding:7px 9px;color:#ffeef1;font-size:12px;line-height:1.5;background:rgba(10,2,5,.55);border:1px solid rgba(255,122,138,.25);outline:none;transition:border-color .15s ease,box-shadow .15s ease}#opf-demand:focus{border-color:rgba(255,110,125,.6);box-shadow:0 0 10px rgba(255,77,94,.25)}#opf-demand::placeholder{color:rgba(255,210,216,.35)}.opf-opts{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:4px 12px 6px}.opf-opt{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:rgba(255,226,230,.78);cursor:pointer}.opf-opt input{accent-color:#ff4d5e;cursor:pointer}.opf-num{width:54px;background:rgba(10,2,5,.55);color:#ffeef1;border:1px solid rgba(255,122,138,.25);border-radius:6px;padding:2px 5px;font-size:11px}#opf-pname{width:150px;background:rgba(10,2,5,.55);color:#ffeef1;border:1px solid rgba(255,122,138,.25);border-radius:6px;padding:2px 6px;font-size:11px}.opf-steps{padding:2px 12px 6px;display:flex;flex-direction:column;gap:6px;overflow-y:auto;max-height:290px}.opf-step{border-radius:10px;border:1px solid rgba(255,122,138,.18);background:rgba(255,235,238,.035);transition:background .15s ease,border-color .15s ease,box-shadow .15s ease}.opf-step[data-st=run]{background:rgba(255,90,105,.10);border-color:rgba(255,120,135,.5);box-shadow:0 0 4px rgba(255,77,94,.35),0 0 12px rgba(200,16,46,.22)}.opf-step[data-st=ok]{background:rgba(120,230,160,.05);border-color:rgba(140,255,180,.25)}.opf-step[data-st=err]{border-color:rgba(255,150,90,.55)}.opf-step-head{display:flex;align-items:center;gap:7px;padding:6px 8px;cursor:pointer}.opf-idx{width:17px;height:17px;border-radius:6px 2px 6px 2px;flex:none;font-size:10px;font-weight:700;color:#ffd7dc;display:inline-flex;align-items:center;justify-content:center;background:linear-gradient(140deg,rgba(200,16,46,.55),rgba(80,10,22,.65));border:1px solid rgba(255,120,135,.35);box-shadow:0 0 6px rgba(255,77,94,.25)}.opf-dot{width:14px;font-size:11px;text-align:center;color:#8e6670;flex:none}.opf-step[data-st=run] .opf-dot{color:#ff8a95;animation:opfPulse 1s infinite}.opf-step[data-st=ok] .opf-dot{color:#7fe6a0}.opf-step[data-st=err] .opf-dot{color:#ffb066}.opf-step-title{flex:1;font-size:12px;color:#ffe9ec}.opf-step-sub{font-size:10px;color:rgba(255,200,208,.45)}.opf-step-act{border:none;background:rgba(255,255,255,.05);color:#ffc0c8;cursor:pointer;border-radius:6px;padding:2px 7px;font-size:10px;transition:all .14s ease}.opf-step-act:hover{background:rgba(255,77,94,.2);color:#fff;box-shadow:0 0 4px rgba(255,77,94,.35),0 0 12px rgba(200,16,46,.22)}.opf-step-body{display:none;padding:4px 9px 8px 30px;font-size:11px;line-height:1.55;color:rgba(255,226,230,.82)}.opf-step.open .opf-step-body{display:block}.opf-step-body pre{white-space:pre-wrap;word-break:break-word;margin:0;font-family:inherit}.opf-out{padding:2px 12px 8px}#opf-json-out{max-height:170px;overflow:auto;margin:0;padding:8px 10px;border-radius:9px;font-size:10.5px;line-height:1.5;white-space:pre-wrap;word-break:break-word;color:#ffd9de;background:rgba(8,1,4,.72);border:1px solid rgba(255,122,138,.22);box-shadow:inset 0 0 24px rgba(255,60,80,.05)}#opf-actions{display:flex;gap:6px;padding:8px 12px 10px;background:linear-gradient(0deg,rgba(200,16,46,.10),rgba(200,16,46,.02));border-top:1px solid rgba(255,122,138,.18)}.opf-btn{flex:1;cursor:pointer;border-radius:8px;border:1px solid transparent;font-size:12px;padding:7px 4px;color:#fff;letter-spacing:1px;transition:all .15s ease}.opf-btn:hover{filter:brightness(1.12)}.opf-btn:disabled{opacity:.45;cursor:not-allowed;filter:none}.opf-btn.primary{background:linear-gradient(135deg,rgba(255,110,120,.92),rgba(190,16,42,.96));border-color:rgba(255,180,190,.5);box-shadow:0 0 6px rgba(255,77,94,.55),0 0 18px rgba(200,16,46,.35);text-shadow:0 0 6px rgba(255,255,255,.4)}.opf-btn.ghost{background:rgba(255,235,238,.06);border-color:rgba(255,122,138,.25);color:#ffd5da}.opf-btn.ghost:hover{background:rgba(255,90,105,.14)}@media (max-width:640px){#opf-root{width:calc(100vw - 14px);left:7px !important;right:auto !important}}";
 var OPF_HTML = "<div id=\"opf-body\"><div class=\"opf-col opf-col-a\"><div id=\"opf-meta\"></div><div class=\"opf-sec\"><div class=\"opf-sec-label\">开局需求</div><textarea id=\"opf-demand\" placeholder=\"例如：给一位从迷雾森林走出、想在瓦伦蒂亚城谋生的流浪剑士配齐开局（1级、偏好近战、带一只契约伙伴……）\"></textarea></div><div class=\"opf-opts\"><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-card\"> 带角色卡</label><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-world\"> 带世界书</label><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-const\"> 仅常驻</label><label class=\"opf-opt\">注入上限<input type=\"number\" id=\"opf-cap\" class=\"opf-num\" min=\"2000\" max=\"200000\" step=\"1000\"></label><label class=\"opf-opt\">名称<input id=\"opf-pname\" value=\"【自定义开局】\" title=\"开局预设名称（导出 name 字段与文件名）\"></label></div><div class=\"opf-opts\"><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-quick\"> 快出模式(单次)</label><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-meta\"> 导出含文件元数据</label><button class=\"opf-step-act\" id=\"opf-wload\" type=\"button\">导入世界书文件</button><button class=\"opf-step-act\" id=\"opf-wclear\" type=\"button\">清世界书</button></div></div><div class=\"opf-col opf-col-b\"><div class=\"opf-sec\"><div class=\"opf-sec-label\">创作步骤</div><div class=\"opf-steps\" id=\"opf-steps\"></div></div><div class=\"opf-out\"><div class=\"opf-sec-label\">预设 JSON</div><pre id=\"opf-json-out\">尚未生成</pre></div></div></div><div id=\"opf-actions\"><button class=\"opf-btn primary\" id=\"opf-btn-run\">▶ 生成初稿</button><button class=\"opf-btn ghost\" id=\"opf-btn-quick\">⚡ 快速初稿</button><button class=\"opf-btn ghost\" id=\"opf-btn-save\">⬇ 导出 .preset.json</button><button class=\"opf-btn ghost\" id=\"opf-btn-copy\">⧉ 复制</button></div>";
@@ -3014,7 +3179,7 @@ var CHAR_MODULES = [
     prompt: "追加【成长弧线】：写角色在故事中可能或应然的转变方向。",
     yamlField: "  成长弧线: .." }
 ];
-var CHAR_HTML = "<div class=\"opf-char-wrap opf-2col\"><div class=\"opf-col opf-col-a\"><div class=\"opf-sec-label\">✦ 二创角色工坊 · 分段式生成（产出世界书 DLC 角色条目）</div><div class=\"opf-dim\">分段写角色设定，产出世界书 DLC 条目。</div><textarea id=\"opf-char-demand\" class=\"opf-char-input\" placeholder=\"写谁？给出大致设定与需求（例：一位出身瓦伦蒂亚贫民区、靠街头格斗活下来的少女，性格倔强护短……）\"></textarea><textarea id=\"opf-char-ref\" class=\"opf-char-input\" placeholder=\"（可选）参考文本：已有设定/原型描述/世界书片段，将作为参考注入\"></textarea><div class=\"opf-sec\"><div class=\"opf-sec-label\">结构维度（可选）</div><div class=\"opf-dim\">勾选想要的结构维度，生成时写进对应分段、并作为最终 YAML 的额外字段。</div><div class=\"opf-mod-wrap\" id=\"opf-char-mods\"></div></div><div class=\"opf-char-tools\"><button type=\"button\" class=\"opf-btn primary\" id=\"opf-char-run\">▶ 分段初稿</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-link\">⚔ 交火梳理</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-final\">🎁 最终封装</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-new\">🗑 新角色</button></div></div><div class=\"opf-col opf-col-b\"><div id=\"opf-char-steps\"></div><div class=\"opf-sec\"><div class=\"opf-sec-label\">交火梳理报告</div><pre id=\"opf-char-report\" class=\"opf-box opf-char-report\">尚未梳理</pre></div><div class=\"opf-out\"><div class=\"opf-sec-label\">最终稿件（YAML 规范输出，可直接粘进世界书 DLC 条目）</div><div class=\"opf-dim\" id=\"opf-char-outnote\"></div><pre id=\"opf-char-out\" class=\"opf-box\">尚未封装</pre><div class=\"opf-char-copyrow\"><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-copy\">⧉ 复制最终稿件</button></div></div></div></div>";
+var CHAR_HTML = "<div class=\"opf-char-wrap opf-2col\"><div class=\"opf-col opf-col-a\"><div class=\"opf-sec-label\">✦ 二创角色工坊 · 分段式生成（产出世界书 DLC 角色条目）</div><div class=\"opf-dim\">分段写角色设定，产出世界书 DLC 条目。</div><textarea id=\"opf-char-demand\" class=\"opf-char-input\" placeholder=\"写谁？给出大致设定与需求（例：一位出身瓦伦蒂亚贫民区、靠街头格斗活下来的少女，性格倔强护短……）\"></textarea><textarea id=\"opf-char-ref\" class=\"opf-char-input\" placeholder=\"（可选）参考文本：已有设定/原型描述/世界书片段，将作为参考注入\"></textarea><div class=\"opf-sec\"><div class=\"opf-sec-label\">结构维度（可选）</div><div class=\"opf-dim\">勾选想要的结构维度，生成时写进对应分段、并作为最终 YAML 的额外字段。</div><div class=\"opf-mod-wrap\" id=\"opf-char-mods\"></div></div><div class=\"opf-char-tools\"><button type=\"button\" class=\"opf-btn primary\" id=\"opf-char-run\">▶ 分段初稿</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-link\">⚔ 交火梳理</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-final\">🎁 最终封装</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-new\">🗑 新角色</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-undo\" disabled>↩ 撤销上次改动</button></div></div><div class=\"opf-col opf-col-b\"><div id=\"opf-char-steps\"></div><div class=\"opf-sec\"><div class=\"opf-sec-label\">交火梳理报告</div><pre id=\"opf-char-report\" class=\"opf-box opf-char-report\">尚未梳理</pre></div><div class=\"opf-out\"><div class=\"opf-sec-label\">最终稿件（YAML 规范输出，可直接粘进世界书 DLC 条目）</div><div class=\"opf-dim\" id=\"opf-char-outnote\"></div><pre id=\"opf-char-out\" class=\"opf-box\">尚未封装</pre><div class=\"opf-char-copyrow\"><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-copy\">⧉ 复制最终稿件</button></div></div></div></div>";
 
 function charInit(){ ST.char = ST.char || { demand: "", ref: "", segs: {}, status: {}, report: "", out: "", outNote: [], name: "", _inited: false }; ST.char.outNote = ST.char.outNote || []; ST.charEls = ST.charEls || {}; }
 function charModulesOn() { return getSettings().charModules || []; }
@@ -3064,6 +3229,7 @@ function bindCharPage(){
   getEl("opf-char-final").addEventListener("click", function(){ finalizeChar(); });
   getEl("opf-char-new").addEventListener("click", function(){ clearChar(); });
   getEl("opf-char-copy").addEventListener("click", function(){ copyCharOut(); });
+  var undo = getEl("opf-char-undo"); if (undo) undo.addEventListener("click", function(){ undoCharChange(); });
   getEl("opf-char-demand").addEventListener("input", function(){ ST.char.demand = this.value; charDraftCacheSave(); });
   getEl("opf-char-ref").addEventListener("input", function(){ ST.char.ref = this.value; charDraftCacheSave(); });
   renderCharMods();
@@ -3088,7 +3254,7 @@ function charUser0(){
 function charDemand() { return '[本次二创需求] ' + (ST.char.demand || ''); }
 // 本页统一走这个：人设页专用段随头部一起发（见 10-base.js sxHead）
 function charMessages(task, user){ return sxMessages(task, user, null, CHAR_PAGE_VOICE); }
-function charSetSeg(pid, st){ ST.char.status[pid] = st; charSetSegUi(pid, st); }
+function charSetSeg(pid, st){ ST.char.status[pid] = st; charSetSegUi(pid, st); charUndoState(); }
 function charSetSegUi(pid, st){
   var row = getEl("opf-cph-" + pid); if (!row) return;
   row.setAttribute("data-st", st);
@@ -3152,6 +3318,7 @@ function renderCharPage(){
   if (note && out && out.textContent !== "尚未封装") note.textContent = (ST.char.outNote && ST.char.outNote.length) ? "⚠ " + ST.char.outNote.join("；") : "✓ 已按 YAML 规范输出";
   var rep = getEl("opf-char-report"); if (rep && rep.textContent !== "交火梳理中…") rep.textContent = ST.char.report || "尚未梳理";
   CHAR_SEGS.forEach(function (s) { renderCharSegOut(s.id); charSetSegUi(s.id, ST.char.status[s.id] || "wait"); });
+  charUndoState();
 }
 async function runCharDraft(){
   if (ST.running) { toast("已有任务进行中（单线程）", "warning"); return; }
@@ -3160,6 +3327,7 @@ async function runCharDraft(){
   ST.char.ref = (r && r.value || "").trim();
   if (!ST.char.demand) { toast("请先填写角色需求", "warning"); return; }
   ST.running = true; ST.stopReq = false; renderRunButtons();
+  segUndoPush(ST.char, "分段初稿", ST.char.segs);
   var msgs = charMessages(charSystemContent() + '\n\n' + charUser0(), charDemand());
   try {
     for (var i = 0; i < CHAR_SEGS.length; i++) {
@@ -3206,6 +3374,7 @@ async function runCharFrom(pid){
   ST.char.demand = (d && d.value || "").trim(); ST.char.ref = (r && r.value || "").trim();
   if (!ST.char.demand) { toast("请先填写角色需求", "warning"); return; }
   ST.running = true; ST.stopReq = false; renderRunButtons();
+  segUndoPush(ST.char, "重跑「" + CHAR_SEGS[start].title + "」及后续", ST.char.segs);
   var msgs = charMessages(charSystemContent() + '\n\n' + charUser0(), charDemand());
   try {
     for (var k = 0; k < start; k++) {
@@ -3235,12 +3404,20 @@ async function refineCharSeg(pid, dir){
   ST.running = true; ST.stopReq = false; renderRunButtons(); charSetSeg(pid, "run");
   try {
     var msgs = charMessages(charSystemContent() + '\n\n' + charUser0(), charDemand());
-    var msg = "【定点修改：只改「" + seg.title + "」这一段】\n\n[用户指令]\n" + dirT + "\n\n[本段现行内容]\n" + ST.char.segs[pid] + "\n\n[冻结区块（其它分段原样保留，一个字都不许改；若发现其它段有问题，最多在结尾另起一行写“备注：建议检查XX段…”提示，不得代改）]\n" + frozen + "\n\n[二创角色·规则约束]\n" + CHAR_RULES + "\n\n要求：只输出修改后的【" + seg.title + "】内容；修改严格限定在用户指令范围内，未要求的地方保持原样，不要顺手润色、扩写或重排。";
+    var msg = "【定点修改：只改「" + seg.title + "」这一段】\n\n[用户指令]\n" + dirT + "\n\n[本段现行内容]\n" + ST.char.segs[pid] + "\n\n[冻结区块（其它分段原样保留，一个字都不许改；若发现其它段有问题，最多在结尾另起一行写“备注：建议检查XX段…”提示，不得代改）]\n" + frozen + "\n\n[二创角色·规则约束]\n" + CHAR_RULES + "\n\n要求：只输出修改后的【" + seg.title + "】内容；修改严格限定在用户指令范围内，未要求的地方保持原样，不要顺手润色、扩写或重排。\n若该指令与本段无关、或本段确实无需改动，只输出四个字「无改动」，不要写任何前言、依据说明或称呼；不要用一句话代替正文。";
     sxTurn(msg, '按上面的用户指令，只修订「' + seg.title + '」这一段。').forEach(function (m) { msgs.push(m); });
     var resp = await callModel(msgs);
-    ST.char.segs[pid] = resp;
+    var g = opfSegApplyGuard(ST.char.segs[pid], resp, seg.title);
+    if (g.action !== "write") {
+      charSetSeg(pid, "ok");
+      if (g.reason === "nochange") toast("模型认为【" + seg.title + "】无需改动，已保留原文");
+      else toast("这次的回复疑似不是正文（" + (g.note || "") + "），已保留原文；要重写请把指令写得更具体", "warning");
+      return;
+    }
+    segUndoPush(ST.char, "定点修改「" + seg.title + "」", ST.char.segs);
+    ST.char.segs[pid] = g.text;
     charSetSeg(pid, "ok"); renderCharSegOut(pid);
-    toast("已修改【" + seg.title + "】（其余分段未动）");
+    toast("已修改【" + seg.title + "】（其余分段未动）" + (g.note ? "；" + g.note : ""));
   } catch (e) { charSetSeg(pid, "err"); toast("定点修改出错：" + (e && e.message ? e.message : e), "error"); }
   finally { ST.running = false; renderRunButtons(); charDraftCacheSave(); }
 }
@@ -3296,7 +3473,9 @@ async function runCharLinkage(){
     if (report) report.textContent = ST.char.report;
     toast("审查报告完成，开始逐段应用联动修订…");
     // ---- 第二步：逐段应用修订（每段单独一次调用，输出只有一段，杜绝截断）----
-    var changed = 0;
+    // 进这一轮改写之前先存快照：万一被写坏，一键退回（见 20-seg-guard.js 头部的事故记录）
+    segUndoPush(ST.char, "交火梳理", ST.char.segs);
+    var changed = 0, same = 0, blocked = [];
     for (var i = 0; i < CHAR_SEGS.length; i++) {
       if (isStop()) break;
       var seg = CHAR_SEGS[i];
@@ -3304,19 +3483,23 @@ async function runCharLinkage(){
       charSetSeg(seg.id, "run");
       var frozen = "";
       CHAR_SEGS.forEach(function (s2) { if (s2.id !== seg.id && ST.char.segs[s2.id]) frozen += "\n\n【" + s2.title + "】\n" + String(ST.char.segs[s2.id]).slice(0, 1200); });
-      var applyMsg = "【交火梳理·第二步：逐段应用修订——只改「" + seg.title + "」这一段】\n\n[梳理报告与改动清单]\n" + ST.char.report + "\n\n[本段现行内容]\n" + ST.char.segs[seg.id] + "\n\n[冻结区块（其它分段，原样保留，一个字都不许改）]\n" + frozen + "\n\n[修订规则]\n" + CHAR_RULES + "\n1. 只输出【" + seg.title + "】的修订后全文；若按报告本段无需改动，只回复“无改动”。\n2. 只做报告指出的联动性修改；不得推翻设定。报告“改动清单”里点名的矛盾/重复/写错的内容，**必须真的删掉或改掉**——旧内容不许留在原地与新内容并排（叠加＝没改）。\n3. 报告点名要删的就删，删完比原来短是正常的；除报告点名的部分外，不许删别的内容，也不许扩写新增。\n4. 武器/装备/道具/技能保持 名称/品质(中文)/叙述 三段式：禁止补回或新增 类型/消耗/标签 字段。\n5. 不生成任何开局预设内容（开局剧情/面板/伙伴/资产等）。";
+      var applyMsg = "【交火梳理·第二步：逐段应用修订——只改「" + seg.title + "」这一段】\n\n[梳理报告与改动清单]\n" + ST.char.report + "\n\n[本段现行内容]\n" + ST.char.segs[seg.id] + "\n\n[冻结区块（其它分段，原样保留，一个字都不许改）]\n" + frozen + "\n\n[修订规则]\n" + CHAR_RULES + "\n1. 只输出【" + seg.title + "】的修订后全文；若按报告本段无需改动，只输出四个字「无改动」，不得写任何前言、依据说明、称呼或解释，也不要写「按照…」「我的回答是…」这类开场。\n2. 只做报告指出的联动性修改；不得推翻设定。报告“改动清单”里点名的矛盾/重复/写错的内容，**必须真的删掉或改掉**——旧内容不许留在原地与新内容并排（叠加＝没改）。\n3. 报告点名要删的就删，删完比原来短是正常的；除报告点名的部分外，不许删别的内容，也不许扩写新增。\n4. 武器/装备/道具/技能保持 名称/品质(中文)/叙述 三段式：禁止补回或新增 类型/消耗/标签 字段。\n5. 不生成任何开局预设内容（开局剧情/面板/伙伴/资产等）。";
       var m2 = charMessages(charSystemContent() + '\n\n[修订规则]\n' + CHAR_RULES, applyMsg);
       var resp2 = await callModelSeg(m2, "交火梳理·" + seg.title, function (note) { if (report) report.textContent = ST.char.report + "\n\n—— 正在修订「" + seg.title + "」：" + note; });
-      var txt = String(resp2 || "").trim();
-      if (txt && !/^无改动[。．.]*$/.test(txt)) { ST.char.segs[seg.id] = txt; changed++; renderCharSegOut(seg.id); }
+      // 落地前守门（见 20-seg-guard.js）：空转 → 保留原文；疑似不是正文 → 不静默覆盖，交用户裁决
+      var g = opfSegApplyGuard(ST.char.segs[seg.id], resp2, seg.title);
+      if (g.action === "write") { ST.char.segs[seg.id] = g.text; changed++; renderCharSegOut(seg.id); }
+      else if (g.reason === "blocked") { blocked.push({ title: seg.title, note: g.note, text: resp2 }); }
+      else { same++; }
       charSetSeg(seg.id, "ok");
       await waitTick();
     }
-    if (report) report.textContent = ST.char.report + (isStop() ? "\n\n（已停止：修订应用中断）" : "\n\n（修订应用完成，改动 " + changed + " 段）");
+    if (report) report.textContent = ST.char.report + opfSegLinkSummary(changed, same, blocked.length, isStop()) + (blocked.length ? "\n\n" + opfSegBlockedText(blocked) : "");
     if (isStop()) toast("已停止");
-    else toast("交火梳理完成：报告已生成，联动修订应用到 " + changed + " 段", "success");
+    else if (blocked.length) toast("交火梳理完成：改写 " + changed + " 段，拦下 " + blocked.length + " 段（原文已保留，见报告）", "warning");
+    else toast("交火梳理完成：报告已生成，联动修订应用到 " + changed + " 段（无需改动 " + same + " 段）", "success");
   } catch (e) { toast("交火梳理出错：" + (e && e.message ? e.message : e), "error"); if (report) report.textContent = "梳理失败：" + (e && e.message ? e.message : e); }
-  finally { ST.running = false; renderRunButtons(); charDraftCacheSave(); }
+  finally { ST.running = false; renderRunButtons(); charUndoState(); charDraftCacheSave(); }
 }
 function charNameGuess(){
   var base = ST.char.segs.base || "";
@@ -3383,6 +3566,31 @@ function clearChar(){
   charDraftCacheSave();
   renderCharSteps(); renderCharPage();
   toast("已清空，可以开始新角色");
+}
+// ---------------- 快照 / 撤销（③ 页）----------------
+// 进任何会改分段的操作（分段初稿 / 重跑 / 定点修改 / 交火梳理）之前先存一份，
+// 出事了能一键退回。起因见 20-seg-guard.js 头部：模型一句客套话曾把六段设定整段覆盖，
+// 而草稿是单份快照 + 自动存档，用户找不回来。
+function charUndoState(){
+  charInit();
+  var b = getEl("opf-char-undo"); if (!b) return;
+  var top = segUndoTop(ST.char);
+  b.disabled = !top || !!ST.running;
+  b.textContent = top ? ("↩ 撤销：" + top.label) : "↩ 撤销上次改动";
+  b.title = top ? ("退回「" + top.label + "」之前的全部分段内容（" + new Date(top.at).toLocaleTimeString() + "）") : "还没有可撤销的改动";
+}
+function undoCharChange(){
+  if (ST.running) { toast("有任务正在进行，先等它结束或点停止", "warning"); return false; }
+  var e = segUndoPop(ST.char);
+  if (!e) { toast("没有可撤销的改动", "warning"); return false; }
+  ST.char.segs = segUndoClone(e.segs);
+  CHAR_SEGS.forEach(function (s) {
+    renderCharSegOut(s.id);
+    charSetSegUi(s.id, ST.char.segs[s.id] ? "ok" : "wait");
+  });
+  charUndoState(); charDraftCacheSave();
+  toast("已退回「" + e.label + "」之前的分段内容");
+  return true;
 }
 function copyCharOut(){
   var txt = ST.char.out || "";
@@ -3720,7 +3928,7 @@ var DEST_KNOWN_CORES = ['梅林核心', '唐吉坷德核心', '奶龙核心', '�
 var DEST_KNOWN_SYSNAMES = ['命定之诗', '铁王冠', '白祷', '银钥之门', '飞鸟之诗', '他者之眼', '命运的舞台监导', '奶人之契', '命定之书', '九十九夜梦', 'user_system'];
 var DEST_KNOWN_TAGS = ['nailong', 'giraffe', 'Foreigner', 'Foreigner_alter', 'lilith', 'xianzu', 'dalian'];
 var DEST_SLOT_ORDER = ['系统名', '系统核心名', '系统核心', 'fp定义', '爆料风格', '登神长阶系统优势', '生命层级成长系统优势', '技能获取系统优势', '经验值获取系统优势', '复活机制'];
-var DEST_HTML = '<div class="opf-char-wrap opf-2col"><div class="opf-col opf-col-a"><div class="opf-sec-label">✦ 命定系统工坊 · 分段式生成（产出世界书「命定系统」核心条目）</div><div class="opf-dim">分段写命定系统核心，产出世界书条目。</div><label id="opf-dest-ejswrap"><input type="checkbox" id="opf-dest-ejs"> 🧬 进阶（可选）：EJS 重型核心 —— 如果你不知道EJS是怎样工作的，且你手头没有其他可用AI工具，不要启用本条目</label><textarea id="opf-dest-demand" class="opf-char-input" placeholder="写谁的核心？例：以《Fate/Grand Order》的梅林为原型做一版二创核心；或：围绕“赌徒的骰子”做一个原创命定系统，赌注越大 FP 越多……"></textarea><textarea id="opf-dest-ref" class="opf-char-input" placeholder="（可选）参考文本：原型描述 / 已有核心片段（可作为骨架改造对象）/ 世界书片段，将作为参考注入"></textarea><input id="opf-dest-author" class="opf-char-input" placeholder="署名（写进条目注释名，例如：北游 / H一串 / 你的ID；留空则写“未署名”）"><div class="opf-char-tools"><button type="button" class="opf-btn primary" id="opf-dest-run">▶ 分段初稿</button><button type="button" class="opf-btn ghost" id="opf-dest-link">⚔ 交火梳理</button><button type="button" class="opf-btn primary" id="opf-dest-final">🎁 脚本封装</button><button type="button" class="opf-btn ghost" id="opf-dest-reviewbtn">🔎 AI 检查</button><button type="button" class="opf-btn ghost" id="opf-dest-finalai">🧠 AI 整合（备用）</button><button type="button" class="opf-btn ghost" id="opf-dest-lint">🔎 重新自检</button><button type="button" class="opf-btn ghost" id="opf-dest-clean">🧹 去装饰</button><button type="button" class="opf-btn ghost" id="opf-dest-std">📐 标准速查</button><button type="button" class="opf-btn ghost" id="opf-dest-ejsstd">🧬 EJS 速查</button><button type="button" class="opf-btn ghost" id="opf-dest-new">🗑 新核心</button></div></div><div class="opf-col opf-col-b"><pre id="opf-dest-standard" class="opf-box opf-char-report" style="display:none">尚未展开</pre><pre id="opf-dest-ejsstandard" class="opf-box opf-char-report" style="display:none">尚未展开</pre><div id="opf-dest-steps"></div><div class="opf-sec"><div class="opf-sec-label">AI 检查报告（只审校不改写：修改一律回到分段，再由脚本重新拼装）</div><pre id="opf-dest-reviewbox" class="opf-box opf-char-report">尚未检查</pre><div id="opf-dest-review"></div></div><div class="opf-sec"><div class="opf-sec-label">交火梳理报告</div><pre id="opf-dest-report" class="opf-box opf-char-report">尚未梳理</pre></div><div class="opf-out"><div class="opf-sec-label">最终稿件（YAML 框架 + 条目正文）</div><div class="opf-dim" id="opf-dest-outnote"></div><pre id="opf-dest-out" class="opf-box">尚未封装</pre><div class="opf-char-copyrow"><button type="button" class="opf-btn ghost" id="opf-dest-copy">⧉ 复制条目正文</button><button type="button" class="opf-btn ghost" id="opf-dest-metacopy">⧉ 复制完整 YAML</button></div><div class="opf-sec"><div class="opf-sec-label">附：可选扩展（命运抽卡等——属于独立条目，不并入正文）</div><pre id="opf-dest-extras" class="opf-box opf-char-report" style="display:none">（空）</pre><div class="opf-char-copyrow"><button type="button" class="opf-btn ghost" id="opf-dest-extracopy">⧉ 复制可选扩展</button></div></div></div></div></div>';
+var DEST_HTML = '<div class="opf-char-wrap opf-2col"><div class="opf-col opf-col-a"><div class="opf-sec-label">✦ 命定系统工坊 · 分段式生成（产出世界书「命定系统」核心条目）</div><div class="opf-dim">分段写命定系统核心，产出世界书条目。</div><label id="opf-dest-ejswrap"><input type="checkbox" id="opf-dest-ejs"> 🧬 进阶（可选）：EJS 重型核心 —— 如果你不知道EJS是怎样工作的，且你手头没有其他可用AI工具，不要启用本条目</label><textarea id="opf-dest-demand" class="opf-char-input" placeholder="写谁的核心？例：以《Fate/Grand Order》的梅林为原型做一版二创核心；或：围绕“赌徒的骰子”做一个原创命定系统，赌注越大 FP 越多……"></textarea><textarea id="opf-dest-ref" class="opf-char-input" placeholder="（可选）参考文本：原型描述 / 已有核心片段（可作为骨架改造对象）/ 世界书片段，将作为参考注入"></textarea><input id="opf-dest-author" class="opf-char-input" placeholder="署名（写进条目注释名，例如：北游 / H一串 / 你的ID；留空则写“未署名”）"><div class="opf-char-tools"><button type="button" class="opf-btn primary" id="opf-dest-run">▶ 分段初稿</button><button type="button" class="opf-btn ghost" id="opf-dest-link">⚔ 交火梳理</button><button type="button" class="opf-btn primary" id="opf-dest-final">🎁 脚本封装</button><button type="button" class="opf-btn ghost" id="opf-dest-reviewbtn">🔎 AI 检查</button><button type="button" class="opf-btn ghost" id="opf-dest-finalai">🧠 AI 整合（备用）</button><button type="button" class="opf-btn ghost" id="opf-dest-lint">🔎 重新自检</button><button type="button" class="opf-btn ghost" id="opf-dest-clean">🧹 去装饰</button><button type="button" class="opf-btn ghost" id="opf-dest-std">📐 标准速查</button><button type="button" class="opf-btn ghost" id="opf-dest-ejsstd">🧬 EJS 速查</button><button type="button" class="opf-btn ghost" id="opf-dest-new">🗑 新核心</button><button type="button" class="opf-btn ghost" id="opf-dest-undo" disabled>↩ 撤销上次改动</button></div></div><div class="opf-col opf-col-b"><pre id="opf-dest-standard" class="opf-box opf-char-report" style="display:none">尚未展开</pre><pre id="opf-dest-ejsstandard" class="opf-box opf-char-report" style="display:none">尚未展开</pre><div id="opf-dest-steps"></div><div class="opf-sec"><div class="opf-sec-label">AI 检查报告（只审校不改写：修改一律回到分段，再由脚本重新拼装）</div><pre id="opf-dest-reviewbox" class="opf-box opf-char-report">尚未检查</pre><div id="opf-dest-review"></div></div><div class="opf-sec"><div class="opf-sec-label">交火梳理报告</div><pre id="opf-dest-report" class="opf-box opf-char-report">尚未梳理</pre></div><div class="opf-out"><div class="opf-sec-label">最终稿件（YAML 框架 + 条目正文）</div><div class="opf-dim" id="opf-dest-outnote"></div><pre id="opf-dest-out" class="opf-box">尚未封装</pre><div class="opf-char-copyrow"><button type="button" class="opf-btn ghost" id="opf-dest-copy">⧉ 复制条目正文</button><button type="button" class="opf-btn ghost" id="opf-dest-metacopy">⧉ 复制完整 YAML</button></div><div class="opf-sec"><div class="opf-sec-label">附：可选扩展（命运抽卡等——属于独立条目，不并入正文）</div><pre id="opf-dest-extras" class="opf-box opf-char-report" style="display:none">（空）</pre><div class="opf-char-copyrow"><button type="button" class="opf-btn ghost" id="opf-dest-extracopy">⧉ 复制可选扩展</button></div></div></div></div></div>';
 
 function destInit(){
   ST.dest = ST.dest || { demand: '', ref: '', author: '', segs: {}, status: {}, report: '', out: '', body: '', meta: '', outNote: [], ejs: false, _inited: false, asmInfo: null, review: '', reviewIssues: [] };
@@ -3742,6 +3950,7 @@ function bindDestinyPage(){
   getEl('opf-dest-ejsstd').addEventListener('click', function(){ toggleDestEjsStandard(); });
   getEl('opf-dest-ejs').addEventListener('change', function(){ toggleDestEjs(this.checked); });
   getEl('opf-dest-new').addEventListener('click', function(){ clearDest(); });
+  var undoB = getEl('opf-dest-undo'); if (undoB) undoB.addEventListener('click', function(){ undoDestChange(); });
   getEl('opf-dest-copy').addEventListener('click', function(){ copyDestOut(); });
   getEl('opf-dest-metacopy').addEventListener('click', function(){ copyDestMeta(); });
   getEl('opf-dest-author').addEventListener('input', function(){ ST.dest.author = this.value; if (ST.dest.body) { ST.dest.out = destBuildFrame(ST.dest.body); var oe = getEl('opf-dest-out'); if (oe) oe.textContent = ST.dest.out; } destDraftCacheSave(); });
@@ -3788,7 +3997,7 @@ function destUser0(){
 function destDemand() { return '[本次命定系统需求] ' + (ST.dest.demand || ''); }
 // 头部＋任务＋需求，一件套
 function destMessages(task, user){ return sxMessages(task === undefined ? (destSystemContent() + '\n\n' + destUser0()) : task, user === undefined ? destDemand() : user, null, DEST_PAGE_VOICE); }
-function destSetSeg(pid, st){ ST.dest.status[pid] = st; destSetSegUi(pid, st); }
+function destSetSeg(pid, st){ ST.dest.status[pid] = st; destSetSegUi(pid, st); destUndoState(); }
 function destSetSegUi(pid, st){
   var row = getEl('opf-dph-' + pid); if (!row || !ST.dest) return;
   row.setAttribute('data-st', st);
@@ -3859,6 +4068,7 @@ function renderDestinyPage(){
   var ex2 = getEl('opf-dest-extras');
   if (ex2) { var hk = ST.dest.asmInfo && ST.dest.asmInfo.hooks; ex2.textContent = hk || '（本次「可选扩展」段为空或写了「无」）'; ex2.style.display = hk ? 'block' : 'none'; }
   destSegs().forEach(function (s) { renderDestSegOut(s.id); destSetSegUi(s.id, ST.dest.status[s.id] || 'wait'); });
+  destUndoState();
 }
 function destNoteText(){
   if (!ST.dest || !ST.dest.out) return '';
@@ -3867,6 +4077,32 @@ function destNoteText(){
   if (ST.dest.outNote && ST.dest.outNote.length) parts.push('⚠ ' + ST.dest.outNote.join('；'));
   else parts.push('✓ 结构与命名自检通过');
   return parts.join('　｜　');
+}
+// ---------------- 快照 / 撤销（④ 页）----------------
+// 与 ③ 页同一套（工具在 20-seg-guard.js）：进任何会改分段的操作之前先存一份。
+// ④ 页还多一层连带伤害：分段被写坏后，destFinalizeScript(true) 会拿被污染的分段重新拼装成品，
+// 所以撤销之后要把成品也重新拼一遍。
+function destUndoState(){
+  destInit();
+  var b = getEl('opf-dest-undo'); if (!b) return;
+  var top = segUndoTop(ST.dest);
+  b.disabled = !top || !!ST.running;
+  b.textContent = top ? ('↩ 撤销：' + top.label) : '↩ 撤销上次改动';
+  b.title = top ? ('退回「' + top.label + '」之前的全部分段内容（' + new Date(top.at).toLocaleTimeString() + '）') : '还没有可撤销的改动';
+}
+function undoDestChange(){
+  if (ST.running) { toast('有任务正在进行，先等它结束或点停止', 'warning'); return false; }
+  var e = segUndoPop(ST.dest);
+  if (!e) { toast('没有可撤销的改动', 'warning'); return false; }
+  ST.dest.segs = segUndoClone(e.segs);
+  destSegs().forEach(function (s) {
+    renderDestSegOut(s.id);
+    destSetSegUi(s.id, ST.dest.segs[s.id] ? 'ok' : 'wait');
+  });
+  if (ST.dest.body) { try { destFinalizeScript(true); } catch (err) { opfErr('undoDestChange re-assemble', err); } }
+  destUndoState(); destDraftCacheSave();
+  toast('已退回「' + e.label + '」之前的分段内容' + (ST.dest.body ? '，成品已重新拼装' : ''));
+  return true;
 }
 function toggleDestStandard(){
   var box = getEl('opf-dest-standard'); if (!box) return;
@@ -3894,6 +4130,7 @@ async function runDestDraft(){
   ST.dest.ref = (r && r.value || '').trim();
   if (!ST.dest.demand) { toast('请先填写命定系统需求', 'warning'); return; }
   ST.running = true; ST.stopReq = false; renderRunButtons();
+  segUndoPush(ST.dest, '分段初稿', ST.dest.segs);
   var msgs = destMessages();
   try {
     for (var i = 0; i < destSegs().length; i++) {
@@ -3936,6 +4173,7 @@ async function runDestFrom(pid){
   ST.dest.demand = (d && d.value || '').trim(); ST.dest.ref = (r && r.value || '').trim();
   if (!ST.dest.demand) { toast('请先填写命定系统需求', 'warning'); return; }
   ST.running = true; ST.stopReq = false; renderRunButtons();
+  segUndoPush(ST.dest, '重跑「' + destSegs()[start].title + '」及后续', ST.dest.segs);
   var msgs = destMessages();
   try {
     for (var k = 0; k < start; k++) {
@@ -3965,13 +4203,21 @@ async function refineDestSeg(pid, dir){
   ST.running = true; ST.stopReq = false; renderRunButtons(); destSetSeg(pid, 'run');
   try {
     var msgs = destMessages();
-    var msg = '【定点修改：只改「' + seg.title + '」这一段】\n\n[用户指令]\n' + dirT + '\n\n[本段现行内容]\n' + ST.dest.segs[pid] + '\n\n[冻结区块（其它分段原样保留，一个字都不许改；若发现其它段有问题，最多在结尾另起一行写“备注：建议检查XX段…”提示，不得代改）]\n' + frozen + '\n\n[命定系统·规则约束]\n' + DEST_RULES + '\n\n要求：只输出修改后的【' + seg.title + '】内容；修改严格限定在用户指令范围内，未要求的地方保持原样，不要顺手润色、扩写或重排。';
+    var msg = '【定点修改：只改「' + seg.title + '」这一段】\n\n[用户指令]\n' + dirT + '\n\n[本段现行内容]\n' + ST.dest.segs[pid] + '\n\n[冻结区块（其它分段原样保留，一个字都不许改；若发现其它段有问题，最多在结尾另起一行写“备注：建议检查XX段…”提示，不得代改）]\n' + frozen + '\n\n[命定系统·规则约束]\n' + DEST_RULES + '\n\n要求：只输出修改后的【' + seg.title + '】内容；修改严格限定在用户指令范围内，未要求的地方保持原样，不要顺手润色、扩写或重排。\n若该指令与本段无关、或本段确实无需改动，只输出四个字「无改动」，不要写任何前言、依据说明或称呼；不要用一句话代替正文。';
     msgs.push({ role: 'user', content: msg });
     var resp = await callModel(msgs);
-    ST.dest.segs[pid] = resp;
+    var g = opfSegApplyGuard(ST.dest.segs[pid], resp, seg.title);
+    if (g.action !== 'write') {
+      destSetSeg(pid, 'ok');
+      if (g.reason === 'nochange') toast('模型认为【' + seg.title + '】无需改动，已保留原文');
+      else toast('这次的回复疑似不是正文（' + (g.note || '') + '），已保留原文；要重写请把指令写得更具体', 'warning');
+      return;
+    }
+    segUndoPush(ST.dest, '定点修改「' + seg.title + '」', ST.dest.segs);
+    ST.dest.segs[pid] = g.text;
     destSetSeg(pid, 'ok'); renderDestSegOut(pid);
     if (ST.dest.body) destFinalizeScript(true);          // 分段一变，成品由脚本重新拼装（不再让模型重抄）
-    toast('已修改【' + seg.title + '】（其余分段未动）' + (ST.dest.body ? '，成品已重新拼装' : ''));
+    toast('已修改【' + seg.title + '】（其余分段未动）' + (ST.dest.body ? '，成品已重新拼装' : '') + (g.note ? '；' + g.note : ''));
   } catch (e) { destSetSeg(pid, 'err'); toast('定点修改出错：' + (e && e.message ? e.message : e), 'error'); }
   finally { ST.running = false; renderRunButtons(); destDraftCacheSave(); }
 }
@@ -4023,7 +4269,9 @@ async function runDestLinkage(){
     ST.dest.report = String(resp || '').trim() || '（报告为空）';
     if (report) report.textContent = ST.dest.report;
     toast('审查报告完成，开始逐段应用联动修订…');
-    var changed = 0;
+    // 进这一轮改写之前先存快照：万一被写坏，一键退回（见 20-seg-guard.js 头部的事故记录）
+    segUndoPush(ST.dest, '交火梳理', ST.dest.segs);
+    var changed = 0, same = 0, blocked = [];
     for (var i = 0; i < destSegs().length; i++) {
       if (isStop()) break;
       var seg = destSegs()[i];
@@ -4031,20 +4279,24 @@ async function runDestLinkage(){
       destSetSeg(seg.id, 'run');
       var frozen = '';
       destSegs().forEach(function (s2) { if (s2.id !== seg.id && ST.dest.segs[s2.id]) frozen += '\n\n【' + s2.title + '】\n' + String(ST.dest.segs[s2.id]).slice(0, 1200); });
-      var applyMsg = '【交火梳理·第二步：逐段应用修订——只改「' + seg.title + '」这一段】\n\n[梳理报告与改动清单]\n' + ST.dest.report + '\n\n[本段现行内容]\n' + ST.dest.segs[seg.id] + '\n\n[冻结区块（其它分段，原样保留，一个字都不许改）]\n' + frozen + '\n\n[修订规则]\n' + DEST_RULES + '\n1. 只输出【' + seg.title + '】的修订后全文；若按报告本段无需改动，只回复“无改动”。\n2. 只做报告指出的联动性修改；不得推翻设定。报告“改动清单”里点名的矛盾/重复/写错的内容，**必须真的删掉或改掉**——旧内容不许留在原地与新内容并排（叠加＝没改）。\n3. 报告点名要删的就删，删完比原来短是正常的；除报告点名的部分外，不许删别的内容，也不许扩写新增。\n4. 不生成任何角色卡或开局预设内容。';
+      var applyMsg = '【交火梳理·第二步：逐段应用修订——只改「' + seg.title + '」这一段】\n\n[梳理报告与改动清单]\n' + ST.dest.report + '\n\n[本段现行内容]\n' + ST.dest.segs[seg.id] + '\n\n[冻结区块（其它分段，原样保留，一个字都不许改）]\n' + frozen + '\n\n[修订规则]\n' + DEST_RULES + '\n1. 只输出【' + seg.title + '】的修订后全文；若按报告本段无需改动，只输出四个字「无改动」，不得写任何前言、依据说明、称呼或解释，也不要写「按照…」「我的回答是…」这类开场。\n2. 只做报告指出的联动性修改；不得推翻设定。报告“改动清单”里点名的矛盾/重复/写错的内容，**必须真的删掉或改掉**——旧内容不许留在原地与新内容并排（叠加＝没改）。\n3. 报告点名要删的就删，删完比原来短是正常的；除报告点名的部分外，不许删别的内容，也不许扩写新增。\n4. 不生成任何角色卡或开局预设内容。';
       var m2 = destMessages(destSystemContent() + '\n\n[修订规则]\n' + DEST_RULES, applyMsg);
       var resp2 = await callModelSeg(m2, "交火梳理·" + seg.title, function (note) { if (report) report.textContent = ST.dest.report + "\n\n—— 正在修订「" + seg.title + "」：" + note; });
-      var txt = String(resp2 || '').trim();
-      if (txt && !/^无改动[。．.]*$/.test(txt)) { ST.dest.segs[seg.id] = txt; changed++; renderDestSegOut(seg.id); }
+      // 落地前守门（见 20-seg-guard.js）：空转 → 保留原文；疑似不是正文 → 不静默覆盖，交用户裁决
+      var g = opfSegApplyGuard(ST.dest.segs[seg.id], resp2, seg.title);
+      if (g.action === 'write') { ST.dest.segs[seg.id] = g.text; changed++; renderDestSegOut(seg.id); }
+      else if (g.reason === 'blocked') { blocked.push({ title: seg.title, note: g.note, text: resp2 }); }
+      else { same++; }
       destSetSeg(seg.id, 'ok');
       await waitTick();
     }
-    if (report) report.textContent = ST.dest.report + (isStop() ? '\n\n（已停止：修订应用中断）' : '\n\n（修订应用完成，改动 ' + changed + ' 段）');
+    if (report) report.textContent = ST.dest.report + opfSegLinkSummary(changed, same, blocked.length, isStop()) + (blocked.length ? '\n\n' + opfSegBlockedText(blocked) : '');
     if (ST.dest.body && changed) destFinalizeScript(true);      // 分段被联动改过 → 成品重新拼装
     if (isStop()) toast('已停止');
-    else toast('交火梳理完成：报告已生成，联动修订应用到 ' + changed + ' 段' + (ST.dest.body ? '，成品已重新拼装' : ''), 'success');
+    else if (blocked.length) toast('交火梳理完成：改写 ' + changed + ' 段，拦下 ' + blocked.length + ' 段（原文已保留，见报告）', 'warning');
+    else toast('交火梳理完成：报告已生成，联动修订应用到 ' + changed + ' 段（无需改动 ' + same + ' 段）' + (ST.dest.body ? '，成品已重新拼装' : ''), 'success');
   } catch (e) { toast('交火梳理出错：' + (e && e.message ? e.message : e), 'error'); if (report) report.textContent = '梳理失败：' + (e && e.message ? e.message : e); }
-  finally { ST.running = false; renderRunButtons(); destDraftCacheSave(); }
+  finally { ST.running = false; renderRunButtons(); destUndoState(); destDraftCacheSave(); }
 }
 function destCoreNameGuess(){
   var f = String(ST.dest.segs.frame || '');

@@ -62,7 +62,7 @@ var CHAR_MODULES = [
     prompt: "追加【成长弧线】：写角色在故事中可能或应然的转变方向。",
     yamlField: "  成长弧线: .." }
 ];
-var CHAR_HTML = "<div class=\"opf-char-wrap opf-2col\"><div class=\"opf-col opf-col-a\"><div class=\"opf-sec-label\">✦ 二创角色工坊 · 分段式生成（产出世界书 DLC 角色条目）</div><div class=\"opf-dim\">分段写角色设定，产出世界书 DLC 条目。</div><textarea id=\"opf-char-demand\" class=\"opf-char-input\" placeholder=\"写谁？给出大致设定与需求（例：一位出身瓦伦蒂亚贫民区、靠街头格斗活下来的少女，性格倔强护短……）\"></textarea><textarea id=\"opf-char-ref\" class=\"opf-char-input\" placeholder=\"（可选）参考文本：已有设定/原型描述/世界书片段，将作为参考注入\"></textarea><div class=\"opf-sec\"><div class=\"opf-sec-label\">结构维度（可选）</div><div class=\"opf-dim\">勾选想要的结构维度，生成时写进对应分段、并作为最终 YAML 的额外字段。</div><div class=\"opf-mod-wrap\" id=\"opf-char-mods\"></div></div><div class=\"opf-char-tools\"><button type=\"button\" class=\"opf-btn primary\" id=\"opf-char-run\">▶ 分段初稿</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-link\">⚔ 交火梳理</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-final\">🎁 最终封装</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-new\">🗑 新角色</button></div></div><div class=\"opf-col opf-col-b\"><div id=\"opf-char-steps\"></div><div class=\"opf-sec\"><div class=\"opf-sec-label\">交火梳理报告</div><pre id=\"opf-char-report\" class=\"opf-box opf-char-report\">尚未梳理</pre></div><div class=\"opf-out\"><div class=\"opf-sec-label\">最终稿件（YAML 规范输出，可直接粘进世界书 DLC 条目）</div><div class=\"opf-dim\" id=\"opf-char-outnote\"></div><pre id=\"opf-char-out\" class=\"opf-box\">尚未封装</pre><div class=\"opf-char-copyrow\"><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-copy\">⧉ 复制最终稿件</button></div></div></div></div>";
+var CHAR_HTML = "<div class=\"opf-char-wrap opf-2col\"><div class=\"opf-col opf-col-a\"><div class=\"opf-sec-label\">✦ 二创角色工坊 · 分段式生成（产出世界书 DLC 角色条目）</div><div class=\"opf-dim\">分段写角色设定，产出世界书 DLC 条目。</div><textarea id=\"opf-char-demand\" class=\"opf-char-input\" placeholder=\"写谁？给出大致设定与需求（例：一位出身瓦伦蒂亚贫民区、靠街头格斗活下来的少女，性格倔强护短……）\"></textarea><textarea id=\"opf-char-ref\" class=\"opf-char-input\" placeholder=\"（可选）参考文本：已有设定/原型描述/世界书片段，将作为参考注入\"></textarea><div class=\"opf-sec\"><div class=\"opf-sec-label\">结构维度（可选）</div><div class=\"opf-dim\">勾选想要的结构维度，生成时写进对应分段、并作为最终 YAML 的额外字段。</div><div class=\"opf-mod-wrap\" id=\"opf-char-mods\"></div></div><div class=\"opf-char-tools\"><button type=\"button\" class=\"opf-btn primary\" id=\"opf-char-run\">▶ 分段初稿</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-link\">⚔ 交火梳理</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-final\">🎁 最终封装</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-new\">🗑 新角色</button><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-undo\" disabled>↩ 撤销上次改动</button></div></div><div class=\"opf-col opf-col-b\"><div id=\"opf-char-steps\"></div><div class=\"opf-sec\"><div class=\"opf-sec-label\">交火梳理报告</div><pre id=\"opf-char-report\" class=\"opf-box opf-char-report\">尚未梳理</pre></div><div class=\"opf-out\"><div class=\"opf-sec-label\">最终稿件（YAML 规范输出，可直接粘进世界书 DLC 条目）</div><div class=\"opf-dim\" id=\"opf-char-outnote\"></div><pre id=\"opf-char-out\" class=\"opf-box\">尚未封装</pre><div class=\"opf-char-copyrow\"><button type=\"button\" class=\"opf-btn ghost\" id=\"opf-char-copy\">⧉ 复制最终稿件</button></div></div></div></div>";
 
 function charInit(){ ST.char = ST.char || { demand: "", ref: "", segs: {}, status: {}, report: "", out: "", outNote: [], name: "", _inited: false }; ST.char.outNote = ST.char.outNote || []; ST.charEls = ST.charEls || {}; }
 function charModulesOn() { return getSettings().charModules || []; }
@@ -112,6 +112,7 @@ function bindCharPage(){
   getEl("opf-char-final").addEventListener("click", function(){ finalizeChar(); });
   getEl("opf-char-new").addEventListener("click", function(){ clearChar(); });
   getEl("opf-char-copy").addEventListener("click", function(){ copyCharOut(); });
+  var undo = getEl("opf-char-undo"); if (undo) undo.addEventListener("click", function(){ undoCharChange(); });
   getEl("opf-char-demand").addEventListener("input", function(){ ST.char.demand = this.value; charDraftCacheSave(); });
   getEl("opf-char-ref").addEventListener("input", function(){ ST.char.ref = this.value; charDraftCacheSave(); });
   renderCharMods();
@@ -136,7 +137,7 @@ function charUser0(){
 function charDemand() { return '[本次二创需求] ' + (ST.char.demand || ''); }
 // 本页统一走这个：人设页专用段随头部一起发（见 10-base.js sxHead）
 function charMessages(task, user){ return sxMessages(task, user, null, CHAR_PAGE_VOICE); }
-function charSetSeg(pid, st){ ST.char.status[pid] = st; charSetSegUi(pid, st); }
+function charSetSeg(pid, st){ ST.char.status[pid] = st; charSetSegUi(pid, st); charUndoState(); }
 function charSetSegUi(pid, st){
   var row = getEl("opf-cph-" + pid); if (!row) return;
   row.setAttribute("data-st", st);
@@ -200,6 +201,7 @@ function renderCharPage(){
   if (note && out && out.textContent !== "尚未封装") note.textContent = (ST.char.outNote && ST.char.outNote.length) ? "⚠ " + ST.char.outNote.join("；") : "✓ 已按 YAML 规范输出";
   var rep = getEl("opf-char-report"); if (rep && rep.textContent !== "交火梳理中…") rep.textContent = ST.char.report || "尚未梳理";
   CHAR_SEGS.forEach(function (s) { renderCharSegOut(s.id); charSetSegUi(s.id, ST.char.status[s.id] || "wait"); });
+  charUndoState();
 }
 async function runCharDraft(){
   if (ST.running) { toast("已有任务进行中（单线程）", "warning"); return; }
@@ -208,6 +210,7 @@ async function runCharDraft(){
   ST.char.ref = (r && r.value || "").trim();
   if (!ST.char.demand) { toast("请先填写角色需求", "warning"); return; }
   ST.running = true; ST.stopReq = false; renderRunButtons();
+  segUndoPush(ST.char, "分段初稿", ST.char.segs);
   var msgs = charMessages(charSystemContent() + '\n\n' + charUser0(), charDemand());
   try {
     for (var i = 0; i < CHAR_SEGS.length; i++) {
@@ -254,6 +257,7 @@ async function runCharFrom(pid){
   ST.char.demand = (d && d.value || "").trim(); ST.char.ref = (r && r.value || "").trim();
   if (!ST.char.demand) { toast("请先填写角色需求", "warning"); return; }
   ST.running = true; ST.stopReq = false; renderRunButtons();
+  segUndoPush(ST.char, "重跑「" + CHAR_SEGS[start].title + "」及后续", ST.char.segs);
   var msgs = charMessages(charSystemContent() + '\n\n' + charUser0(), charDemand());
   try {
     for (var k = 0; k < start; k++) {
@@ -283,12 +287,20 @@ async function refineCharSeg(pid, dir){
   ST.running = true; ST.stopReq = false; renderRunButtons(); charSetSeg(pid, "run");
   try {
     var msgs = charMessages(charSystemContent() + '\n\n' + charUser0(), charDemand());
-    var msg = "【定点修改：只改「" + seg.title + "」这一段】\n\n[用户指令]\n" + dirT + "\n\n[本段现行内容]\n" + ST.char.segs[pid] + "\n\n[冻结区块（其它分段原样保留，一个字都不许改；若发现其它段有问题，最多在结尾另起一行写“备注：建议检查XX段…”提示，不得代改）]\n" + frozen + "\n\n[二创角色·规则约束]\n" + CHAR_RULES + "\n\n要求：只输出修改后的【" + seg.title + "】内容；修改严格限定在用户指令范围内，未要求的地方保持原样，不要顺手润色、扩写或重排。";
+    var msg = "【定点修改：只改「" + seg.title + "」这一段】\n\n[用户指令]\n" + dirT + "\n\n[本段现行内容]\n" + ST.char.segs[pid] + "\n\n[冻结区块（其它分段原样保留，一个字都不许改；若发现其它段有问题，最多在结尾另起一行写“备注：建议检查XX段…”提示，不得代改）]\n" + frozen + "\n\n[二创角色·规则约束]\n" + CHAR_RULES + "\n\n要求：只输出修改后的【" + seg.title + "】内容；修改严格限定在用户指令范围内，未要求的地方保持原样，不要顺手润色、扩写或重排。\n若该指令与本段无关、或本段确实无需改动，只输出四个字「无改动」，不要写任何前言、依据说明或称呼；不要用一句话代替正文。";
     sxTurn(msg, '按上面的用户指令，只修订「' + seg.title + '」这一段。').forEach(function (m) { msgs.push(m); });
     var resp = await callModel(msgs);
-    ST.char.segs[pid] = resp;
+    var g = opfSegApplyGuard(ST.char.segs[pid], resp, seg.title);
+    if (g.action !== "write") {
+      charSetSeg(pid, "ok");
+      if (g.reason === "nochange") toast("模型认为【" + seg.title + "】无需改动，已保留原文");
+      else toast("这次的回复疑似不是正文（" + (g.note || "") + "），已保留原文；要重写请把指令写得更具体", "warning");
+      return;
+    }
+    segUndoPush(ST.char, "定点修改「" + seg.title + "」", ST.char.segs);
+    ST.char.segs[pid] = g.text;
     charSetSeg(pid, "ok"); renderCharSegOut(pid);
-    toast("已修改【" + seg.title + "】（其余分段未动）");
+    toast("已修改【" + seg.title + "】（其余分段未动）" + (g.note ? "；" + g.note : ""));
   } catch (e) { charSetSeg(pid, "err"); toast("定点修改出错：" + (e && e.message ? e.message : e), "error"); }
   finally { ST.running = false; renderRunButtons(); charDraftCacheSave(); }
 }
@@ -344,7 +356,9 @@ async function runCharLinkage(){
     if (report) report.textContent = ST.char.report;
     toast("审查报告完成，开始逐段应用联动修订…");
     // ---- 第二步：逐段应用修订（每段单独一次调用，输出只有一段，杜绝截断）----
-    var changed = 0;
+    // 进这一轮改写之前先存快照：万一被写坏，一键退回（见 20-seg-guard.js 头部的事故记录）
+    segUndoPush(ST.char, "交火梳理", ST.char.segs);
+    var changed = 0, same = 0, blocked = [];
     for (var i = 0; i < CHAR_SEGS.length; i++) {
       if (isStop()) break;
       var seg = CHAR_SEGS[i];
@@ -352,19 +366,23 @@ async function runCharLinkage(){
       charSetSeg(seg.id, "run");
       var frozen = "";
       CHAR_SEGS.forEach(function (s2) { if (s2.id !== seg.id && ST.char.segs[s2.id]) frozen += "\n\n【" + s2.title + "】\n" + String(ST.char.segs[s2.id]).slice(0, 1200); });
-      var applyMsg = "【交火梳理·第二步：逐段应用修订——只改「" + seg.title + "」这一段】\n\n[梳理报告与改动清单]\n" + ST.char.report + "\n\n[本段现行内容]\n" + ST.char.segs[seg.id] + "\n\n[冻结区块（其它分段，原样保留，一个字都不许改）]\n" + frozen + "\n\n[修订规则]\n" + CHAR_RULES + "\n1. 只输出【" + seg.title + "】的修订后全文；若按报告本段无需改动，只回复“无改动”。\n2. 只做报告指出的联动性修改；不得推翻设定。报告“改动清单”里点名的矛盾/重复/写错的内容，**必须真的删掉或改掉**——旧内容不许留在原地与新内容并排（叠加＝没改）。\n3. 报告点名要删的就删，删完比原来短是正常的；除报告点名的部分外，不许删别的内容，也不许扩写新增。\n4. 武器/装备/道具/技能保持 名称/品质(中文)/叙述 三段式：禁止补回或新增 类型/消耗/标签 字段。\n5. 不生成任何开局预设内容（开局剧情/面板/伙伴/资产等）。";
+      var applyMsg = "【交火梳理·第二步：逐段应用修订——只改「" + seg.title + "」这一段】\n\n[梳理报告与改动清单]\n" + ST.char.report + "\n\n[本段现行内容]\n" + ST.char.segs[seg.id] + "\n\n[冻结区块（其它分段，原样保留，一个字都不许改）]\n" + frozen + "\n\n[修订规则]\n" + CHAR_RULES + "\n1. 只输出【" + seg.title + "】的修订后全文；若按报告本段无需改动，只输出四个字「无改动」，不得写任何前言、依据说明、称呼或解释，也不要写「按照…」「我的回答是…」这类开场。\n2. 只做报告指出的联动性修改；不得推翻设定。报告“改动清单”里点名的矛盾/重复/写错的内容，**必须真的删掉或改掉**——旧内容不许留在原地与新内容并排（叠加＝没改）。\n3. 报告点名要删的就删，删完比原来短是正常的；除报告点名的部分外，不许删别的内容，也不许扩写新增。\n4. 武器/装备/道具/技能保持 名称/品质(中文)/叙述 三段式：禁止补回或新增 类型/消耗/标签 字段。\n5. 不生成任何开局预设内容（开局剧情/面板/伙伴/资产等）。";
       var m2 = charMessages(charSystemContent() + '\n\n[修订规则]\n' + CHAR_RULES, applyMsg);
       var resp2 = await callModelSeg(m2, "交火梳理·" + seg.title, function (note) { if (report) report.textContent = ST.char.report + "\n\n—— 正在修订「" + seg.title + "」：" + note; });
-      var txt = String(resp2 || "").trim();
-      if (txt && !/^无改动[。．.]*$/.test(txt)) { ST.char.segs[seg.id] = txt; changed++; renderCharSegOut(seg.id); }
+      // 落地前守门（见 20-seg-guard.js）：空转 → 保留原文；疑似不是正文 → 不静默覆盖，交用户裁决
+      var g = opfSegApplyGuard(ST.char.segs[seg.id], resp2, seg.title);
+      if (g.action === "write") { ST.char.segs[seg.id] = g.text; changed++; renderCharSegOut(seg.id); }
+      else if (g.reason === "blocked") { blocked.push({ title: seg.title, note: g.note, text: resp2 }); }
+      else { same++; }
       charSetSeg(seg.id, "ok");
       await waitTick();
     }
-    if (report) report.textContent = ST.char.report + (isStop() ? "\n\n（已停止：修订应用中断）" : "\n\n（修订应用完成，改动 " + changed + " 段）");
+    if (report) report.textContent = ST.char.report + opfSegLinkSummary(changed, same, blocked.length, isStop()) + (blocked.length ? "\n\n" + opfSegBlockedText(blocked) : "");
     if (isStop()) toast("已停止");
-    else toast("交火梳理完成：报告已生成，联动修订应用到 " + changed + " 段", "success");
+    else if (blocked.length) toast("交火梳理完成：改写 " + changed + " 段，拦下 " + blocked.length + " 段（原文已保留，见报告）", "warning");
+    else toast("交火梳理完成：报告已生成，联动修订应用到 " + changed + " 段（无需改动 " + same + " 段）", "success");
   } catch (e) { toast("交火梳理出错：" + (e && e.message ? e.message : e), "error"); if (report) report.textContent = "梳理失败：" + (e && e.message ? e.message : e); }
-  finally { ST.running = false; renderRunButtons(); charDraftCacheSave(); }
+  finally { ST.running = false; renderRunButtons(); charUndoState(); charDraftCacheSave(); }
 }
 function charNameGuess(){
   var base = ST.char.segs.base || "";
@@ -431,6 +449,31 @@ function clearChar(){
   charDraftCacheSave();
   renderCharSteps(); renderCharPage();
   toast("已清空，可以开始新角色");
+}
+// ---------------- 快照 / 撤销（③ 页）----------------
+// 进任何会改分段的操作（分段初稿 / 重跑 / 定点修改 / 交火梳理）之前先存一份，
+// 出事了能一键退回。起因见 20-seg-guard.js 头部：模型一句客套话曾把六段设定整段覆盖，
+// 而草稿是单份快照 + 自动存档，用户找不回来。
+function charUndoState(){
+  charInit();
+  var b = getEl("opf-char-undo"); if (!b) return;
+  var top = segUndoTop(ST.char);
+  b.disabled = !top || !!ST.running;
+  b.textContent = top ? ("↩ 撤销：" + top.label) : "↩ 撤销上次改动";
+  b.title = top ? ("退回「" + top.label + "」之前的全部分段内容（" + new Date(top.at).toLocaleTimeString() + "）") : "还没有可撤销的改动";
+}
+function undoCharChange(){
+  if (ST.running) { toast("有任务正在进行，先等它结束或点停止", "warning"); return false; }
+  var e = segUndoPop(ST.char);
+  if (!e) { toast("没有可撤销的改动", "warning"); return false; }
+  ST.char.segs = segUndoClone(e.segs);
+  CHAR_SEGS.forEach(function (s) {
+    renderCharSegOut(s.id);
+    charSetSegUi(s.id, ST.char.segs[s.id] ? "ok" : "wait");
+  });
+  charUndoState(); charDraftCacheSave();
+  toast("已退回「" + e.label + "」之前的分段内容");
+  return true;
 }
 function copyCharOut(){
   var txt = ST.char.out || "";

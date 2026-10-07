@@ -313,7 +313,7 @@ var DEST_KNOWN_CORES = ['梅林核心', '唐吉坷德核心', '奶龙核心', '�
 var DEST_KNOWN_SYSNAMES = ['命定之诗', '铁王冠', '白祷', '银钥之门', '飞鸟之诗', '他者之眼', '命运的舞台监导', '奶人之契', '命定之书', '九十九夜梦', 'user_system'];
 var DEST_KNOWN_TAGS = ['nailong', 'giraffe', 'Foreigner', 'Foreigner_alter', 'lilith', 'xianzu', 'dalian'];
 var DEST_SLOT_ORDER = ['系统名', '系统核心名', '系统核心', 'fp定义', '爆料风格', '登神长阶系统优势', '生命层级成长系统优势', '技能获取系统优势', '经验值获取系统优势', '复活机制'];
-var DEST_HTML = '<div class="opf-char-wrap opf-2col"><div class="opf-col opf-col-a"><div class="opf-sec-label">✦ 命定系统工坊 · 分段式生成（产出世界书「命定系统」核心条目）</div><div class="opf-dim">分段写命定系统核心，产出世界书条目。</div><label id="opf-dest-ejswrap"><input type="checkbox" id="opf-dest-ejs"> 🧬 进阶（可选）：EJS 重型核心 —— 如果你不知道EJS是怎样工作的，且你手头没有其他可用AI工具，不要启用本条目</label><textarea id="opf-dest-demand" class="opf-char-input" placeholder="写谁的核心？例：以《Fate/Grand Order》的梅林为原型做一版二创核心；或：围绕“赌徒的骰子”做一个原创命定系统，赌注越大 FP 越多……"></textarea><textarea id="opf-dest-ref" class="opf-char-input" placeholder="（可选）参考文本：原型描述 / 已有核心片段（可作为骨架改造对象）/ 世界书片段，将作为参考注入"></textarea><input id="opf-dest-author" class="opf-char-input" placeholder="署名（写进条目注释名，例如：北游 / H一串 / 你的ID；留空则写“未署名”）"><div class="opf-char-tools"><button type="button" class="opf-btn primary" id="opf-dest-run">▶ 分段初稿</button><button type="button" class="opf-btn ghost" id="opf-dest-link">⚔ 交火梳理</button><button type="button" class="opf-btn primary" id="opf-dest-final">🎁 脚本封装</button><button type="button" class="opf-btn ghost" id="opf-dest-reviewbtn">🔎 AI 检查</button><button type="button" class="opf-btn ghost" id="opf-dest-finalai">🧠 AI 整合（备用）</button><button type="button" class="opf-btn ghost" id="opf-dest-lint">🔎 重新自检</button><button type="button" class="opf-btn ghost" id="opf-dest-clean">🧹 去装饰</button><button type="button" class="opf-btn ghost" id="opf-dest-std">📐 标准速查</button><button type="button" class="opf-btn ghost" id="opf-dest-ejsstd">🧬 EJS 速查</button><button type="button" class="opf-btn ghost" id="opf-dest-new">🗑 新核心</button></div></div><div class="opf-col opf-col-b"><pre id="opf-dest-standard" class="opf-box opf-char-report" style="display:none">尚未展开</pre><pre id="opf-dest-ejsstandard" class="opf-box opf-char-report" style="display:none">尚未展开</pre><div id="opf-dest-steps"></div><div class="opf-sec"><div class="opf-sec-label">AI 检查报告（只审校不改写：修改一律回到分段，再由脚本重新拼装）</div><pre id="opf-dest-reviewbox" class="opf-box opf-char-report">尚未检查</pre><div id="opf-dest-review"></div></div><div class="opf-sec"><div class="opf-sec-label">交火梳理报告</div><pre id="opf-dest-report" class="opf-box opf-char-report">尚未梳理</pre></div><div class="opf-out"><div class="opf-sec-label">最终稿件（YAML 框架 + 条目正文）</div><div class="opf-dim" id="opf-dest-outnote"></div><pre id="opf-dest-out" class="opf-box">尚未封装</pre><div class="opf-char-copyrow"><button type="button" class="opf-btn ghost" id="opf-dest-copy">⧉ 复制条目正文</button><button type="button" class="opf-btn ghost" id="opf-dest-metacopy">⧉ 复制完整 YAML</button></div><div class="opf-sec"><div class="opf-sec-label">附：可选扩展（命运抽卡等——属于独立条目，不并入正文）</div><pre id="opf-dest-extras" class="opf-box opf-char-report" style="display:none">（空）</pre><div class="opf-char-copyrow"><button type="button" class="opf-btn ghost" id="opf-dest-extracopy">⧉ 复制可选扩展</button></div></div></div></div></div>';
+var DEST_HTML = '<div class="opf-char-wrap opf-2col"><div class="opf-col opf-col-a"><div class="opf-sec-label">✦ 命定系统工坊 · 分段式生成（产出世界书「命定系统」核心条目）</div><div class="opf-dim">分段写命定系统核心，产出世界书条目。</div><label id="opf-dest-ejswrap"><input type="checkbox" id="opf-dest-ejs"> 🧬 进阶（可选）：EJS 重型核心 —— 如果你不知道EJS是怎样工作的，且你手头没有其他可用AI工具，不要启用本条目</label><textarea id="opf-dest-demand" class="opf-char-input" placeholder="写谁的核心？例：以《Fate/Grand Order》的梅林为原型做一版二创核心；或：围绕“赌徒的骰子”做一个原创命定系统，赌注越大 FP 越多……"></textarea><textarea id="opf-dest-ref" class="opf-char-input" placeholder="（可选）参考文本：原型描述 / 已有核心片段（可作为骨架改造对象）/ 世界书片段，将作为参考注入"></textarea><input id="opf-dest-author" class="opf-char-input" placeholder="署名（写进条目注释名，例如：北游 / H一串 / 你的ID；留空则写“未署名”）"><div class="opf-char-tools"><button type="button" class="opf-btn primary" id="opf-dest-run">▶ 分段初稿</button><button type="button" class="opf-btn ghost" id="opf-dest-link">⚔ 交火梳理</button><button type="button" class="opf-btn primary" id="opf-dest-final">🎁 脚本封装</button><button type="button" class="opf-btn ghost" id="opf-dest-reviewbtn">🔎 AI 检查</button><button type="button" class="opf-btn ghost" id="opf-dest-finalai">🧠 AI 整合（备用）</button><button type="button" class="opf-btn ghost" id="opf-dest-lint">🔎 重新自检</button><button type="button" class="opf-btn ghost" id="opf-dest-clean">🧹 去装饰</button><button type="button" class="opf-btn ghost" id="opf-dest-std">📐 标准速查</button><button type="button" class="opf-btn ghost" id="opf-dest-ejsstd">🧬 EJS 速查</button><button type="button" class="opf-btn ghost" id="opf-dest-new">🗑 新核心</button><button type="button" class="opf-btn ghost" id="opf-dest-undo" disabled>↩ 撤销上次改动</button></div></div><div class="opf-col opf-col-b"><pre id="opf-dest-standard" class="opf-box opf-char-report" style="display:none">尚未展开</pre><pre id="opf-dest-ejsstandard" class="opf-box opf-char-report" style="display:none">尚未展开</pre><div id="opf-dest-steps"></div><div class="opf-sec"><div class="opf-sec-label">AI 检查报告（只审校不改写：修改一律回到分段，再由脚本重新拼装）</div><pre id="opf-dest-reviewbox" class="opf-box opf-char-report">尚未检查</pre><div id="opf-dest-review"></div></div><div class="opf-sec"><div class="opf-sec-label">交火梳理报告</div><pre id="opf-dest-report" class="opf-box opf-char-report">尚未梳理</pre></div><div class="opf-out"><div class="opf-sec-label">最终稿件（YAML 框架 + 条目正文）</div><div class="opf-dim" id="opf-dest-outnote"></div><pre id="opf-dest-out" class="opf-box">尚未封装</pre><div class="opf-char-copyrow"><button type="button" class="opf-btn ghost" id="opf-dest-copy">⧉ 复制条目正文</button><button type="button" class="opf-btn ghost" id="opf-dest-metacopy">⧉ 复制完整 YAML</button></div><div class="opf-sec"><div class="opf-sec-label">附：可选扩展（命运抽卡等——属于独立条目，不并入正文）</div><pre id="opf-dest-extras" class="opf-box opf-char-report" style="display:none">（空）</pre><div class="opf-char-copyrow"><button type="button" class="opf-btn ghost" id="opf-dest-extracopy">⧉ 复制可选扩展</button></div></div></div></div></div>';
 
 function destInit(){
   ST.dest = ST.dest || { demand: '', ref: '', author: '', segs: {}, status: {}, report: '', out: '', body: '', meta: '', outNote: [], ejs: false, _inited: false, asmInfo: null, review: '', reviewIssues: [] };
@@ -335,6 +335,7 @@ function bindDestinyPage(){
   getEl('opf-dest-ejsstd').addEventListener('click', function(){ toggleDestEjsStandard(); });
   getEl('opf-dest-ejs').addEventListener('change', function(){ toggleDestEjs(this.checked); });
   getEl('opf-dest-new').addEventListener('click', function(){ clearDest(); });
+  var undoB = getEl('opf-dest-undo'); if (undoB) undoB.addEventListener('click', function(){ undoDestChange(); });
   getEl('opf-dest-copy').addEventListener('click', function(){ copyDestOut(); });
   getEl('opf-dest-metacopy').addEventListener('click', function(){ copyDestMeta(); });
   getEl('opf-dest-author').addEventListener('input', function(){ ST.dest.author = this.value; if (ST.dest.body) { ST.dest.out = destBuildFrame(ST.dest.body); var oe = getEl('opf-dest-out'); if (oe) oe.textContent = ST.dest.out; } destDraftCacheSave(); });
@@ -381,7 +382,7 @@ function destUser0(){
 function destDemand() { return '[本次命定系统需求] ' + (ST.dest.demand || ''); }
 // 头部＋任务＋需求，一件套
 function destMessages(task, user){ return sxMessages(task === undefined ? (destSystemContent() + '\n\n' + destUser0()) : task, user === undefined ? destDemand() : user, null, DEST_PAGE_VOICE); }
-function destSetSeg(pid, st){ ST.dest.status[pid] = st; destSetSegUi(pid, st); }
+function destSetSeg(pid, st){ ST.dest.status[pid] = st; destSetSegUi(pid, st); destUndoState(); }
 function destSetSegUi(pid, st){
   var row = getEl('opf-dph-' + pid); if (!row || !ST.dest) return;
   row.setAttribute('data-st', st);
@@ -452,6 +453,7 @@ function renderDestinyPage(){
   var ex2 = getEl('opf-dest-extras');
   if (ex2) { var hk = ST.dest.asmInfo && ST.dest.asmInfo.hooks; ex2.textContent = hk || '（本次「可选扩展」段为空或写了「无」）'; ex2.style.display = hk ? 'block' : 'none'; }
   destSegs().forEach(function (s) { renderDestSegOut(s.id); destSetSegUi(s.id, ST.dest.status[s.id] || 'wait'); });
+  destUndoState();
 }
 function destNoteText(){
   if (!ST.dest || !ST.dest.out) return '';
@@ -460,6 +462,32 @@ function destNoteText(){
   if (ST.dest.outNote && ST.dest.outNote.length) parts.push('⚠ ' + ST.dest.outNote.join('；'));
   else parts.push('✓ 结构与命名自检通过');
   return parts.join('　｜　');
+}
+// ---------------- 快照 / 撤销（④ 页）----------------
+// 与 ③ 页同一套（工具在 20-seg-guard.js）：进任何会改分段的操作之前先存一份。
+// ④ 页还多一层连带伤害：分段被写坏后，destFinalizeScript(true) 会拿被污染的分段重新拼装成品，
+// 所以撤销之后要把成品也重新拼一遍。
+function destUndoState(){
+  destInit();
+  var b = getEl('opf-dest-undo'); if (!b) return;
+  var top = segUndoTop(ST.dest);
+  b.disabled = !top || !!ST.running;
+  b.textContent = top ? ('↩ 撤销：' + top.label) : '↩ 撤销上次改动';
+  b.title = top ? ('退回「' + top.label + '」之前的全部分段内容（' + new Date(top.at).toLocaleTimeString() + '）') : '还没有可撤销的改动';
+}
+function undoDestChange(){
+  if (ST.running) { toast('有任务正在进行，先等它结束或点停止', 'warning'); return false; }
+  var e = segUndoPop(ST.dest);
+  if (!e) { toast('没有可撤销的改动', 'warning'); return false; }
+  ST.dest.segs = segUndoClone(e.segs);
+  destSegs().forEach(function (s) {
+    renderDestSegOut(s.id);
+    destSetSegUi(s.id, ST.dest.segs[s.id] ? 'ok' : 'wait');
+  });
+  if (ST.dest.body) { try { destFinalizeScript(true); } catch (err) { opfErr('undoDestChange re-assemble', err); } }
+  destUndoState(); destDraftCacheSave();
+  toast('已退回「' + e.label + '」之前的分段内容' + (ST.dest.body ? '，成品已重新拼装' : ''));
+  return true;
 }
 function toggleDestStandard(){
   var box = getEl('opf-dest-standard'); if (!box) return;
@@ -487,6 +515,7 @@ async function runDestDraft(){
   ST.dest.ref = (r && r.value || '').trim();
   if (!ST.dest.demand) { toast('请先填写命定系统需求', 'warning'); return; }
   ST.running = true; ST.stopReq = false; renderRunButtons();
+  segUndoPush(ST.dest, '分段初稿', ST.dest.segs);
   var msgs = destMessages();
   try {
     for (var i = 0; i < destSegs().length; i++) {
@@ -529,6 +558,7 @@ async function runDestFrom(pid){
   ST.dest.demand = (d && d.value || '').trim(); ST.dest.ref = (r && r.value || '').trim();
   if (!ST.dest.demand) { toast('请先填写命定系统需求', 'warning'); return; }
   ST.running = true; ST.stopReq = false; renderRunButtons();
+  segUndoPush(ST.dest, '重跑「' + destSegs()[start].title + '」及后续', ST.dest.segs);
   var msgs = destMessages();
   try {
     for (var k = 0; k < start; k++) {
@@ -558,13 +588,21 @@ async function refineDestSeg(pid, dir){
   ST.running = true; ST.stopReq = false; renderRunButtons(); destSetSeg(pid, 'run');
   try {
     var msgs = destMessages();
-    var msg = '【定点修改：只改「' + seg.title + '」这一段】\n\n[用户指令]\n' + dirT + '\n\n[本段现行内容]\n' + ST.dest.segs[pid] + '\n\n[冻结区块（其它分段原样保留，一个字都不许改；若发现其它段有问题，最多在结尾另起一行写“备注：建议检查XX段…”提示，不得代改）]\n' + frozen + '\n\n[命定系统·规则约束]\n' + DEST_RULES + '\n\n要求：只输出修改后的【' + seg.title + '】内容；修改严格限定在用户指令范围内，未要求的地方保持原样，不要顺手润色、扩写或重排。';
+    var msg = '【定点修改：只改「' + seg.title + '」这一段】\n\n[用户指令]\n' + dirT + '\n\n[本段现行内容]\n' + ST.dest.segs[pid] + '\n\n[冻结区块（其它分段原样保留，一个字都不许改；若发现其它段有问题，最多在结尾另起一行写“备注：建议检查XX段…”提示，不得代改）]\n' + frozen + '\n\n[命定系统·规则约束]\n' + DEST_RULES + '\n\n要求：只输出修改后的【' + seg.title + '】内容；修改严格限定在用户指令范围内，未要求的地方保持原样，不要顺手润色、扩写或重排。\n若该指令与本段无关、或本段确实无需改动，只输出四个字「无改动」，不要写任何前言、依据说明或称呼；不要用一句话代替正文。';
     msgs.push({ role: 'user', content: msg });
     var resp = await callModel(msgs);
-    ST.dest.segs[pid] = resp;
+    var g = opfSegApplyGuard(ST.dest.segs[pid], resp, seg.title);
+    if (g.action !== 'write') {
+      destSetSeg(pid, 'ok');
+      if (g.reason === 'nochange') toast('模型认为【' + seg.title + '】无需改动，已保留原文');
+      else toast('这次的回复疑似不是正文（' + (g.note || '') + '），已保留原文；要重写请把指令写得更具体', 'warning');
+      return;
+    }
+    segUndoPush(ST.dest, '定点修改「' + seg.title + '」', ST.dest.segs);
+    ST.dest.segs[pid] = g.text;
     destSetSeg(pid, 'ok'); renderDestSegOut(pid);
     if (ST.dest.body) destFinalizeScript(true);          // 分段一变，成品由脚本重新拼装（不再让模型重抄）
-    toast('已修改【' + seg.title + '】（其余分段未动）' + (ST.dest.body ? '，成品已重新拼装' : ''));
+    toast('已修改【' + seg.title + '】（其余分段未动）' + (ST.dest.body ? '，成品已重新拼装' : '') + (g.note ? '；' + g.note : ''));
   } catch (e) { destSetSeg(pid, 'err'); toast('定点修改出错：' + (e && e.message ? e.message : e), 'error'); }
   finally { ST.running = false; renderRunButtons(); destDraftCacheSave(); }
 }
@@ -616,7 +654,9 @@ async function runDestLinkage(){
     ST.dest.report = String(resp || '').trim() || '（报告为空）';
     if (report) report.textContent = ST.dest.report;
     toast('审查报告完成，开始逐段应用联动修订…');
-    var changed = 0;
+    // 进这一轮改写之前先存快照：万一被写坏，一键退回（见 20-seg-guard.js 头部的事故记录）
+    segUndoPush(ST.dest, '交火梳理', ST.dest.segs);
+    var changed = 0, same = 0, blocked = [];
     for (var i = 0; i < destSegs().length; i++) {
       if (isStop()) break;
       var seg = destSegs()[i];
@@ -624,20 +664,24 @@ async function runDestLinkage(){
       destSetSeg(seg.id, 'run');
       var frozen = '';
       destSegs().forEach(function (s2) { if (s2.id !== seg.id && ST.dest.segs[s2.id]) frozen += '\n\n【' + s2.title + '】\n' + String(ST.dest.segs[s2.id]).slice(0, 1200); });
-      var applyMsg = '【交火梳理·第二步：逐段应用修订——只改「' + seg.title + '」这一段】\n\n[梳理报告与改动清单]\n' + ST.dest.report + '\n\n[本段现行内容]\n' + ST.dest.segs[seg.id] + '\n\n[冻结区块（其它分段，原样保留，一个字都不许改）]\n' + frozen + '\n\n[修订规则]\n' + DEST_RULES + '\n1. 只输出【' + seg.title + '】的修订后全文；若按报告本段无需改动，只回复“无改动”。\n2. 只做报告指出的联动性修改；不得推翻设定。报告“改动清单”里点名的矛盾/重复/写错的内容，**必须真的删掉或改掉**——旧内容不许留在原地与新内容并排（叠加＝没改）。\n3. 报告点名要删的就删，删完比原来短是正常的；除报告点名的部分外，不许删别的内容，也不许扩写新增。\n4. 不生成任何角色卡或开局预设内容。';
+      var applyMsg = '【交火梳理·第二步：逐段应用修订——只改「' + seg.title + '」这一段】\n\n[梳理报告与改动清单]\n' + ST.dest.report + '\n\n[本段现行内容]\n' + ST.dest.segs[seg.id] + '\n\n[冻结区块（其它分段，原样保留，一个字都不许改）]\n' + frozen + '\n\n[修订规则]\n' + DEST_RULES + '\n1. 只输出【' + seg.title + '】的修订后全文；若按报告本段无需改动，只输出四个字「无改动」，不得写任何前言、依据说明、称呼或解释，也不要写「按照…」「我的回答是…」这类开场。\n2. 只做报告指出的联动性修改；不得推翻设定。报告“改动清单”里点名的矛盾/重复/写错的内容，**必须真的删掉或改掉**——旧内容不许留在原地与新内容并排（叠加＝没改）。\n3. 报告点名要删的就删，删完比原来短是正常的；除报告点名的部分外，不许删别的内容，也不许扩写新增。\n4. 不生成任何角色卡或开局预设内容。';
       var m2 = destMessages(destSystemContent() + '\n\n[修订规则]\n' + DEST_RULES, applyMsg);
       var resp2 = await callModelSeg(m2, "交火梳理·" + seg.title, function (note) { if (report) report.textContent = ST.dest.report + "\n\n—— 正在修订「" + seg.title + "」：" + note; });
-      var txt = String(resp2 || '').trim();
-      if (txt && !/^无改动[。．.]*$/.test(txt)) { ST.dest.segs[seg.id] = txt; changed++; renderDestSegOut(seg.id); }
+      // 落地前守门（见 20-seg-guard.js）：空转 → 保留原文；疑似不是正文 → 不静默覆盖，交用户裁决
+      var g = opfSegApplyGuard(ST.dest.segs[seg.id], resp2, seg.title);
+      if (g.action === 'write') { ST.dest.segs[seg.id] = g.text; changed++; renderDestSegOut(seg.id); }
+      else if (g.reason === 'blocked') { blocked.push({ title: seg.title, note: g.note, text: resp2 }); }
+      else { same++; }
       destSetSeg(seg.id, 'ok');
       await waitTick();
     }
-    if (report) report.textContent = ST.dest.report + (isStop() ? '\n\n（已停止：修订应用中断）' : '\n\n（修订应用完成，改动 ' + changed + ' 段）');
+    if (report) report.textContent = ST.dest.report + opfSegLinkSummary(changed, same, blocked.length, isStop()) + (blocked.length ? '\n\n' + opfSegBlockedText(blocked) : '');
     if (ST.dest.body && changed) destFinalizeScript(true);      // 分段被联动改过 → 成品重新拼装
     if (isStop()) toast('已停止');
-    else toast('交火梳理完成：报告已生成，联动修订应用到 ' + changed + ' 段' + (ST.dest.body ? '，成品已重新拼装' : ''), 'success');
+    else if (blocked.length) toast('交火梳理完成：改写 ' + changed + ' 段，拦下 ' + blocked.length + ' 段（原文已保留，见报告）', 'warning');
+    else toast('交火梳理完成：报告已生成，联动修订应用到 ' + changed + ' 段（无需改动 ' + same + ' 段）' + (ST.dest.body ? '，成品已重新拼装' : ''), 'success');
   } catch (e) { toast('交火梳理出错：' + (e && e.message ? e.message : e), 'error'); if (report) report.textContent = '梳理失败：' + (e && e.message ? e.message : e); }
-  finally { ST.running = false; renderRunButtons(); destDraftCacheSave(); }
+  finally { ST.running = false; renderRunButtons(); destUndoState(); destDraftCacheSave(); }
 }
 function destCoreNameGuess(){
   var f = String(ST.dest.segs.frame || '');
