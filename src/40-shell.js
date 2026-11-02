@@ -1,4 +1,4 @@
-//@module 40-shell — 分页外壳（PAGE_DEFS/建壳/切页）+ 本地缓存
+﻿//@module 40-shell — 分页外壳（PAGE_DEFS/建壳/切页）+ 本地缓存
 // ============================================================================
 // v1.7.0 全屏分页壳 + 本地缓存 + 二创角色工坊
 // ============================================================================
@@ -171,6 +171,7 @@ function buildShell(){
   renderSteps(); syncFromSettings(); addWorkflowUI(root);
   try { addQuickStartUI(root); } catch (e) { opfErr("quickstart ui", e); }
   try { addStoryToneUI(root); } catch (e) { opfErr("story ui", e); }
+  try { addPresetLinkageUI(root); } catch (e) { opfErr("preset linkage ui", e); }
   try { buildWorldSideButton(root); } catch (e) { opfErr("side button", e); }
   try { addComplianceToggle(root); } catch (e) { opfErr("compliance toggle", e); }
   try { bindCharPage(); } catch (e) { opfErr("char page", e); }
@@ -329,3 +330,4 @@ function worldCacheRestore(){
     toast("已从本地缓存恢复 " + restored + " 本世界书及上次勾选（重新导入同名文件会刷新内容并保留勾选）");
   }
 }
+
