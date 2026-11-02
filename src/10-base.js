@@ -27,6 +27,10 @@ var DEFAULT_SETTINGS = {
   charModules: [],           // ③ 二创角色勾选的结构维度 id 数组（阵营/目标/驱动力…）
   quickStart: false,         // ① 页快速开局：一键勾好生成所需的世界书条目
   quickStartLoc: '',         // 快速开局选定的地点（存条目 comment，换书后按名字重找）
+  storyTone: 'default',      // 故事基调：sunny | default | gloomy（必选其一）
+  storyType: '',             // 开局题材 id（11 选一，空=不指定）
+  storySchool: 'normal',     // 校园题材的子项：normal | magic
+  storyRole: ''              // 血族真祖题材的子项：''(按人设) | butler | maid
 };
 
 // ---------------- 始弦人设（唯一真源 · 原版预设原文，一字不改） ----------------
@@ -373,6 +377,8 @@ function buildSystemContent() {
   var s = getSettings();
   var lines = [];
   lines.push('[任务] 你正在帮{{user}}为即将开启新世界旅程的开局角色配置“开局预设”。接下来会分阶段收到 技能→装备→道具→资产→背景→最终汇总 的创作请求；每一阶段都顺着本对话已产出的内容继续创作，不要重复或推翻先前内容；栏目品质、消耗、世界观必须与本对话给出的规则保持一致。');
+  var storyBlock = (typeof storyPromptBlock === 'function') ? String(storyPromptBlock() || '').trim() : '';
+  if (storyBlock) lines.push(storyBlock);
   lines.push('[世界规则·创作限制]');
   lines.push(WORLD_RULES);
   lines.push(styleRulesAll());

@@ -170,6 +170,7 @@ function buildShell(){
   bindPanel(root);
   renderSteps(); syncFromSettings(); addWorkflowUI(root);
   try { addQuickStartUI(root); } catch (e) { opfErr("quickstart ui", e); }
+  try { addStoryToneUI(root); } catch (e) { opfErr("story ui", e); }
   try { buildWorldSideButton(root); } catch (e) { opfErr("side button", e); }
   try { addComplianceToggle(root); } catch (e) { opfErr("compliance toggle", e); }
   try { bindCharPage(); } catch (e) { opfErr("char page", e); }
