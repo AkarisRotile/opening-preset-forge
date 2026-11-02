@@ -25,6 +25,8 @@ var DEFAULT_SETTINGS = {
   createType: 'preset',      // 「分段创作」当前类型：preset | char
   destinyTab: 'destiny',     // 「命定系统」页内当前子标签：destiny | refine | regex
   charModules: [],           // ③ 二创角色勾选的结构维度 id 数组（阵营/目标/驱动力…）
+  quickStart: false,         // ① 页快速开局：一键勾好生成所需的世界书条目
+  quickStartLoc: '',         // 快速开局选定的地点（存条目 comment，换书后按名字重找）
 };
 
 // ---------------- 始弦人设（唯一真源 · 原版预设原文，一字不改） ----------------
@@ -381,7 +383,14 @@ function buildSystemContent() {
 
 function buildUser0() {
   var demand = getEl('opf-demand') && getEl('opf-demand').value.trim();
-  return ('[本次开局需求] ' + (demand || '请为我的开局角色设计一套合理的开局预设。'));
+  var s = getSettings();
+  var extra = '';
+  if (s.quickStart && s.quickStartLoc) {
+    var p = (typeof qsParseComment === 'function') ? qsParseComment(s.quickStartLoc) : null;
+    var label = p ? (p.country + '-' + (p.group && p.group !== p.country ? p.group + '-' : '') + p.name) : s.quickStartLoc;
+    extra = '\n[开局地点] ' + label + '（快速开局已选定：开局剧情、起始场景与人物活动都围绕这里展开；地名照世界书的层级写，不要另造）';
+  }
+  return ('[本次开局需求] ' + (demand || '请为我的开局角色设计一套合理的开局预设。') + extra);
 }
 // [工作方式] 属于任务侧（告诉模型这一页怎么走），不属于用户输入
 function buildWorkNote() {

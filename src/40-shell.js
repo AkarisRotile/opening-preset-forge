@@ -169,9 +169,9 @@ function buildShell(){
   var root = getEl("opf-root");
   bindPanel(root);
   renderSteps(); syncFromSettings(); addWorkflowUI(root);
+  try { addQuickStartUI(root); } catch (e) { opfErr("quickstart ui", e); }
   try { buildWorldSideButton(root); } catch (e) { opfErr("side button", e); }
   try { addComplianceToggle(root); } catch (e) { opfErr("compliance toggle", e); }
-  try { addMemoUI(root); } catch (e) { opfErr("memo ui", e); }
   try { bindCharPage(); } catch (e) { opfErr("char page", e); }
   try { bindDestinyPage(); } catch (e) { opfErr("destiny page", e); }
   try { bindRxPage(); } catch (e) { opfErr("regex page", e); }

@@ -9,7 +9,6 @@ function boot(){
   try { destDraftRestore(); } catch (e) { opfErr("destDraftRestore", e); }
   try { rxCacheRestore(); } catch (e) { opfErr("rxCacheRestore", e); }
   try { shxInit(); shxLoadCfgToUi(); } catch (e) { opfErr("shxInit", e); }
-  initMemo();
   // 工程列表：必须在三条流水线的草稿恢复之后引导，否则会把空状态当成"现有草稿"
   try { projBootstrap(); } catch (e) { opfErr("projBootstrap", e); }
   try { renderProjList(); } catch (e) { opfErr("renderProjList", e); }

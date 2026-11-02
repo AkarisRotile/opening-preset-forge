@@ -152,6 +152,7 @@ function updateSendText(){
   }
   ST.worldInfo = parts.join(nl2);
   worldCachePersistSel();
+  try { if (typeof qsRender === 'function' && getEl('opf-qs-list')) qsRender(); } catch (e) {}
 }
 function clearWorldbook(){
   ST.wb = { entries: [], books: [], loaded: {}, bookOf: {}, source: "none", fileName: null };
@@ -309,7 +310,6 @@ var SIZE_CSS = [
   // 宽屏下内容走左右两栏（左＝需求与选项，右＝创作步骤与 JSON），窄屏自动叠成一栏。
   "#opf-page-preset #opf-body{display:grid!important;grid-template-columns:minmax(300px,380px) minmax(0,1fr)!important;gap:14px 22px!important;align-items:start;max-width:1680px!important;margin:0 auto;width:100%;padding:16px 20px 20px!important;overflow:visible!important;min-height:0!important}",
   "#opf-page-preset .opf-col{display:flex;flex-direction:column;gap:10px;min-width:0}",
-  "#opf-page-preset #opf-memo{grid-column:1/-1}",
   "@media (max-width:920px){#opf-page-preset #opf-body{grid-template-columns:minmax(0,1fr)!important}}",
   "#opf-page-preset #opf-actions{position:sticky!important;bottom:0;z-index:6;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}",
   "#opf-title{font-size:16px!important}",
@@ -344,10 +344,6 @@ var SIZE_CSS = [
   "#opf-lside-filter{font-size:13px!important}",
   ".opf-lside-hint{font-size:12.5px!important}",
   "#opf-lside-head{font-size:13.5px!important}",
-  // ===== ① 页备忘录 =====
-  ".opf-memo-hint{font-size:12px!important}",
-  ".opf-memo-out{font-size:12.5px!important}",
-  ".opf-memo-raw{font-size:12.5px!important}",
   // ===== ⑧ 造物工坊 =====
   "#opf-page-atelier{font-size:15px!important}",
   ".atl-space-name{font-size:13.5px!important}",

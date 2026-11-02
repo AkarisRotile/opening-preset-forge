@@ -42,6 +42,8 @@ var DEFAULT_SETTINGS = {
   createType: 'preset',      // 「分段创作」当前类型：preset | char
   destinyTab: 'destiny',     // 「命定系统」页内当前子标签：destiny | refine | regex
   charModules: [],           // ③ 二创角色勾选的结构维度 id 数组（阵营/目标/驱动力…）
+  quickStart: false,         // ① 页快速开局：一键勾好生成所需的世界书条目
+  quickStartLoc: '',         // 快速开局选定的地点（存条目 comment，换书后按名字重找）
 };
 
 // ---------------- 始弦人设（唯一真源 · 原版预设原文，一字不改） ----------------
@@ -398,7 +400,14 @@ function buildSystemContent() {
 
 function buildUser0() {
   var demand = getEl('opf-demand') && getEl('opf-demand').value.trim();
-  return ('[本次开局需求] ' + (demand || '请为我的开局角色设计一套合理的开局预设。'));
+  var s = getSettings();
+  var extra = '';
+  if (s.quickStart && s.quickStartLoc) {
+    var p = (typeof qsParseComment === 'function') ? qsParseComment(s.quickStartLoc) : null;
+    var label = p ? (p.country + '-' + (p.group && p.group !== p.country ? p.group + '-' : '') + p.name) : s.quickStartLoc;
+    extra = '\n[开局地点] ' + label + '（快速开局已选定：开局剧情、起始场景与人物活动都围绕这里展开；地名照世界书的层级写，不要另造）';
+  }
+  return ('[本次开局需求] ' + (demand || '请为我的开局角色设计一套合理的开局预设。') + extra);
 }
 // [工作方式] 属于任务侧（告诉模型这一页怎么走），不属于用户输入
 function buildWorkNote() {
@@ -1223,7 +1232,7 @@ function segUndoTop(holder) {
 
 //@module 30-preset-ui — ① 开局预设：页面 UI + 分步管线 + 每步精修 + 重新汇总
 var OPF_CSS = "#opf-root,#opf-launcher{box-sizing:border-box;font-family:'Noto Sans SC','Microsoft YaHei',sans-serif;letter-spacing:.3px}#opf-root *,#opf-launcher *{box-sizing:border-box}#opf-launcher{position:fixed;right:6px;top:42%;z-index:2147480001;width:38px;height:38px;border-radius:12px 6px 6px 12px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#ffd9de;background:linear-gradient(160deg,rgba(74,10,20,.92),rgba(24,3,8,.88));border:1px solid rgba(255,106,122,.28);box-shadow:0 0 6px rgba(255,77,94,.55),0 0 18px rgba(200,16,46,.35);font-size:18px;transition:transform .18s ease,box-shadow .18s ease;user-select:none}#opf-launcher:hover{transform:scale(1.08);box-shadow:0 0 6px rgba(255,77,94,.55),0 0 18px rgba(200,16,46,.35),0 0 24px rgba(255,77,94,.5)}#opf-launcher .opf-la-dot{position:absolute;top:-3px;right:-3px;width:10px;height:10px;border-radius:50%;background:#39d353;border:1px solid rgba(0,0,0,.5);display:none}#opf-launcher.running .opf-la-dot{display:block;animation:opfPulse 1s infinite}@keyframes opfPulse{0%,100%{opacity:1}50%{opacity:.25}}#opf-root{position:fixed;z-index:2147480000;width:392px;max-width:calc(100vw - 18px);max-height:min(760px,92vh);display:flex;flex-direction:column;border-radius:14px;color:#fdeef0;overflow:hidden;background:linear-gradient(180deg,rgba(46,6,14,.92) 0%,rgba(30,4,10,.90) 45%,rgba(16,2,6,.94) 100%);border:1px solid rgba(255,122,138,.34);box-shadow:0 0 0 1px rgba(0,0,0,.35),0 10px 34px rgba(0,0,0,.55),inset 0 0 42px rgba(255,60,80,.05),0 0 22px rgba(255,77,94,.22);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);transition:opacity .16s ease,transform .16s ease}#opf-root::before{content:'';position:absolute;inset:0 0 auto 0;height:2px;background:linear-gradient(90deg,transparent,#ff4d5e 18%,#ffd9a8 50%,#c8102e 82%,transparent);box-shadow:0 0 12px rgba(255,90,100,.8);opacity:.9}#opf-root.opf-hidden{opacity:0;pointer-events:none;transform:translateY(6px) scale(.98)}#opf-head{display:flex;align-items:center;gap:6px;padding:8px 10px 7px 12px;cursor:move;user-select:none;background:linear-gradient(90deg,rgba(255,200,210,.10),rgba(200,16,46,.06) 55%,rgba(255,200,210,.04));border-bottom:1px solid rgba(255,122,138,.18)}#opf-title{font-weight:700;font-size:13px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#ffd9de;text-shadow:0 0 8px rgba(255,77,94,.65)}#opf-title .s{color:#ffb7be;font-size:11px;font-weight:500;margin-left:6px}.opf-ico-btn{border:1px solid transparent;background:rgba(255,255,255,.04);color:#ff8a95;border-radius:7px;cursor:pointer;width:24px;height:22px;font-size:12px;line-height:1;transition:all .14s ease}.opf-ico-btn:hover{background:rgba(255,77,94,.18);color:#fff;border-color:rgba(255,106,122,.28);box-shadow:0 0 4px rgba(255,77,94,.35),0 0 12px rgba(200,16,46,.22)}#opf-body{overflow-y:auto;display:flex;flex-direction:column;min-height:0}#opf-meta{display:flex;flex-wrap:wrap;gap:4px 8px;padding:6px 12px;font-size:11px;color:rgba(255,230,234,.72);background:rgba(255,255,255,.02);border-bottom:1px dashed rgba(255,122,138,.16)}#opf-meta .tag{padding:1px 6px;border-radius:20px;font-size:10px;background:rgba(255,77,94,.12);border:1px solid rgba(255,122,138,.25);color:#ffc9ce}#opf-meta .tag.ok{color:#a5f0c0;border-color:rgba(120,255,170,.35);background:rgba(60,160,90,.14)}#opf-meta .tag.err{color:#ffd0a3;border-color:rgba(255,170,90,.4);background:rgba(200,110,40,.14)}.opf-sec{padding:8px 12px 6px}.opf-sec-label{font-size:10px;letter-spacing:2px;color:rgba(255,170,180,.62);margin-bottom:6px;text-transform:uppercase;display:flex;align-items:center;gap:6px}.opf-sec-label::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(255,120,135,.35),transparent)}#opf-demand{width:100%;resize:vertical;min-height:44px;max-height:120px;border-radius:9px;padding:7px 9px;color:#ffeef1;font-size:12px;line-height:1.5;background:rgba(10,2,5,.55);border:1px solid rgba(255,122,138,.25);outline:none;transition:border-color .15s ease,box-shadow .15s ease}#opf-demand:focus{border-color:rgba(255,110,125,.6);box-shadow:0 0 10px rgba(255,77,94,.25)}#opf-demand::placeholder{color:rgba(255,210,216,.35)}.opf-opts{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:4px 12px 6px}.opf-opt{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:rgba(255,226,230,.78);cursor:pointer}.opf-opt input{accent-color:#ff4d5e;cursor:pointer}.opf-num{width:54px;background:rgba(10,2,5,.55);color:#ffeef1;border:1px solid rgba(255,122,138,.25);border-radius:6px;padding:2px 5px;font-size:11px}#opf-pname{width:150px;background:rgba(10,2,5,.55);color:#ffeef1;border:1px solid rgba(255,122,138,.25);border-radius:6px;padding:2px 6px;font-size:11px}.opf-steps{padding:2px 12px 6px;display:flex;flex-direction:column;gap:6px;overflow-y:auto;max-height:290px}.opf-step{border-radius:10px;border:1px solid rgba(255,122,138,.18);background:rgba(255,235,238,.035);transition:background .15s ease,border-color .15s ease,box-shadow .15s ease}.opf-step[data-st=run]{background:rgba(255,90,105,.10);border-color:rgba(255,120,135,.5);box-shadow:0 0 4px rgba(255,77,94,.35),0 0 12px rgba(200,16,46,.22)}.opf-step[data-st=ok]{background:rgba(120,230,160,.05);border-color:rgba(140,255,180,.25)}.opf-step[data-st=err]{border-color:rgba(255,150,90,.55)}.opf-step-head{display:flex;align-items:center;gap:7px;padding:6px 8px;cursor:pointer}.opf-idx{width:17px;height:17px;border-radius:6px 2px 6px 2px;flex:none;font-size:10px;font-weight:700;color:#ffd7dc;display:inline-flex;align-items:center;justify-content:center;background:linear-gradient(140deg,rgba(200,16,46,.55),rgba(80,10,22,.65));border:1px solid rgba(255,120,135,.35);box-shadow:0 0 6px rgba(255,77,94,.25)}.opf-dot{width:14px;font-size:11px;text-align:center;color:#8e6670;flex:none}.opf-step[data-st=run] .opf-dot{color:#ff8a95;animation:opfPulse 1s infinite}.opf-step[data-st=ok] .opf-dot{color:#7fe6a0}.opf-step[data-st=err] .opf-dot{color:#ffb066}.opf-step-title{flex:1;font-size:12px;color:#ffe9ec}.opf-step-sub{font-size:10px;color:rgba(255,200,208,.45)}.opf-step-act{border:none;background:rgba(255,255,255,.05);color:#ffc0c8;cursor:pointer;border-radius:6px;padding:2px 7px;font-size:10px;transition:all .14s ease}.opf-step-act:hover{background:rgba(255,77,94,.2);color:#fff;box-shadow:0 0 4px rgba(255,77,94,.35),0 0 12px rgba(200,16,46,.22)}.opf-step-body{display:none;padding:4px 9px 8px 30px;font-size:11px;line-height:1.55;color:rgba(255,226,230,.82)}.opf-step.open .opf-step-body{display:block}.opf-step-body pre{white-space:pre-wrap;word-break:break-word;margin:0;font-family:inherit}.opf-out{padding:2px 12px 8px}#opf-json-out{max-height:170px;overflow:auto;margin:0;padding:8px 10px;border-radius:9px;font-size:10.5px;line-height:1.5;white-space:pre-wrap;word-break:break-word;color:#ffd9de;background:rgba(8,1,4,.72);border:1px solid rgba(255,122,138,.22);box-shadow:inset 0 0 24px rgba(255,60,80,.05)}#opf-actions{display:flex;gap:6px;padding:8px 12px 10px;background:linear-gradient(0deg,rgba(200,16,46,.10),rgba(200,16,46,.02));border-top:1px solid rgba(255,122,138,.18)}.opf-btn{flex:1;cursor:pointer;border-radius:8px;border:1px solid transparent;font-size:12px;padding:7px 4px;color:#fff;letter-spacing:1px;transition:all .15s ease}.opf-btn:hover{filter:brightness(1.12)}.opf-btn:disabled{opacity:.45;cursor:not-allowed;filter:none}.opf-btn.primary{background:linear-gradient(135deg,rgba(255,110,120,.92),rgba(190,16,42,.96));border-color:rgba(255,180,190,.5);box-shadow:0 0 6px rgba(255,77,94,.55),0 0 18px rgba(200,16,46,.35);text-shadow:0 0 6px rgba(255,255,255,.4)}.opf-btn.ghost{background:rgba(255,235,238,.06);border-color:rgba(255,122,138,.25);color:#ffd5da}.opf-btn.ghost:hover{background:rgba(255,90,105,.14)}@media (max-width:640px){#opf-root{width:calc(100vw - 14px);left:7px !important;right:auto !important}}";
-var OPF_HTML = "<div id=\"opf-body\"><div class=\"opf-col opf-col-a\"><div id=\"opf-meta\"></div><div class=\"opf-sec\"><div class=\"opf-sec-label\">开局需求</div><textarea id=\"opf-demand\" placeholder=\"例如：给一位从迷雾森林走出、想在瓦伦蒂亚城谋生的流浪剑士配齐开局（1级、偏好近战、带一只契约伙伴……）\"></textarea></div><div class=\"opf-opts\"><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-card\"> 带角色卡</label><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-world\"> 带世界书</label><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-const\"> 仅常驻</label><label class=\"opf-opt\">注入上限<input type=\"number\" id=\"opf-cap\" class=\"opf-num\" min=\"2000\" max=\"200000\" step=\"1000\"></label><label class=\"opf-opt\">名称<input id=\"opf-pname\" value=\"【自定义开局】\" title=\"开局预设名称（导出 name 字段与文件名）\"></label></div><div class=\"opf-opts\"><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-quick\"> 快出模式(单次)</label><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-meta\"> 导出含文件元数据</label><button class=\"opf-step-act\" id=\"opf-wload\" type=\"button\">导入世界书文件</button><button class=\"opf-step-act\" id=\"opf-wclear\" type=\"button\">清世界书</button></div></div><div class=\"opf-col opf-col-b\"><div class=\"opf-sec\"><div class=\"opf-sec-label\">创作步骤</div><div class=\"opf-steps\" id=\"opf-steps\"></div></div><div class=\"opf-out\"><div class=\"opf-sec-label\">预设 JSON</div><pre id=\"opf-json-out\">尚未生成</pre></div></div></div><div id=\"opf-actions\"><button class=\"opf-btn primary\" id=\"opf-btn-run\">▶ 生成初稿</button><button class=\"opf-btn ghost\" id=\"opf-btn-quick\">⚡ 快速初稿</button><button class=\"opf-btn ghost\" id=\"opf-btn-save\">⬇ 导出 .preset.json</button><button class=\"opf-btn ghost\" id=\"opf-btn-copy\">⧉ 复制</button></div>";
+var OPF_HTML = "<div id=\"opf-body\"><div class=\"opf-hero\"><div class=\"opf-hero-t\">开局预设<span class=\"s\">技能 → 装备 → 道具 → 资产 → 背景 → 汇总</span></div><div id=\"opf-meta\"></div></div><section class=\"opf-card opf-card-qs\" id=\"opf-qs-card\"></section><div class=\"opf-col opf-col-a\"><section class=\"opf-card\"><div class=\"opf-card-hd\"><span class=\"opf-card-no\">01</span><span class=\"opf-card-t\">开局需求</span><span class=\"opf-card-sub\">人设 · 偏好 · 限制</span></div><textarea id=\"opf-demand\" placeholder=\"例如：给一位从迷雾森林走出、想在瓦伦蒂亚城谋生的流浪剑士配齐开局（1级、偏好近战、带一只契约伙伴……）\"></textarea><div class=\"opf-opts\"><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-card\"> 带角色卡</label><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-world\"> 带世界书</label><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-const\"> 仅常驻</label><label class=\"opf-opt\">注入上限<input type=\"number\" id=\"opf-cap\" class=\"opf-num\" min=\"2000\" max=\"200000\" step=\"1000\"></label><label class=\"opf-opt\">名称<input id=\"opf-pname\" value=\"【自定义开局】\" title=\"开局预设名称（导出 name 字段与文件名）\"></label></div></section><section class=\"opf-card\"><div class=\"opf-card-hd\"><span class=\"opf-card-no\">02</span><span class=\"opf-card-t\">生成选项</span><span class=\"opf-card-sub\">快出 · 导出 · 世界书来源</span></div><div class=\"opf-opts\"><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-quick\"> 快出模式(单次)</label><label class=\"opf-opt\"><input type=\"checkbox\" id=\"opf-ck-meta\"> 导出含文件元数据</label><button class=\"opf-step-act\" id=\"opf-wload\" type=\"button\">导入世界书文件</button><button class=\"opf-step-act\" id=\"opf-wclear\" type=\"button\">清世界书</button></div></section></div><div class=\"opf-col opf-col-b\"><section class=\"opf-card\"><div class=\"opf-card-hd\"><span class=\"opf-card-no\">03</span><span class=\"opf-card-t\">创作步骤</span><span class=\"opf-card-sub\">点标题展开 · 每步可单独精修</span></div><div class=\"opf-steps\" id=\"opf-steps\"></div></section><section class=\"opf-card\"><div class=\"opf-card-hd\"><span class=\"opf-card-no\">04</span><span class=\"opf-card-t\">预设 JSON</span><span class=\"opf-card-sub\">导出后导入自定义开局</span></div><div class=\"opf-out\"><pre id=\"opf-json-out\">尚未生成</pre></div></section></div></div><div id=\"opf-actions\"><button class=\"opf-btn primary\" id=\"opf-btn-run\">▶ 生成初稿</button><button class=\"opf-btn ghost\" id=\"opf-btn-quick\">⚡ 快速初稿</button><button class=\"opf-btn ghost\" id=\"opf-btn-save\">⬇ 导出 .preset.json</button><button class=\"opf-btn ghost\" id=\"opf-btn-copy\">⧉ 复制</button></div>";
 
 function injectStyle(){ if (getEl(NS + "_css")) return; var st = document.createElement("style"); st.id = NS + "_css"; st.textContent = OPF_CSS; document.head.appendChild(st); var st2 = document.createElement("style"); st2.id = NS + "_css_extra"; st2.textContent = EXTRA_CSS; document.head.appendChild(st2); }
 function launcher(){
@@ -1807,6 +1816,7 @@ function updateSendText(){
   }
   ST.worldInfo = parts.join(nl2);
   worldCachePersistSel();
+  try { if (typeof qsRender === 'function' && getEl('opf-qs-list')) qsRender(); } catch (e) {}
 }
 function clearWorldbook(){
   ST.wb = { entries: [], books: [], loaded: {}, bookOf: {}, source: "none", fileName: null };
@@ -1964,7 +1974,6 @@ var SIZE_CSS = [
   // 宽屏下内容走左右两栏（左＝需求与选项，右＝创作步骤与 JSON），窄屏自动叠成一栏。
   "#opf-page-preset #opf-body{display:grid!important;grid-template-columns:minmax(300px,380px) minmax(0,1fr)!important;gap:14px 22px!important;align-items:start;max-width:1680px!important;margin:0 auto;width:100%;padding:16px 20px 20px!important;overflow:visible!important;min-height:0!important}",
   "#opf-page-preset .opf-col{display:flex;flex-direction:column;gap:10px;min-width:0}",
-  "#opf-page-preset #opf-memo{grid-column:1/-1}",
   "@media (max-width:920px){#opf-page-preset #opf-body{grid-template-columns:minmax(0,1fr)!important}}",
   "#opf-page-preset #opf-actions{position:sticky!important;bottom:0;z-index:6;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}",
   "#opf-title{font-size:16px!important}",
@@ -1999,10 +2008,6 @@ var SIZE_CSS = [
   "#opf-lside-filter{font-size:13px!important}",
   ".opf-lside-hint{font-size:12.5px!important}",
   "#opf-lside-head{font-size:13.5px!important}",
-  // ===== ① 页备忘录 =====
-  ".opf-memo-hint{font-size:12px!important}",
-  ".opf-memo-out{font-size:12.5px!important}",
-  ".opf-memo-raw{font-size:12.5px!important}",
   // ===== ⑧ 造物工坊 =====
   "#opf-page-atelier{font-size:15px!important}",
   ".atl-space-name{font-size:13.5px!important}",
@@ -2014,6 +2019,459 @@ var SIZE_CSS = [
 ].join("");
 function injectGlobalSizeCSS(){
   try { if (getEl(NS + "_css_size")) return; var st = document.createElement("style"); st.id = NS + "_css_size"; st.textContent = SIZE_CSS; document.head.appendChild(st); } catch (e) { opfErr("injectGlobalSizeCSS", e); }
+}
+
+//@module 33-quickstart — ① 页「快速开局」：一键勾好生成所需条目 + 按开局地点智能勾选 + 可视化
+// 设计：地点与专题都从世界书条目名解析（[本体][势力][国家][上级]名称(作者)）。
+//       勾选只写 ST.wb.entries[i].sel，与 ② 页共用同一份状态；本模块不碰请求与提示词。
+var QS_RULE_KEYS = ['核心数值表', '品质效果限定', '技能装备道具生成规则', '经济价格指南', '角色生成', '角色辅助指导'];
+// 世界设定里生成预设直接要用的一条（层级/阶级名要写进 lifeLevel 与生命层级）
+var QS_WORLD_KEYS = ['生命层级与社会阶级'];
+var QS_REGION_TAGS = ['势力', '冒险区域'];
+var QS_TOPIC_ORDER = ['loc', 'parent', 'locpol', 'locculture', 'overview', 'culture', 'politics', 'festival', 'rule'];
+var QS_TOPIC_LABEL = {
+  loc: '开局地点', parent: '上级地点',
+  locpol: '地点·政治与社会', locculture: '地点·文化',
+  overview: '国家总览', culture: '文化', politics: '政治与社会', festival: '节庆',
+  rule: '生成规则'
+};
+var QS = { marks: [], built: false };
+
+// ---------------- 解析 ----------------
+/** 去掉条目名末尾的 (作者) */
+function qsStripAuthor(s) {
+  return String(s == null ? '' : s).replace(/[（(][^（）()]{0,24}[）)]\s*$/, '').trim();
+}
+/** 取前导 [x] 标签之后的名字 */
+function qsAfterTags(comment) {
+  var cm = String(comment == null ? '' : comment);
+  var tags = leadingTags(cm), pos = 0;
+  for (var i = 0; i < tags.length; i++) pos += ('[' + tags[i] + ']').length;
+  return qsStripAuthor(cm.slice(pos));
+}
+/** 解析条目名：{ country, chain, group, name, tags }；不属于势力/冒险区域的返回 null
+ *  chain = 国家之后的全部中括号标签（[城镇][挽歌堡]…），最后一个才是「上级」，前面的是类型词 */
+function qsParseComment(comment) {
+  var cm = String(comment || '');
+  var tags = leadingTags(cm);
+  if (!tags.length) return null;
+  if (tags[0] !== '本体' && tags[0] !== 'DLC') return null;
+  if (tags.length < 3) return null;
+  var kind = tags[1];
+  if (QS_REGION_TAGS.indexOf(kind) < 0) return null;
+  var country = tags[2] || '';
+  var chain = tags.slice(3);
+  var group = chain.length ? chain[chain.length - 1] : '';
+  var name = qsStripAuthor(qsAfterTags(cm));
+  if (!country || !name) return null;
+  return { country: country, chain: chain, group: group, name: name, tags: tags };
+}
+/** 专题判定：总览 / 文化 / 政治与社会 / 节庆 */
+function qsTopicOf(name) {
+  var n = String(name || '');
+  if (n === '总览' || n === '概览' || n === '势力概览') return 'overview';
+  if (n.indexOf('政治与社会') >= 0) return 'politics';
+  if (n.indexOf('文化') >= 0) return 'culture';
+  if (n === '节庆总览') return 'festival';
+  if (n === '节庆') return 'festival';
+  return '';
+}
+/** 是否专题条目（不是可选的「地点」） */
+function qsIsTopic(name) {
+  return !!qsTopicOf(name) || /^(贵族|活动|派阀|地理|地理概览|神迹群山地理概览|军事|经济|人物|历史|组织|怪物)$/.test(String(name || ''));
+}
+/** 是否专题标签（[节庆]、[政治与社会] 这类中括号标签，不是地名） */
+function qsIsTopicTag(tag) {
+  return /^(节庆|节庆总览|政治与社会|文化|地理|地理与文化|地理概览|总览|概览|贵族|活动|派阀|军事|经济|人物|历史)$/.test(String(tag || ''));
+}
+/** 是否地点类型词（[城镇][城市][地块]…），用来在下拉里标注类型、并且不当前级去找 */
+function qsIsTypeTag(tag) {
+  return /(城镇|城市|地块|王国|自治区|聚落|区域|群岛|领地|要塞|村镇|村庄|圣域|眷族|联邦|帝国|公国|王庭|联盟)$/.test(String(tag || ''));
+}
+/** 从 chain 里取类型词（可能没有） */
+function qsTypeOf(p) {
+  var chain = (p && p.chain) || [];
+  for (var i = 0; i < chain.length; i++) if (qsIsTypeTag(chain[i])) return chain[i];
+  return '';
+}
+
+// ---------------- 地点索引 ----------------
+/** 从条目列表建立 { groups:[{country, locs:[{comment, name, size}]}] } */
+function qsIndex(list) {
+  var map = {}, order = [];
+  (list || []).forEach(function (e) {
+    var p = qsParseComment(e.comment);
+    if (!p) return;
+    if (qsIsTopic(p.name)) return;
+    if (p.group && qsIsTopicTag(p.group)) return;   // [节庆]耀日回归祭 这类专题子条目
+    if (p.name === p.country) return;   // 国家/区域自身那条是总览，不进地点下拉
+    if (!map[p.country]) { map[p.country] = []; order.push(p.country); }
+    map[p.country].push({ comment: e.comment, name: p.name, group: p.group, type: qsTypeOf(p), size: (e.content || '').length });
+  });
+  order.sort(function (a, b) { return a.localeCompare(b, 'zh-Hans-CN'); });
+  return {
+    groups: order.map(function (c) {
+      var locs = map[c].sort(function (a, b) { return a.name.localeCompare(b.name, 'zh-Hans-CN'); });
+      return { country: c, locs: locs };
+    })
+  };
+}
+
+// ---------------- 勾选计划 ----------------
+/**
+ * 按选中的地点算出要勾的条目（纯函数，便于测试）
+ * @param {Array} list ST.wb.entries
+ * @param {string} locComment 选中的地点条目 comment（空=只勾生成规则）
+ */
+function qsPlan(list, locComment) {
+  var marks = [], seen = {};
+  function add(e, topic) {
+    if (!e || !e.id || seen[e.id]) return;
+    seen[e.id] = 1;
+    marks.push({ id: e.id, topic: topic, comment: e.comment || '' });
+  }
+  var parsed = [];
+  (list || []).forEach(function (e) {
+    var p = qsParseComment(e.comment);
+    parsed.push({ e: e, p: p, name: p ? p.name : '', country: p ? p.country : '', group: p ? p.group : '', chain: p ? p.chain : [] });
+  });
+  function pick(fn) {
+    for (var i = 0; i < parsed.length; i++) if (parsed[i].p && fn(parsed[i])) return parsed[i];
+    return null;
+  }
+
+  var loc = locComment ? qsParseComment(locComment) : null;
+  if (loc) {
+    // 1) 地点本身
+    var hit = pick(function (it) { return it.country === loc.country && it.name === loc.name; });
+    if (hit) add(hit.e, 'loc');
+    // 2) 上级地点（[城镇][挽歌堡]黑冠台 → 挽歌堡；[红叶镇]赤枫堡 → 红叶镇）
+    var chain = (loc.chain || []).slice().reverse();
+    for (var ci = 0; ci < chain.length; ci++) {
+      var tag = chain[ci];
+      if (!tag || tag === loc.name || qsIsTypeTag(tag) || qsIsTopicTag(tag)) continue;
+      var par = pick(function (it) { return it.country === loc.country && it.name === tag && (it.chain || []).indexOf(tag) >= 0; })
+        || pick(function (it) { return it.country === loc.country && it.name === tag; });
+      if (par) { add(par.e, 'parent'); break; }
+    }
+    // 3) 地点自己的专题（[伯伦斯法环][雾晶港]政治与社会）
+    parsed.forEach(function (it) {
+      if (!it.p || it.country !== loc.country || it.group !== loc.name) return;
+      var t = qsTopicOf(it.name);
+      if (t === 'politics') add(it.e, 'locpol');
+      else if (t === 'culture') add(it.e, 'locculture');
+    });
+    // 4) 所在国家的专题：总览 / 文化 / 政治与社会 / 节庆（节庆只开总览，不铺开每一个祭典）
+    var own = pick(function (it) { return it.country === loc.country && !it.group && it.name === loc.country; });
+    if (own) add(own.e, 'overview');
+    var ov = pick(function (it) { return it.country === loc.country && !it.group && /^(总览|概览)$/.test(it.name); });
+    if (!own && ov) add(ov.e, 'overview');
+    var cu = pick(function (it) { return it.country === loc.country && !it.group && qsTopicOf(it.name) === 'culture'; });
+    if (cu) add(cu.e, 'culture');
+    var po = pick(function (it) { return it.country === loc.country && !it.group && qsTopicOf(it.name) === 'politics'; });
+    if (po) add(po.e, 'politics');
+    var fe = pick(function (it) { return it.country === loc.country && !it.group && it.name === '节庆总览'; })
+      || pick(function (it) { return it.country === loc.country && !it.group && it.name === '节庆'; });
+    if (fe) add(fe.e, 'festival');
+  }
+  // 5) 生成规则（本工具生成开局预设必须的）
+  parsed.forEach(function (it) {
+    var cm = it.e.comment || '';
+    if (cm.indexOf('[额外设定]') >= 0) {
+      for (var k = 0; k < QS_RULE_KEYS.length; k++) {
+        if (cm.indexOf(QS_RULE_KEYS[k]) >= 0) { add(it.e, 'rule'); return; }
+      }
+      return;
+    }
+    if (cm.indexOf('[世界设定]') >= 0) {
+      for (var w = 0; w < QS_WORLD_KEYS.length; w++) {
+        if (cm.indexOf(QS_WORLD_KEYS[w]) >= 0) { add(it.e, 'rule'); return; }
+      }
+    }
+  });
+  return marks;
+}
+
+// ---------------- 勾选执行 ----------------
+function qsEntryById(id) {
+  var list = (ST.wb && ST.wb.entries) || [];
+  for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i];
+  return null;
+}
+function qsSelectedChars(marks) {
+  var total = 0;
+  (marks || []).forEach(function (m) {
+    var e = qsEntryById(m.id);
+    if (e && e.sel) total += (e.content || '').length;
+  });
+  return total;
+}
+/** 按当前设置重算并勾选 */
+function qsApply(silent) {
+  var s = getSettings();
+  var wb = ST.wb || { entries: [] };
+  if (!wb.entries || !wb.entries.length) {
+    QS.marks = [];
+    if (!silent) toast('还没有载入世界书：先「导入世界书文件」或在酒馆里激活世界书', 'warning');
+    qsRender();
+    return { applied: 0 };
+  }
+  var locComment = s.quickStartLoc || '';
+  if (!locComment) {
+    // 未选地点时只勾生成规则
+    QS.marks = qsPlan(wb.entries, '');
+    if (!silent) toast('先选一个开局地点，再自动勾选地点与国家条目');
+  } else {
+    QS.marks = qsPlan(wb.entries, locComment);
+  }
+  var applied = 0;
+  QS.marks.forEach(function (m) {
+    var e = qsEntryById(m.id);
+    if (!e) return;
+    if (!e.sel) { e.sel = true; applied++; }
+  });
+  if (!s.includeWorld) {
+    s.includeWorld = true;
+    var cw = getEl('opf-ck-world'); if (cw) cw.checked = true;
+  }
+  saveSettings();
+  try { updateSendText(); } catch (e) { opfErr('qs updateSendText', e); }
+  try { renderWorldSide(); } catch (e) { opfErr('qs renderWorldSide', e); }
+  try { renderMetaStatus(); } catch (e) { opfErr('qs renderMetaStatus', e); }
+  qsRender();
+  if (!silent) {
+    var c = wpkCounts();
+    toast('快速开局：本次勾选 ' + QS.marks.length + ' 条（新增 ' + applied + ' 条）· 已选 ' + c.selN + '/' + c.total);
+  }
+  return { applied: applied, marks: QS.marks.length };
+}
+/** 取消本功能勾选过的条目 */
+function qsClearMarks(silent) {
+  var n = 0;
+  QS.marks.forEach(function (m) {
+    var e = qsEntryById(m.id);
+    if (e && e.sel) { e.sel = false; n++; }
+  });
+  QS.marks = [];
+  saveSettings();
+  try { updateSendText(); } catch (e) {}
+  try { renderWorldSide(); } catch (e) {}
+  try { renderMetaStatus(); } catch (e) {}
+  qsRender();
+  if (!silent) toast('已取消快速开局勾选的 ' + n + ' 条');
+  return n;
+}
+function qsToggleMark(id, on) {
+  var e = qsEntryById(id);
+  if (!e) return;
+  e.sel = !!on;
+  saveSettings();
+  try { updateSendText(); } catch (err) {}
+  try { renderWorldSide(); } catch (err) {}
+  try { renderMetaStatus(); } catch (err) {}
+  qsRender();
+}
+
+// ---------------- 渲染 ----------------
+function qsSyncUi() {
+  var s = getSettings();
+  var ck = getEl('opf-ck-fast'); if (ck) ck.checked = !!s.quickStart;
+  var body = getEl('opf-qs-body'); if (body) body.style.display = s.quickStart ? '' : 'none';
+}
+/** 重建地点下拉 + 已启用条目清单 */
+function qsRender() {
+  var sel = getEl('opf-qs-loc');
+  var listEl = getEl('opf-qs-list');
+  var statEl = getEl('opf-qs-stat');
+  var s = getSettings();
+  var wb = ST.wb || { entries: [] };
+  var entries = wb.entries || [];
+
+  if (sel) {
+    var keep = s.quickStartLoc || '';
+    sel.textContent = '';
+    var ph = document.createElement('option');
+    ph.value = '';
+    ph.textContent = entries.length ? '（只勾生成规则，不选地点）' : '（先导入世界书）';
+    sel.appendChild(ph);
+    var idx = qsIndex(entries);
+    idx.groups.forEach(function (g) {
+      var og = document.createElement('optgroup');
+      og.label = g.country;
+      g.locs.forEach(function (l) {
+        var op = document.createElement('option');
+        op.value = l.comment;
+        var suffix = l.type || (l.group && l.group !== l.name ? l.group : '');
+        op.textContent = l.name + (suffix ? '（' + suffix + '）' : '');
+        og.appendChild(op);
+      });
+      sel.appendChild(og);
+    });
+    if (keep) {
+      var has = false;
+      for (var i = 0; i < sel.options.length; i++) if (sel.options[i].value === keep) { has = true; break; }
+      if (has) sel.value = keep;
+      else if (keep) { s.quickStartLoc = ''; saveSettings(); }
+    }
+  }
+
+  if (listEl) {
+    listEl.textContent = '';
+    if (!s.quickStart) {
+      listEl.appendChild(qsHint('勾选上面的「启用快速开局」后，这里会列出本功能勾好的条目，可以逐条取消。'));
+    } else if (!QS.marks.length) {
+      listEl.appendChild(qsHint(entries.length ? '还没算勾选：选一个开局地点，或点「↻ 重新智能勾选」。' : '还没有载入世界书：点「导入世界书文件」，或在酒馆里打开世界书。'));
+    } else {
+      var byTopic = {};
+      QS.marks.forEach(function (m) {
+        var e = qsEntryById(m.id);
+        if (!e) return;
+        (byTopic[m.topic] = byTopic[m.topic] || []).push({ e: e, m: m });
+      });
+      QS_TOPIC_ORDER.forEach(function (topic) {
+        var arr = byTopic[topic];
+        if (!arr || !arr.length) return;
+        var head = document.createElement('div');
+        head.className = 'opf-qs-group';
+        head.textContent = QS_TOPIC_LABEL[topic] + '（' + arr.length + '）';
+        listEl.appendChild(head);
+        arr.forEach(function (it) {
+          var row = document.createElement('label');
+          row.className = 'opf-qs-item' + (it.e.sel ? '' : ' off');
+          var cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.checked = !!it.e.sel;
+          cb.addEventListener('change', function () { qsToggleMark(it.m.id, cb.checked); });
+          var tx = document.createElement('span');
+          tx.className = 'opf-qs-name';
+          tx.textContent = String(it.e.comment || '').replace(/^\[本体\]|^\[DLC\]/, '');
+          var sz = document.createElement('span');
+          sz.className = 'opf-qs-size';
+          sz.textContent = qsSize((it.e.content || '').length);
+          row.appendChild(cb); row.appendChild(tx); row.appendChild(sz);
+          listEl.appendChild(row);
+        });
+      });
+    }
+  }
+
+  if (statEl) {
+    var c = wpkCounts();
+    var mine = qsSelectedChars(QS.marks);
+    var cap = s.capChars || 30000;
+    var head = '本功能 ' + QS.marks.length + ' 条 / 约 ' + Math.round(mine / 1000) + 'k 字';
+    var tail = ' · 世界书已选 ' + c.selN + '/' + c.total + ' 条（约 ' + Math.round(c.chars / 1000) + 'k 字，上限 ' + Math.round(cap / 1000) + 'k）';
+    statEl.textContent = head + tail;
+    statEl.className = 'opf-dim' + (c.chars >= cap ? ' warn' : '');
+    var raise = getEl('opf-qs-raise');
+    if (raise) raise.style.display = (c.chars >= cap) ? '' : 'none';
+  }
+}
+function qsSize(n) {
+  return n >= 1000 ? (Math.round(n / 100) / 10) + 'k' : String(n);
+}
+function qsHint(text) {
+  var d = document.createElement('div');
+  d.className = 'opf-qs-hint';
+  d.textContent = text;
+  return d;
+}
+
+// ---------------- UI ----------------
+var QS_CSS = [
+  '#opf-page-preset #opf-body>.opf-hero,#opf-page-preset #opf-body>#opf-qs-card{grid-column:1/-1}',
+  '.opf-hero{display:flex;flex-direction:column;gap:7px}',
+  '.opf-hero-t{font-size:17px;font-weight:700;letter-spacing:1.5px;color:#ffd9de;text-shadow:0 0 12px rgba(255,77,94,.45)}',
+  '.opf-hero-t .s{font-size:12px;font-weight:500;letter-spacing:.5px;color:rgba(255,200,208,.65);margin-left:8px}',
+  '.opf-card{border:1px solid rgba(255,122,138,.22);border-radius:12px;background:linear-gradient(180deg,rgba(255,235,238,.055),rgba(255,235,238,.015));box-shadow:0 6px 18px rgba(0,0,0,.18);padding:11px 13px 12px;display:flex;flex-direction:column;gap:9px;min-width:0}',
+  '.opf-card-hd{display:flex;align-items:center;gap:9px;min-width:0}',
+  '.opf-card-no{flex:none;font-size:10.5px;letter-spacing:1px;color:#ffd9a8;background:rgba(200,130,40,.14);border:1px solid rgba(255,190,120,.32);border-radius:6px;padding:1px 7px;line-height:1.6}',
+  '.opf-card-t{flex:none;font-size:14px;font-weight:600;color:#ffe9ec}',
+  '.opf-card-sub{flex:1 1 auto;min-width:0;font-size:11.5px;color:rgba(255,200,208,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+  '.opf-card .opf-opts{padding:0!important}',
+  '.opf-card .opf-sec{padding:0!important}',
+  '#opf-qs-card{gap:8px}',
+  '.opf-qs-toggle{font-size:13.5px!important;gap:8px!important;padding:2px 0}',
+  '.opf-qs-body{display:flex;flex-direction:column;gap:8px}',
+  '.opf-qs-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}',
+  '.opf-qs-loc{max-width:min(420px,100%);border-radius:8px;padding:5px 8px;font-size:13px;color:#ffeef1;background:rgba(10,2,5,.6);border:1px solid rgba(255,122,138,.3);outline:none}',
+  '.opf-qs-loc:focus{border-color:rgba(255,110,125,.65);box-shadow:0 0 8px rgba(255,77,94,.25)}',
+  '#opf-qs-stat.warn{color:#ffcf9a}',
+  '#opf-qs-list{display:flex;flex-direction:column;gap:2px;max-height:270px;overflow:auto;padding:2px 2px 2px 0}',
+  '.opf-qs-group{margin:6px 0 2px;font-size:11.5px;letter-spacing:1px;color:#ffb7be;border-left:2px solid rgba(255,90,105,.55);padding-left:7px}',
+  '.opf-qs-item{display:flex;align-items:flex-start;gap:7px;padding:3px 6px;border-radius:7px;font-size:12.5px;color:rgba(255,236,240,.9);cursor:pointer;line-height:1.4}',
+  '.opf-qs-item:hover{background:rgba(255,235,238,.06)}',
+  '.opf-qs-item input{margin-top:2px;flex:none;accent-color:#ff4d5e;cursor:pointer}',
+  '.opf-qs-item.off{opacity:.48}',
+  '.opf-qs-item .opf-qs-name{flex:1 1 auto;min-width:0;word-break:break-word}',
+  '.opf-qs-item .opf-qs-size{flex:none;font-size:10.5px;color:rgba(255,200,208,.45)}',
+  '.opf-qs-hint{font-size:12px;line-height:1.6;color:rgba(255,200,208,.6);padding:4px 2px}'
+].join('');
+
+function addQuickStartUI(root) {
+  var card = root && root.querySelector ? root.querySelector('#opf-qs-card') : null;
+  if (!card || QS.built) return;
+  try {
+    if (!getEl(NS + '_css_qs')) {
+      var st = document.createElement('style');
+      st.id = NS + '_css_qs';
+      st.textContent = QS_CSS;
+      document.head.appendChild(st);
+    }
+  } catch (e) { opfErr('qs css', e); }
+
+  card.innerHTML = '<div class="opf-card-hd"><span class="opf-card-no">QS</span><span class="opf-card-t">快速开局</span>' +
+    '<span class="opf-card-sub">一键勾好生成所需条目，再按开局地点自动选条目（可逐条取消）</span></div>' +
+    '<label class="opf-opt opf-qs-toggle"><input type="checkbox" id="opf-ck-fast"> 启用快速开局（自动勾选本工具生成开局预设必需的世界书条目）</label>' +
+    '<div class="opf-qs-body" id="opf-qs-body" style="display:none">' +
+    '<div class="opf-qs-row">' +
+    '<label class="opf-opt" for="opf-qs-loc">开局地点 <select id="opf-qs-loc" class="opf-qs-loc"></select></label>' +
+    '<button class="opf-step-act" id="opf-qs-reapply" type="button" title="按当前地点重新勾选（会把你手动取消的条目再勾回来）">↻ 重新智能勾选</button>' +
+    '<button class="opf-step-act" id="opf-qs-clear" type="button" title="只取消本功能勾过的条目，别的手动勾选不动">✕ 取消本功能勾选</button>' +
+    '<button class="opf-step-act" id="opf-qs-raise" type="button" style="display:none" title="把世界书注入上限提到当前总量，避免末尾被截断">↑ 调高注入上限</button>' +
+    '</div>' +
+    '<div class="opf-dim" id="opf-qs-stat">—</div>' +
+    '<div id="opf-qs-list"></div>' +
+    '</div>';
+
+  var ck = getEl('opf-ck-fast');
+  var loc = getEl('opf-qs-loc');
+  var body = getEl('opf-qs-body');
+
+  ck.addEventListener('change', function () {
+    var s = getSettings();
+    s.quickStart = !!ck.checked;
+    saveSettings();
+    if (body) body.style.display = s.quickStart ? '' : 'none';
+    if (s.quickStart) { qsApply(true); renderMetaStatus(); }
+    qsRender();
+  });
+  loc.addEventListener('change', function () {
+    var s = getSettings();
+    s.quickStartLoc = loc.value || '';
+    saveSettings();
+    if (s.quickStart) qsApply(true);
+    qsRender();
+  });
+  getEl('opf-qs-reapply').addEventListener('click', function () {
+    if (!getSettings().quickStart) { toast('先勾选「启用快速开局」', 'warning'); return; }
+    qsApply(false);
+  });
+  getEl('opf-qs-clear').addEventListener('click', function () { qsClearMarks(false); });
+  getEl('opf-qs-raise').addEventListener('click', function () {
+    var s = getSettings(), c = wpkCounts();
+    s.capChars = Math.min(200000, Math.max(1000, Math.ceil((c.chars * 1.05) / 1000) * 1000));
+    saveSettings();
+    var capEl = getEl('opf-cap'); if (capEl) capEl.value = s.capChars;
+    try { updateSendText(); renderMetaStatus(); } catch (e) {}
+    qsRender();
+    toast('世界书注入上限已调到 ' + s.capChars + ' 字');
+  });
+
+  QS.built = true;
+  qsSyncUi();
+  if (getSettings().quickStart) { QS.marks = qsPlan((ST.wb && ST.wb.entries) || [], getSettings().quickStartLoc || ''); }
+  qsRender();
 }
 
 //@module 34-preset-tools — ① 开局预设：合规自检修复 + 备忘录 + 品质规范化
@@ -2098,470 +2556,6 @@ async function runCompliance(){
     ST._complyBusy = false;
     renderRunButtons();
   }
-}
-
-// ============================================================================
-// 网游核心 · 文本总结（独立模块，与开局预设功能完全隔离）
-// ----------------------------------------------------------------------------
-// 功能：默认关闭。开启后，每次 AI 完成一条输出（MESSAGE_RECEIVED），就用当前
-//       主 API 把「已有摘要 + 最新对话」压缩成一段极短的「状态摘要」；下一次
-//       生成时通过 setExtensionPrompt 把摘要作为提示词一起发给 AI。
-// 适配：专门针对「网游核心YAML版」这类 MMORPG 世界书——只记对后续推进有用的
-//       状态/数值/目标/任务/物品/NPC 关系，不记文笔剧情，长度受控。
-// 隔离：独立设置命名空间(settings.summary)、独立状态对象(MEMO)、独立事件监听、
-//       独立注入 key、独立 UI 区块；不读写 ST.*、不碰 callModel / ST.msgs。
-// ============================================================================
-var MEMO_PROMPT_KEY = 'openingPresetForgeSummary';   // setExtensionPrompt 注入 key
-var MEMO_META_KEY = 'openingPresetForgeMemo';        // 持久化到对话 metadata 的 key（按角色/对话单独保存）
-var MEMO_DEFAULTS = {
-  enabled: false,     // 默认关闭，用户手动开启才生效
-  maxChars: 800,      // 摘要最大字数（注入内容不能太长）
-  capFeed: 5000,      // 每次喂给总结的新内容最多字数
-  viewMode: 'visual'  // 摘要展示：'visual' 可视化 / 'raw' YAML 原文
-};
-var MEMO = {
-  summary: '',        // 当前累计摘要
-  busy: false,        // 总结请求进行中（防并发）
-  queued: false,      // 总结期间又有新消息，标记待补跑
-  lastLen: -1,        // 已总结到的 chat 长度（-1 = 尚未总结）
-  chatKey: '',        // 当前会话标识（切换时清空摘要）
-  bound: false        // 事件是否已绑定
-};
-
-function getMemoSettings() {
-  var s = getSettings(); // 复用同一份 extensionSettings[NS]，但只读写其中的 .summary 子对象
-  if (!s || typeof s !== 'object') return Object.assign({}, MEMO_DEFAULTS);
-  if (!s.summary || typeof s.summary !== 'object') s.summary = {};
-  var m = s.summary;
-  for (var k in MEMO_DEFAULTS) {
-    if (!Object.prototype.hasOwnProperty.call(m, k)) m[k] = MEMO_DEFAULTS[k];
-  }
-  return m;
-}
-function saveMemoSettings() { saveSettings(); }
-
-// 收集「自上次总结以来」的新内容（冷启动时取最近若干条），用于喂给总结
-function memoTranscript() {
-  var c = getCtx();
-  var chat = (c && Array.isArray(c.chat)) ? c.chat : [];
-  if (!chat.length) return '';
-  var ms = getMemoSettings();
-  var cap = Number(ms.capFeed) || 4000;
-  var start = (MEMO.lastLen >= 0) ? MEMO.lastLen : Math.max(0, chat.length - 20);
-  var parts = [];
-  var used = 0;
-  for (var i = Math.max(0, start); i < chat.length; i++) {
-    var m = chat[i];
-    if (!m || m.is_system) continue;
-    var txt = String(m.mes || '').trim();
-    if (!txt) continue;
-    var who = m.is_user ? (m.name || '玩家') : (m.name || '角色');
-    var line = who + '：' + txt;
-    if (used + line.length > cap) break;
-    parts.push(line);
-    used += line.length;
-  }
-  return parts.join('\n');
-}
-
-// 专门适配「网游核心YAML版」的总结系统提示词（{{maxChars}} 在运行时替换）
-// 站在攻略队伍视角维护记忆：同名副本跨挑战保持一致 + 高难开荒不剧透
-function buildMemoSystem(maxChars) {
-  var n = Number(maxChars) || 800;
-  return '你是一个「网游核心YAML版」世界里的攻略记忆压缩器，站在攻略队伍的视角维护记忆。唯一任务：把对话中最新发生的事，压缩成一段极短的 YAML 记忆，供下一次生成时注入提示词。\n' +
-    '记忆必须服务于两个目的：\n' +
-    'A) 同名内容保持一致：同一个 任务/副本/高难本 反复出现时，按「名称」归并记忆；已记录过的 怪物分布/BOSS结构 不得被悄悄改写成另一套，只能在其基础上补充推进（同一副本多次挑战时前后要一致）。\n' +
-    'B) 高难开荒不剧透：只记录队伍在战斗中实际看到并确认过的内容；队伍尚未打到的阶段/BOSS机制一律标「未见到/未知」或直接省略，严禁脑补编造后续阶段的机制。\n' +
-    '只记录以下三类，其余（玩家属性/等级/职业/装备/物品/货币/剧情文笔）一律不记：\n' +
-    '1) 进行中的任务/副本：名称 + 目标/下一步；副本另记 怪物分布 与已见到的首领阶段机制。\n' +
-    '2) 已通关的任务/副本：名称 + 结果；副本作为“可复刷的固定蓝图”保留其 怪物分布 + 首领机制，同一本再进入时按此呈现一致内容。\n' +
-    '3) 高难挑战（歼殛战 / 零式大型 / 绝境战）：开荒中的记 进度（当前打到哪一阶段/灭团几次）、已破解机制（只写队伍已确认掌握的，按阶段），未破解部分明确标「未知」不填内容；已通关的可当固定蓝图完整记录。\n' +
-    '输出必须是一段严格 YAML，参考骨架如下（没有的内容就省略对应节点）：\n' +
-    '进行中:\n' +
-    '  任务:\n' +
-    '    - 名称: ...\n' +
-    '      目标: ...\n' +
-    '  副本:\n' +
-    '    - 名称: ...\n' +
-    '      怪物分布: ...\n' +
-    '      首领机制: ...\n' +
-    '已通关:\n' +
-    '  任务:\n' +
-    '    - 名称: ...\n' +
-    '  副本:\n' +
-    '    - 名称: ...\n' +
-    '      怪物分布: ...\n' +
-    '      首领机制: ...\n' +
-    '高难挑战:\n' +
-    '  歼殛战:\n' +
-    '    - 名称: ...\n' +
-    '      进度: ...        # 例：初见 / 灭3次 / 已见阶段2\n' +
-    '      已破解:\n' +
-    '        阶段1: ...\n' +
-    '      未破解: 阶段2之后未知\n' +
-    '  零式大型:\n' +
-    '    - 名称: ...\n' +
-    '      进度: ...\n' +
-    '      已破解:\n' +
-    '        阶段1: ...\n' +
-    '      未破解: ...\n' +
-    '  绝境战:\n' +
-    '    - 名称: ...\n' +
-    '      进度: ...\n' +
-    '      已破解:\n' +
-    '        阶段1: ...\n' +
-    '      未破解: ...\n' +
-    '规则：\n' +
-    '1) 若给了你「已有记忆」，必须合并更新：同一名称条目保留其既有记录，只补充/推进新信息，不得另起炉灶或改动其已记录的怪物分布/BOSS结构。\n' +
-    '2) 机制只记关键词/要点（技能名/机制名/处理方式），越短越好，果断舍弃次要细节。\n' +
-    '3) 总字数严格 ≤ ' + n + ' 字；优先保留：进行中进度、高难开荒进度、可复刷副本的蓝图。\n' +
-    '4) 只输出 YAML 本身，不要任何解释、标题或代码块围栏。';
-}
-
-function buildMemoRequest() {
-  var ms = getMemoSettings();
-  var feed = memoTranscript();
-  var user = '';
-  if (MEMO.summary) user += '[已有摘要]\n' + MEMO.summary + '\n\n';
-  user += '[本轮新内容]\n' + (feed || '（无新内容）');
-  return { system: buildMemoSystem(ms.maxChars), user: user, feed: feed };
-}
-
-function cleanMemoText(t) {
-  return String(t || '')
-    .replace(/\`\`\`[a-z]*/gi, '')
-    .replace(/^\s*(摘要|总结|状态摘要)[：:]\s*/i, '')
-    .trim();
-}
-function clampMemoText(t, max) {
-  var n = Number(max) || 500;
-  return t.length > n ? t.slice(0, n) : t;
-}
-
-// 把当前摘要注入到下一次生成（或清空注入）
-function applyMemoPrompt() {
-  var c = getCtx();
-  if (!c || typeof c.setExtensionPrompt !== 'function') return;
-  try {
-    if (getMemoSettings().enabled && MEMO.summary) {
-      c.setExtensionPrompt(MEMO_PROMPT_KEY, '[网游核心·状态摘要]\n' + MEMO.summary, 0, 2, false, 0);
-    } else {
-      c.setExtensionPrompt(MEMO_PROMPT_KEY, '', -1, 2, false, 0);
-    }
-  } catch (e) { opfErr('applyMemoPrompt', e); }
-}
-
-async function runMemoSummarize() {
-  var ms = getMemoSettings();
-  if (!ms.enabled) return;
-  if (MEMO.busy) { MEMO.queued = true; return; }
-  var c = getCtx();
-  if (!c || typeof c.generateRaw !== 'function') { renderMemoStatus('主 API 未就绪，无法总结'); return; }
-  var req = buildMemoRequest();
-  if (!req.feed) { renderMemoStatus(); return; } // 无新内容，跳过
-  MEMO.busy = true;
-  renderMemoStatus('⏳ 正在总结…');
-  try {
-    // 统一走 callModel：与分段/交火/封装/精修同一套传输（由 ⚙ 设置页决定），不再绕过
-    var resp = await callModel([
-      { role: 'system', content: req.system },
-      { role: 'user', content: req.user }
-    ]);
-    var text = cleanMemoText(resp);
-    if (text) {
-      MEMO.summary = clampMemoText(text, ms.maxChars);
-      applyMemoPrompt();
-      renderMemoSummary();
-      saveMemoToChat();
-    }
-    MEMO.lastLen = (c.chat && Array.isArray(c.chat)) ? c.chat.length : MEMO.lastLen;
-    renderMemoStatus('✓ 已总结 · ' + (MEMO.summary ? MEMO.summary.length : 0) + ' 字');
-  } catch (e) {
-    opfErr('runMemoSummarize', e);
-    renderMemoStatus('⚠ 总结失败：' + (e && e.message ? e.message : e));
-  } finally {
-    MEMO.busy = false;
-    if (MEMO.queued) { MEMO.queued = false; setTimeout(runMemoSummarize, 0); }
-  }
-}
-
-function clearMemo() {
-  MEMO.summary = '';
-  MEMO.lastLen = -1;
-  MEMO.queued = false;
-  applyMemoPrompt();
-  renderMemoSummary();
-  saveMemoToChat();
-  renderMemoStatus('已清空总结');
-  toast('已清空文本总结');
-}
-
-// ---- 摘要持久化：写入当前对话的 chat_metadata（随对话文件保存，按角色/对话单独存储）----
-function saveMemoToChat() {
-  var c = getCtx();
-  if (!c || !c.chatMetadata) return;
-  try {
-    c.chatMetadata[MEMO_META_KEY] = MEMO.summary || '';
-    if (typeof c.saveMetadataDebounced === 'function') c.saveMetadataDebounced();
-    else if (typeof c.saveMetadata === 'function') c.saveMetadata();
-  } catch (e) { opfErr('saveMemoToChat', e); }
-}
-function loadMemoFromChat() {
-  var v = '';
-  try {
-    var c = getCtx();
-    var cm = c && c.chatMetadata ? c.chatMetadata : null;
-    if (cm && typeof cm[MEMO_META_KEY] === 'string') v = cm[MEMO_META_KEY];
-  } catch (e) { v = ''; }
-  MEMO.summary = v || '';
-}
-
-function memoChatKey() {
-  var c = getCtx();
-  try {
-    if (c && c.chatId != null) return 'chat:' + c.chatId;
-    if (c && c.characterId != null) return 'char:' + c.characterId;
-  } catch (e) {}
-  return '';
-}
-
-function onMemoMessageReceived() {
-  var ms = getMemoSettings();
-  if (!ms.enabled) return;
-  if (MEMO.busy) { MEMO.queued = true; return; }
-  setTimeout(function () {
-    if (MEMO.busy) { MEMO.queued = true; return; }
-    runMemoSummarize();
-  }, 250);
-}
-
-function onMemoChatChanged() {
-  var key = memoChatKey();
-  if (key && key !== MEMO.chatKey) {
-    MEMO.chatKey = key;
-    MEMO.lastLen = -1;
-    MEMO.queued = false;
-    loadMemoFromChat();   // 切对话后，从该对话的 metadata 恢复它自己的摘要
-    applyMemoPrompt();
-    renderMemoSummary();
-    renderMemoStatus();
-  }
-}
-
-function renderMemoStatus(msg) {
-  var el = getEl('opf-memo-status');
-  if (!el) return;
-  if (msg) { el.textContent = msg; return; }
-  var ms = getMemoSettings();
-  if (!ms.enabled) { el.textContent = '未启用（勾选后每次 AI 输出自动总结）'; }
-  else if (MEMO.busy) { el.textContent = '⏳ 正在总结…'; }
-  else if (MEMO.summary) { el.textContent = '已启用 · 摘要 ' + MEMO.summary.length + ' 字'; }
-  else { el.textContent = '已启用 · 尚无摘要（等待下次 AI 输出）'; }
-}
-function renderMemoSummary() {
-  var box = getEl('opf-memo-out');
-  if (!box) return;
-  box.textContent = '';
-  var yaml = MEMO.summary || '';
-  if (!yaml) {
-    var d = document.createElement('div');
-    d.className = 'opf-memo-empty';
-    d.textContent = '（暂无摘要）';
-    box.appendChild(d);
-    return;
-  }
-  var ms = getMemoSettings();
-  if (ms.viewMode === 'raw') {
-    var pre = document.createElement('pre');
-    pre.className = 'opf-memo-raw';
-    pre.textContent = yaml;
-    box.appendChild(pre);
-    return;
-  }
-  renderMemoVisual(box, yaml);
-}
-
-// 把 YAML 摘要渲染成 分节 + 键值着色 + 可折叠 的可视化视图
-function renderMemoVisual(box, yaml) {
-  var lines = String(yaml).replace(/\r\n/g, '\n').split('\n');
-  var sections = [];
-  var cur = null;
-  for (var i = 0; i < lines.length; i++) {
-    var raw = lines[i];
-    if (!raw.trim()) continue;
-    var indent = raw.length - raw.replace(/^ +/, '').length;
-    var text = raw.trim();
-    if (indent === 0 && /^[^\s\-][^:]*:$/.test(text)) {
-      cur = { title: text.replace(/:$/, ''), items: [] };
-      sections.push(cur);
-    } else {
-      if (!cur) { cur = { title: '摘要', items: [] }; sections.push(cur); }
-      cur.items.push({ indent: indent, text: text });
-    }
-  }
-  sections.forEach(function (sec) {
-    var s = document.createElement('div');
-    s.className = 'opf-memo-sec';
-    var h = document.createElement('div');
-    h.className = 'opf-memo-sec-h';
-    var caret = document.createElement('span');
-    caret.className = 'opf-memo-caret';
-    caret.textContent = '▾';
-    var ttl = document.createElement('span');
-    ttl.className = 'opf-memo-sec-t';
-    ttl.textContent = sec.title;
-    h.appendChild(caret); h.appendChild(ttl);
-    h.addEventListener('click', function () { s.classList.toggle('collapsed'); });
-    s.appendChild(h);
-    var b = document.createElement('div');
-    b.className = 'opf-memo-sec-b';
-    sec.items.forEach(function (it) { b.appendChild(memoVisualLine(it)); });
-    s.appendChild(b);
-    box.appendChild(s);
-  });
-}
-
-function memoVisualLine(it) {
-  var row = document.createElement('div');
-  row.className = 'opf-memo-line';
-  row.style.paddingLeft = Math.min(it.indent * 12, 120) + 'px';
-  var t = it.text;
-  var m = t.match(/^-\s*(.*)$/);
-  if (m) {
-    var bullet = document.createElement('span');
-    bullet.className = 'opf-memo-bullet';
-    bullet.textContent = '▪';
-    row.appendChild(bullet);
-    row.appendChild(document.createTextNode(' '));
-    row.appendChild(memoVisualInline(m[1]));
-    return row;
-  }
-  row.appendChild(memoVisualInline(t));
-  return row;
-}
-
-function memoVisualInline(s) {
-  var frag = document.createElement('span');
-  frag.className = 'opf-memo-txt';
-  var m = s.match(/^([^:]+):\s*(.*)$/);
-  if (m) {
-    var k = document.createElement('span');
-    k.className = 'opf-memo-key';
-    k.textContent = m[1].trim() + ':';
-    frag.appendChild(k);
-    if (m[2]) {
-      frag.appendChild(document.createTextNode(' '));
-      var v = document.createElement('span');
-      v.className = 'opf-memo-val';
-      v.textContent = m[2];
-      frag.appendChild(v);
-    }
-  } else {
-    frag.textContent = s;
-  }
-  return frag;
-}
-
-function onMemoToggle() {
-  var ms = getMemoSettings();
-  initMemo();
-  if (ms.enabled) {
-    applyMemoPrompt();
-    renderMemoStatus();
-  } else {
-    MEMO.queued = false;
-    applyMemoPrompt(); // 关闭时清空注入
-    renderMemoStatus();
-  }
-}
-
-function initMemo() {
-  var c = getCtx();
-  if (!c) return;
-  if (MEMO.bound) return;
-  var es = c.eventSource;
-  var et = c.eventTypes || c.event_types;
-  if (!es || !et || typeof es.on !== 'function') return;
-  try {
-    es.on(et.MESSAGE_RECEIVED, onMemoMessageReceived);
-    es.on(et.CHAT_CHANGED, onMemoChatChanged);
-    MEMO.bound = true;
-    MEMO.chatKey = memoChatKey();
-    loadMemoFromChat();   // 启动时恢复当前对话已有的摘要
-    applyMemoPrompt();
-    opfLog('memo module bound');
-  } catch (e) { opfErr('initMemo bind', e); }
-}
-
-var MEMO_CSS = "#opf-memo{border-top:1px solid rgba(255,122,138,.25);margin-top:6px;padding-top:8px}.opf-memo-lab{display:flex;align-items:center;gap:6px}.opf-memo-tag{font-size:9px;color:#8fd6ff;background:rgba(60,140,200,.16);border:1px solid rgba(120,190,255,.35);border-radius:8px;padding:0 6px;line-height:1.5}.opf-memo-hint{font-size:10px;color:rgba(255,200,208,.6);display:block;margin-top:2px}.opf-memo-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px}#opf-memo-out{font-size:11px;max-height:200px;overflow-y:auto;background:rgba(10,2,5,.45);border:1px solid rgba(255,122,138,.2);border-radius:8px;padding:6px 8px;margin-top:6px;color:#ffeef1}.opf-memo-sec{margin:2px 0}.opf-memo-sec-h{display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none;padding:2px;border-radius:6px;font-weight:600;color:#ffb7be}.opf-memo-sec-h:hover{background:rgba(255,77,94,.12)}.opf-memo-caret{color:#ff8a95;font-size:9px;transition:transform .12s}.opf-memo-sec.collapsed .opf-memo-caret{transform:rotate(-90deg)}.opf-memo-sec.collapsed .opf-memo-sec-b{display:none}.opf-memo-sec-t{letter-spacing:.5px}.opf-memo-sec-b{margin-left:2px;border-left:1px dashed rgba(255,122,138,.2);padding-left:6px}.opf-memo-line{line-height:1.5;white-space:pre-wrap;word-break:break-word}.opf-memo-bullet{color:#ffd9a8;margin-right:2px}.opf-memo-key{color:#8fd6ff}.opf-memo-val{color:#ffeef1}.opf-memo-txt{color:#ffeef1}.opf-memo-raw{white-space:pre-wrap;word-break:break-word;margin:0;font-family:inherit;font-size:11px}.opf-memo-empty{color:rgba(255,200,208,.55)}";
-
-function addMemoUI(root) {
-  if (!root || getEl('opf-memo')) return;
-  var body = root.querySelector('#opf-body');
-  if (!body) return;
-  try {
-    if (!getEl('opf_memo_css')) {
-      var st = document.createElement('style');
-      st.id = 'opf_memo_css';
-      st.textContent = MEMO_CSS;
-      document.head.appendChild(st);
-    }
-  } catch (e) { opfErr('memo css', e); }
-
-  var sec = document.createElement('div');
-  sec.className = 'opf-sec';
-  sec.id = 'opf-memo';
-  sec.innerHTML =
-    '<div class="opf-sec-label opf-memo-lab">🧠 网游核心 · 文本总结<span class="opf-memo-tag">独立模块</span></div>' +
-    '<label class="opf-opt"><input type="checkbox" id="opf-memo-enable"> 启用文本总结<span class="opf-memo-hint">默认关闭；开启后每次 AI 输出后自动总结并注入下次提示词</span></label>' +
-    '<div class="opf-memo-row">' +
-      '<label class="opf-opt">摘要上限 <input type="number" id="opf-memo-cap" class="opf-num" min="200" max="3000" step="100"> 字</label>' +
-      '<button class="opf-step-act" type="button" id="opf-memo-now">立即总结</button>' +
-      '<button class="opf-step-act" type="button" id="opf-memo-clear">清空</button>' +
-      '<button class="opf-step-act" type="button" id="opf-memo-view">YAML原文</button>' +
-    '</div>' +
-    '<div class="opf-dim" id="opf-memo-status"></div>' +
-    '<div id="opf-memo-out"></div>';
-  body.appendChild(sec);
-
-  var en = getEl('opf-memo-enable');
-  var capEl = getEl('opf-memo-cap');
-  var ms = getMemoSettings();
-  en.checked = !!ms.enabled;
-  capEl.value = ms.maxChars;
-  en.addEventListener('change', function () {
-    getMemoSettings().enabled = !!en.checked;
-    saveMemoSettings();
-    onMemoToggle();
-  });
-  capEl.addEventListener('change', function () {
-    var v = parseInt(capEl.value, 10);
-    var m2 = getMemoSettings();
-    m2.maxChars = isNaN(v) ? 800 : clamp(v, 200, 3000);
-    capEl.value = m2.maxChars;
-    saveMemoSettings();
-  });
-  var viewBtn = getEl('opf-memo-view');
-  function syncMemoViewBtn() {
-    var m3 = getMemoSettings();
-    viewBtn.textContent = m3.viewMode === 'raw' ? '可视化' : 'YAML原文';
-    viewBtn.title = m3.viewMode === 'raw' ? '切换为可视化视图' : '切换为 YAML 原文';
-  }
-  viewBtn.addEventListener('click', function () {
-    var m4 = getMemoSettings();
-    m4.viewMode = (m4.viewMode === 'raw') ? 'visual' : 'raw';
-    saveMemoSettings();
-    syncMemoViewBtn();
-    renderMemoSummary();
-  });
-  getEl('opf-memo-now').addEventListener('click', function () {
-    if (!getMemoSettings().enabled) { toast('请先勾选「启用文本总结」', 'warning'); return; }
-    runMemoSummarize();
-  });
-  getEl('opf-memo-clear').addEventListener('click', clearMemo);
-  syncMemoViewBtn();
-  renderMemoStatus();
-  renderMemoSummary();
 }
 
 //@module 36-projects — 工程列表：①③④ 三条流水线各可保存多份草稿
@@ -2992,9 +2986,9 @@ function buildShell(){
   var root = getEl("opf-root");
   bindPanel(root);
   renderSteps(); syncFromSettings(); addWorkflowUI(root);
+  try { addQuickStartUI(root); } catch (e) { opfErr("quickstart ui", e); }
   try { buildWorldSideButton(root); } catch (e) { opfErr("side button", e); }
   try { addComplianceToggle(root); } catch (e) { opfErr("compliance toggle", e); }
-  try { addMemoUI(root); } catch (e) { opfErr("memo ui", e); }
   try { bindCharPage(); } catch (e) { opfErr("char page", e); }
   try { bindDestinyPage(); } catch (e) { opfErr("destiny page", e); }
   try { bindRxPage(); } catch (e) { opfErr("regex page", e); }
@@ -11310,7 +11304,6 @@ function boot(){
   try { destDraftRestore(); } catch (e) { opfErr("destDraftRestore", e); }
   try { rxCacheRestore(); } catch (e) { opfErr("rxCacheRestore", e); }
   try { shxInit(); shxLoadCfgToUi(); } catch (e) { opfErr("shxInit", e); }
-  initMemo();
   // 工程列表：必须在三条流水线的草稿恢复之后引导，否则会把空状态当成"现有草稿"
   try { projBootstrap(); } catch (e) { opfErr("projBootstrap", e); }
   try { renderProjList(); } catch (e) { opfErr("renderProjList", e); }
