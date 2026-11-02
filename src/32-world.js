@@ -1,4 +1,4 @@
-//@module 32-world — ② 世界书：左缘勾选侧栏 + 分类/搜索 + 尺寸 CSS
+﻿//@module 32-world — ② 世界书：左缘勾选侧栏 + 分类/搜索 + 尺寸 CSS
 // ============ 世界书左缘侧栏（懒加载独立浮层，不碰主窗口布局） ============
 var LSIDE_CSS2 = ".opf-wi-cat{font-size:10px;letter-spacing:1px;color:#ffb7be;background:rgba(255,77,94,.10);border:1px solid rgba(255,122,138,.22);border-radius:6px;padding:2px 8px;margin:6px 2px 2px;flex:none}#opf-lside-cat{flex:1 1 90px;min-width:80px;border-radius:7px;padding:4px 6px;font-size:11px;color:#ffeef1;background:rgba(10,2,5,.55);border:1px solid rgba(255,122,138,.25);outline:none}";
 var LSIDE_CSS = "#opf-lside{position:fixed;left:0;top:70px;bottom:70px;width:min(360px,86vw);z-index:2147480003;display:flex;flex-direction:column;min-height:0;background:linear-gradient(180deg,rgba(24,4,10,.96),rgba(12,2,6,.97));border:1px solid rgba(255,122,138,.3);border-left:none;border-radius:0 12px 12px 0;box-shadow:6px 0 22px rgba(0,0,0,.4),0 0 18px rgba(255,77,94,.18);transform:translateX(-110%);transition:transform .18s ease;overflow:hidden}#opf-lside.open{transform:translateX(0)}#opf-lside-head{display:flex;align-items:center;gap:6px;padding:8px 10px;font-size:12px;font-weight:600;color:#ffd9de;border-bottom:1px solid rgba(255,122,138,.2);flex:none}#opf-lside-head .t{flex:1}.opf-lside-ico{border:none;background:transparent;color:#ff8a95;cursor:pointer;font-size:12px;padding:2px 6px;border-radius:6px}.opf-lside-ico:hover{background:rgba(255,77,94,.16);color:#fff}#opf-lside-tools{display:flex;gap:4px;padding:6px 8px 2px;flex-wrap:wrap;flex:none}#opf-lside-count{font-size:10px;color:rgba(255,200,208,.7);padding:2px 8px;width:100%}#opf-lside-filter{margin:2px 8px 4px;border-radius:7px;padding:4px 7px;font-size:11px;color:#ffeef1;background:rgba(10,2,5,.55);border:1px solid rgba(255,122,138,.25);outline:none}#opf-lside-list{flex:1 1 auto;overflow-y:auto;padding:2px 6px 8px;min-height:0}.opf-lside-hint{font-size:10.5px;color:rgba(255,200,208,.6);line-height:1.5;padding:10px 12px;white-space:pre-wrap}.opf-wi-row{display:flex;gap:6px;align-items:flex-start;padding:3px 4px;border-radius:6px;cursor:pointer;font-size:10.5px;color:rgba(255,226,230,.88)}.opf-wi-row:hover{background:rgba(255,235,238,.06)}.opf-wi-row input{margin-top:2px;accent-color:#ff4d5e;cursor:pointer}.opf-wi-row .tx{flex:1 1 auto;min-width:0;word-break:break-word;line-height:1.35}.opf-wi-row .ln{flex:none;color:rgba(255,200,208,.42);font-size:9.5px}.opf-wi-row .cst{flex:none;color:#8fd6ff;font-size:9px;padding:0 4px;border:1px solid rgba(120,190,255,.35);border-radius:8px}";
@@ -91,41 +91,144 @@ function wpkRegion(cm){
   if (dash > 0) return inner.slice(0, dash).trim();
   return inner;
 }
-function wpkNorm(rawList, idPrefix){
+function wpkNorm(rawList, idPrefix, srcKey){
   var out = []; if (!Array.isArray(rawList)) return out;
   var pre = idPrefix || "";
+  // 书的身份键必须与 importWorldEntries 里的 key 一致（不含结尾冒号）；
+  // 以前这里直接用了 id 前缀（key + ":"），导致「同书重导」的过滤条件永远不成立 → 条目每次翻倍。
+  var src = (srcKey == null ? String(pre).replace(/:$/, "") : String(srcKey));
   for (var i = 0; i < rawList.length; i++) {
     var e = rawList[i];
     if (!e || typeof e.content !== "string" || !e.content.trim()) continue;
     var keyStr = Array.isArray(e.key) ? e.key.join(" / ") : (typeof e.key === "string" ? e.key : "");
     var cv = wpkCategory(e);
-    out.push({ id: pre + (e.uid != null ? "u" + e.uid : "i" + i), srcKey: pre, comment: (e.comment || ""), key: keyStr, content: e.content, constant: !!e.constant, sel: false, cat: cv, region: (cv === "地区·地理" ? wpkRegion(e.comment || "") : "") });
+    out.push({ id: pre + (e.uid != null ? "u" + e.uid : "i" + i), srcKey: src, comment: (e.comment || ""), key: keyStr, content: e.content, constant: !!e.constant, sel: false, cat: cv, region: (cv === "地区·地理" ? wpkRegion(e.comment || "") : "") });
   }
   return out;
 }
+// ---- 世界书去重：同名 / 同内容再导入时不再翻倍 ----
+/** 书名归一：去扩展名、去 (6)/（7） 这类序号、去 v4.3 版本号、去空白与分隔符 */
+function wpkNormLabel(s){
+  return String(s == null ? "" : s)
+    .replace(/\.json$/i, "")
+    .replace(/[（(]\s*\d+\s*[）)]/g, "")
+    .replace(/v?\d+(?:\.\d+)+/gi, "")
+    .replace(/[\s_\-—·]+/g, "")
+    .trim();
+}
+/** 丢掉若干本书（连带书名登记） */
+function wpkDropBooks(keys){
+  if (!keys || !keys.length) return 0;
+  var wb = ST.wb || {};
+  var drop = {};
+  keys.forEach(function (k) { drop[k] = 1; });
+  var before = (wb.entries || []).length;
+  wb.entries = (wb.entries || []).filter(function (e) { return !drop[e.srcKey]; });
+  keys.forEach(function (k) {
+    if (wb.bookOf && wb.bookOf[k]) {
+      var lb = wb.bookOf[k];
+      var i = (wb.books || []).indexOf(lb);
+      if (i >= 0 && wb.books) wb.books.splice(i, 1);
+      delete wb.bookOf[k];
+    }
+    if (wb.loaded) delete wb.loaded[k];
+  });
+  return before - wb.entries.length;
+}
+/** 跨书去重：条目正文+标题完全相同只留一条（勾选的那条优先留） */
+function wpkDedupeEntries(){
+  var wb = ST.wb;
+  if (!wb || !Array.isArray(wb.entries)) return 0;
+  var seen = {}, kept = [];
+  wb.entries.forEach(function (e) {
+    var k = String(e.comment || "") + "\u0001" + String(e.content || "");
+    if (Object.prototype.hasOwnProperty.call(seen, k)) {
+      var at = seen[k];
+      if (!kept[at].sel && e.sel) kept[at] = e;
+      return;
+    }
+    seen[k] = kept.length;
+    kept.push(e);
+  });
+  var removed = wb.entries.length - kept.length;
+  if (!removed) return 0;
+  wb.entries = kept;
+  var alive = {};
+  kept.forEach(function (e) { alive[e.srcKey] = 1; });
+  var dead = Object.keys(wb.bookOf || {}).filter(function (k) { return !alive[k]; });
+  if (dead.length) wpkDropBooks(dead);
+  return removed;
+}
+
 function importWorldEntries(rawEntries, sourceName, fileName){
   rawEntries = Array.isArray(rawEntries) ? rawEntries : [];
   var key = fileName ? "file:" + fileName : (sourceName === "st" ? "st:active" : "book:" + String(sourceName || "book"));
   var label = fileName ? String(fileName).replace(/\.json$/i, "") : (sourceName === "st" ? "酒馆激活" : String(sourceName || "book"));
   ST.wb = ST.wb || { entries: [], books: [], loaded: {} };
   ST.wb.loaded = ST.wb.loaded || {};
+  ST.wb.bookOf = ST.wb.bookOf || {};
+  ST.wb.books = ST.wb.books || [];
+
+  var fresh = wpkNorm(rawEntries, key + ":", key);
+
+  // ① 同名世界书（归一化书名一致）= 同一本的重新导入 → 整本替换，勾选按 comment 带过来
+  var normLabel = wpkNormLabel(label);
+  var groups = {};
+  (ST.wb.entries || []).forEach(function (e) {
+    if (e.srcKey === key) return;
+    (groups[e.srcKey] = groups[e.srcKey] || []).push(e);
+  });
+  var carrySel = {};
+  var replaceKeys = Object.keys(groups).filter(function (k) {
+    if (!normLabel) return false;
+    var other = wpkNormLabel(ST.wb.bookOf[k] || String(k).replace(/^file:/, ""));
+    return !!other && other === normLabel;
+  });
+  replaceKeys.forEach(function (k) {
+    groups[k].forEach(function (e) { if (e.sel && e.comment) carrySel[e.comment] = true; });
+  });
+  if (replaceKeys.length) {
+    var dropped = wpkDropBooks(replaceKeys);
+    opfLog("同名世界书替换：", replaceKeys.join(","), "移除旧条目", dropped);
+  }
+
   var old = ST.wb.entries || [];
   var oldSel = {};
-  old.forEach(function (o){ if (o.srcKey === key) oldSel[o.id] = o.sel; });
+  old.forEach(function (o) { if (o.srcKey === key) oldSel[o.id] = o.sel; });
   // 跨会话缓存勾选：按 comment 匹配（同一本书重复导入/刷新时保留上次勾选，即使 uid 变化）
   var cacheSel = worldCacheGetSel(fileName || null, key);
-  var fresh = wpkNorm(rawEntries, key + ":");
+  // ② 跨书同文条目（酒馆激活 + 手动导入同一本）：完全相同的正文不再收第二份
+  var seenText = {};
+  old.forEach(function (o) {
+    if (o.srcKey === key) return;
+    seenText[String(o.comment || "") + "\u0001" + String(o.content || "")] = 1;
+  });
+  var skipped = 0;
   var c = 0;
-  fresh.forEach(function (e){
+  fresh.forEach(function (e) {
+    var tk = String(e.comment || "") + "\u0001" + String(e.content || "");
+    if (Object.prototype.hasOwnProperty.call(seenText, tk)) { skipped++; e._dup = true; return; }
+    seenText[tk] = 1;
+    if (Object.prototype.hasOwnProperty.call(carrySel, e.comment)) { e.sel = true; c++; return; }
     if (Object.prototype.hasOwnProperty.call(oldSel, e.id)) e.sel = !!oldSel[e.id];
     else if (cacheSel && Object.prototype.hasOwnProperty.call(cacheSel, e.comment)) e.sel = !!cacheSel[e.comment];
     else e.sel = !!e.constant;
     if (e.sel) c++;
   });
-  ST.wb.entries = old.filter(function (o){ return o.srcKey !== key; }).concat(fresh);
-  ST.wb.books = ST.wb.books || [];
-  ST.wb.bookOf = ST.wb.bookOf || {}; ST.wb.bookOf[key] = label;
-  if (fresh.length && ST.wb.books.indexOf(label) < 0) ST.wb.books.push(label);
+  if (skipped) {
+    fresh = fresh.filter(function (e) { return !e._dup; });
+    opfLog("世界书去重：跳过与已载条目完全相同的", skipped, "条");
+  }
+
+  ST.wb.entries = old.filter(function (o) { return o.srcKey !== key; }).concat(fresh);
+  if (fresh.length) {
+    ST.wb.bookOf[key] = label;
+    if (ST.wb.books.indexOf(label) < 0) ST.wb.books.push(label);
+  } else if (!ST.wb.entries.length) {
+    delete ST.wb.bookOf[key];
+  }
+  // ③ 收尾再按正文去重一次（防书内自重复 / 历史遗留）
+  wpkDedupeEntries();
   ST.worldSource = (ST.wb.books.length > 1) ? "multi" : (fileName ? "file:" + fileName : (sourceName === "st" ? "st" : "file"));
   ST.catOpen = null; ST.regionOpen = null;
   ST.worldInfo = "";
@@ -133,7 +236,7 @@ function importWorldEntries(rawEntries, sourceName, fileName){
   updateSendText();
   try { renderWorldSide(); } catch (e) { opfErr("renderWorldSide", e); }
   renderMetaStatus();
-  return { added: fresh.length, total: ST.wb.entries.length, sel: c, books: ST.wb.books.length };
+  return { added: fresh.length, skipped: skipped, replaced: replaceKeys.length, total: ST.wb.entries.length, sel: c, books: ST.wb.books.length };
 }
 function updateSendText(){
   var s = getSettings();
@@ -267,6 +370,10 @@ function buildWorldSide(){
   var hx = document.createElement("button"); hx.type = "button"; hx.className = "opf-lside-ico"; hx.textContent = "✕"; hx.addEventListener("click", function(){ switchPage("preset"); });
   head.appendChild(t); head.appendChild(hx); side.appendChild(head);
   var tools = document.createElement("div"); tools.id = "opf-lside-tools";
+  var bImport = document.createElement("button"); bImport.type = "button"; bImport.className = "opf-step-act"; bImport.id = "opf-lside-import"; bImport.textContent = "导入文件"; bImport.title = "导入世界书 JSON（重复导入同一本 = 刷新内容并保留勾选，不会翻倍）";
+  bImport.addEventListener("click", function(){ if (ST.fileInput) ST.fileInput.click(); else { var w0 = getEl("opf-wload"); if (w0) w0.click(); } });
+  var bClear = document.createElement("button"); bClear.type = "button"; bClear.className = "opf-step-act"; bClear.id = "opf-lside-clear"; bClear.textContent = "清空世界书"; bClear.title = "清掉已导入的全部世界书条目（勾选与缓存书单一起清）";
+  bClear.addEventListener("click", function(){ clearWorldbook(); });
   var bAll = document.createElement("button"); bAll.type = "button"; bAll.className = "opf-step-act"; bAll.textContent = "全选"; bAll.addEventListener("click", function(){ wpkSetAll(true); });
   var bConst = document.createElement("button"); bConst.type = "button"; bConst.className = "opf-step-act"; bConst.textContent = "仅常驻"; bConst.addEventListener("click", wpkSetConst);
   var bNone = document.createElement("button"); bNone.type = "button"; bNone.className = "opf-step-act"; bNone.textContent = "清空勾选"; bNone.addEventListener("click", function(){ wpkSetAll(false); });
@@ -274,7 +381,7 @@ function buildWorldSide(){
   var catSel = document.createElement("select"); catSel.id = "opf-lside-cat";
   ["全部","命定系统","规则·系统","导览开关","地区·地理","种族","角色","组织·势力","经济·产业","节庆","DLC扩展","DLC事件","DLC内容","其他"].forEach(function (v){ var o = document.createElement("option"); o.value = v; o.textContent = v; catSel.appendChild(o); });
   catSel.addEventListener("change", function(){ renderWorldSide(); });
-  tools.appendChild(bAll); tools.appendChild(bConst); tools.appendChild(bNone); tools.appendChild(filt); tools.appendChild(catSel); side.appendChild(tools);
+  tools.appendChild(bImport); tools.appendChild(bClear); tools.appendChild(bAll); tools.appendChild(bConst); tools.appendChild(bNone); tools.appendChild(filt); tools.appendChild(catSel); side.appendChild(tools);
   var cnt = document.createElement("div"); cnt.id = "opf-lside-count"; side.appendChild(cnt);
   var list = document.createElement("div"); list.id = "opf-lside-list"; side.appendChild(list);
   var host = getEl("opf-page-world") || document.body;
@@ -356,3 +463,4 @@ var SIZE_CSS = [
 function injectGlobalSizeCSS(){
   try { if (getEl(NS + "_css_size")) return; var st = document.createElement("style"); st.id = NS + "_css_size"; st.textContent = SIZE_CSS; document.head.appendChild(st); } catch (e) { opfErr("injectGlobalSizeCSS", e); }
 }
+

@@ -317,13 +317,15 @@ function worldCacheRestore(){
     restored++;
   });
   if (restored) {
+    var deduped = (typeof wpkDedupeEntries === "function") ? wpkDedupeEntries() : 0;
+    if (deduped) opfLog("世界书缓存里有重复条目，已去重", deduped, "条");
     var wkeys = Object.keys(ST.wb.bookOf || {});
     ST.worldSource = ST.wb.books.length > 1 ? "multi" : (wkeys.length ? "file:" + wkeys[0] : "file");
     ST.catOpen = null; ST.regionOpen = null;
     updateSendText();
     try { renderWorldSide(); } catch (e) {}
     renderMetaStatus();
-    opfLog("世界书缓存已恢复", restored, "本");
+    opfLog("世界书缓存已恢复", restored, "本", deduped ? "（去重 " + deduped + " 条）" : "");
     toast("已从本地缓存恢复 " + restored + " 本世界书及上次勾选（重新导入同名文件会刷新内容并保留勾选）");
   }
 }
