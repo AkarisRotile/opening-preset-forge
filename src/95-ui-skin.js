@@ -17,7 +17,7 @@ var OPF_LAYOUT_FIX_CSS = [
   '}',
   '@media (max-width:560px){',
   '  #opf-shell:not(.opf-theme-clock) #opf-nav{width:132px !important;padding-left:5px !important;padding-right:5px !important;}',
-  '  #opf-shell:not(.opf-theme-clock) #opf-shell-actions{left:132px !important;width:calc(100% - 132px - 16px) !important;}',
+  '  #opf-shell:not(.opf-theme-clock) #opf-actions{left:132px !important;width:calc(100% - 132px - 16px) !important;}',
   '  .opf-char-wrap,.opf-char-wrap.opf-2col{padding-left:10px !important;padding-right:10px !important;}',
   '  .opf-card{padding:12px 12px 13px !important;}',
   '}',
