@@ -54,8 +54,16 @@ async function runCompliance(){
     var prev = JSON.stringify(ST.finalJson);
     // 以前超过 12000 字符会截断再发给模型，模型只能照着半截 JSON 编后半段，回来还无条件覆盖。
     // 现在原样发；结果先做「条目数不能变少」的比对，丢条目就拒绝写回。
+    // 发给模型的 JSON 先剥掉注入标记（_opfl/__opfLibBg），别把内部字段教给模型；
+    // 锁定条目本身保留在 JSON 里，模型知道它们存在，才不会重复写同名条目。
     var cur = prev;
-    var complyTask = "【合规自检与修复】请用下面“技能/装备/道具/资产生成规范”逐类检查开局预设 JSON：字段是否齐全、品质是否为七等、标签/消耗/效果/结算/总空间/内部资产等是否符合规范；只修正不合规处，其余内容保持原样，最后完整输出修订后的开局预设 JSON，放在 " + fence() + "text 代码块中。\n\n[生成规范]\n" + COMPLIANCE_SPEC + '\n\n' + buildSystemContent();
+    try {
+      if (typeof libDeep === 'function' && typeof libStripPresetMarkers === 'function') {
+        var sendObj = libDeep(ST.finalJson);
+        if (sendObj) { libStripPresetMarkers(sendObj); cur = JSON.stringify(sendObj); }
+      }
+    } catch (e) { opfErr('compliance strip markers', e); }
+    var complyTask = "【合规自检与修复】请用下面“技能/装备/道具/资产生成规范”逐类检查开局预设 JSON：字段是否齐全、品质是否为七等、标签/消耗/效果/结算/总空间/内部资产等是否符合规范；只修正不合规处，其余内容保持原样，最后完整输出修订后的开局预设 JSON，放在 " + fence() + "text 代码块中。\n\n[生成规范]\n" + COMPLIANCE_SPEC + '\n\n' + buildSystemContent() + '\n\n' + presetInjectBlock('final') + '\n\n[锁定提醒] 上面「自备条目」里的内容由用户手写并锁定：一个字段都不许改，必须逐字保留在输出里。';
     var complyUser = "[当前开局预设 JSON]\n" + cur;
     var msgs = sxMessages(complyTask, complyUser);
     ST._complyRun = true;
@@ -63,6 +71,8 @@ async function runCompliance(){
       var resp = await callModel(msgs);
       var ex = extractJson(resp);
       if (ex.ok && ex.obj) {
+        // 自检后把锁定条目再原样放回：即使模型"顺手规范化"了用户手写的内容，也以用户写的为准。
+        try { if (typeof libMergeIntoPreset === 'function') libMergeIntoPreset(ex.obj); } catch (e) { opfErr('compliance merge locked', e); }
         var lost = 0;
         ['equipments', 'items', 'assets', 'skills', 'partners'].forEach(function (k) {
           var before = (ST.finalJson && Array.isArray(ST.finalJson[k])) ? ST.finalJson[k].length : 0;

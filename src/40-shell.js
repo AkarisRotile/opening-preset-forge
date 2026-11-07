@@ -5,6 +5,7 @@
 // 页 id → 显示名。**不带页码圆圈**（用户反馈圆圈数字不好看）。
 var PAGE_DEFS = [
   { id: "preset", label: "开局预设" },
+  { id: "library", label: "自备开局" },
   { id: "world",  label: "世界书" },
   { id: "char",   label: "二创角色" },
   { id: "destiny",label: "命定系统" },
@@ -37,7 +38,7 @@ function domainOfPage(id) { for (var i = 0; i < DOMAINS.length; i++) if (DOMAINS
 function domainByNav(id) { for (var i = 0; i < DOMAINS.length; i++) if (DOMAINS[i].nav === id) return DOMAINS[i]; return null; }
 // 导航：带 title 的是分组标题。三条创作流水线并列在「创作」组里。
 var NAV_GROUPS = [
-  { title: "创作", items: ["preset", "char", "destinyhub"] },
+  { title: "创作", items: ["preset", "library", "char", "destinyhub"] },
   { title: "造物", items: ["atelier"] },
   { title: "对话", items: ["shixian"] }
 ];
@@ -138,6 +139,8 @@ function buildShell(){
     if (p.id === "preset") {
       var root = document.createElement("div"); root.id = "opf-root"; root.className = ""; root.style.display = "flex"; root.innerHTML = OPF_HTML;
       d.appendChild(root);
+    } else if (p.id === "library") {
+      d.innerHTML = LIB_HTML;
     } else if (p.id === "char") {
       d.innerHTML = CHAR_HTML;
     } else if (p.id === "destiny") {
@@ -174,6 +177,8 @@ function buildShell(){
   try { addPresetLinkageUI(root); } catch (e) { opfErr("preset linkage ui", e); }
   try { buildWorldSideButton(root); } catch (e) { opfErr("side button", e); }
   try { addComplianceToggle(root); } catch (e) { opfErr("compliance toggle", e); }
+  try { libBindPage(); } catch (e) { opfErr("library page", e); }
+  try { libRenderInjectCard(); } catch (e) { opfErr("inject card", e); }
   try { bindCharPage(); } catch (e) { opfErr("char page", e); }
   try { bindDestinyPage(); } catch (e) { opfErr("destiny page", e); }
   try { bindRxPage(); } catch (e) { opfErr("regex page", e); }
@@ -230,6 +235,7 @@ function switchPage(id, force){
   try { opfSkinNavSync(); } catch (e) { opfErr("skin nav", e); }
   try { renderProjList(); } catch (e) { opfErr("renderProjList", e); }
   if (id === "world") { try { buildWorldSide(); renderWorldSide(); } catch (e) {} }
+  if (id === "library") { try { libRender(); } catch (e) {} }
   if (id === "char") { try { renderCharPage(); } catch (e) {} }
   if (id === "destiny") { try { renderDestinyPage(); } catch (e) {} }
   if (id === "regex") { try { rxRenderItems(); } catch (e) {} }

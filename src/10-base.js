@@ -431,20 +431,32 @@ function sxPresetMessages() {
   ]);
 }
 
+// 自备开局库的锁定条目：作为提示词里的「已定稿」内容，让模型围着它补，而不是重写它。
+// 真正的兜底在 handleModelReply 的 libMergeIntoPreset——模型即使写了同名条目，落盘前也会被原样覆盖回。
+function presetInjectBlock(phaseKey) {
+  try {
+    if (typeof libInjectPromptBlock === 'function') return String(libInjectPromptBlock(phaseKey) || '').trim();
+  } catch (e) { opfErr('presetInjectBlock', e); }
+  return '';
+}
 function phasePrompt(phase) {
   var body = macroFill(PAYLOAD[phase.key]);
   if (phase.key === 'final') {
+    var injectFinal = presetInjectBlock('final');
     return '【最终汇总阶段】\n下面是最终“开局预设 JSON”的完整格式模板与全部填写规则（含数值规则），请仔细阅读：\n\n' +
       body + '\n\n请把本对话中已经产出的全部栏目内容（技能/装备/道具/资产/背景）汇总成这一份完整的开局预设 JSON。' +
-      '输出时把 JSON 放在 ' + fence() + 'text 代码块里，严格按照模板的字段、结构与规则填写，不要遗漏任何符号。';
+      (injectFinal ? '\n\n' + injectFinal : '') +
+      '\n\n输出时把 JSON 放在 ' + fence() + 'text 代码块里，严格按照模板的字段、结构与规则填写，不要遗漏任何符号。';
   }
   var first = (phase.key === 'skill') ? '（先完成技能栏：把开局角色要学的技能一次性列全；没有特殊技能需求则回复“无”）' : '';
   var spec = SPEC_PROMPT[phase.key];
   var specBlock = spec ? '\n\n[生成规范 · ' + phase.title + ']\n' + spec + '\n' : '';
   // 背景这一步先过一遍文风与信息边界（用户指定，原文注入）
   var antiSlopBlock = (phase.key === 'background') ? '\n[文风与信息边界]\n' + ANTI_SLOP_RULES + '\n' : '';
+  var injectPhase = presetInjectBlock(phase.key);
   return '【阶段：' + phase.title + '】\n' + body + specBlock + antiSlopBlock + '\n' +
-    '请严格按上面的格式与生成规范，一次性产出本栏完整内容（若该栏确实无内容则回复“无”）。' + first;
+    '请严格按上面的格式与生成规范，一次性产出本栏完整内容（若该栏确实无内容则回复“无”）。' + first +
+    (injectPhase ? '\n\n' + injectPhase : '');
 }
 
 function systemCtxBudgetOk(msgs) {
@@ -865,6 +877,8 @@ async function runQuick() {
   }
   lines.push('【最终汇总】\n下面是最终“开局预设 JSON”的完整格式模板与填写规则：\n' + macroFill(PAYLOAD.final));
   lines.push('请一次性完成全部栏目创作并输出最终 JSON，放在 ' + fence() + 'text 代码块里。');
+  var quickInject = presetInjectBlock('final');
+  if (quickInject) lines.push(quickInject);
   var msgs = sxMessages(buildSystemContent() + '\n\n' + buildWorkNote() + '\n\n' + lines.join('\n\n'), buildUser0());
   ST.msgs = msgs;
   setPhase('final', 'run');
@@ -938,6 +952,9 @@ function handleModelReply(text) {
   var ex = extractJson(text);
   if (ex.ok) {
     ST.finalJson = ex.obj;
+    // 自备条目在落盘前强制并进去：模型输出里同名的条目被原样替换，其余追加。
+    // 后面的补点数、自检、导出都基于合并后的 JSON，所以模型没机会改动锁定内容。
+    try { if (typeof libMergeIntoPreset === 'function') libMergeIntoPreset(ex.obj); } catch (e) { opfErr('merge locked', e); }
     var fixedCost = normalizeCostTree(ex.obj, []);
     normalizePoints(ex.obj, fixedCost);
     var warns = validatePreset(ex.obj);
@@ -1086,6 +1103,15 @@ function buildExportDoc() {
   var s = getSettings();
   var obj = ST.finalJson;
   if (!obj) return null;
+  // 导出用克隆：先清掉上一轮注入、再并进当前勾选，最后剥掉内部标记。
+  // 这样「生成完 JSON 之后才去选/取消条目」也能立刻反映到导出，不用重跑整条管线；
+  // ST.finalJson 里的标记仍然留着，供下次合并识别该清掉哪些条目。
+  try {
+    if (typeof libDeep === 'function') obj = libDeep(obj) || obj;
+    if (typeof libStripInjected === 'function') libStripInjected(obj);
+    if (typeof libMergeIntoPreset === 'function') libMergeIntoPreset(obj);
+    if (typeof libStripPresetMarkers === 'function') libStripPresetMarkers(obj);
+  } catch (e) { opfErr('export merge locked', e); }
   if (s.metaMode === 'full') {
     var now = Date.now();
     return {

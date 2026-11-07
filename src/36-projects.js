@@ -56,6 +56,7 @@ function projSnap(type) {
       status: projClone(ST.status) || {},
       finalJson: projClone(ST.finalJson),
       finalText: ST.finalText || "",
+      inject: projClone(ST.inject) || null,     // 自备开局库的锁定选取跟着草稿走
       demand: projVal("opf-demand"),
       pname: projVal("opf-pname")
     };
@@ -71,6 +72,9 @@ function projApply(type, data) {
     ST.status = projClone(data.status) || {};
     ST.finalJson = projClone(data.finalJson) || null;
     ST.finalText = data.finalText || "";
+    // 锁定选取属于「这份开局预设草稿」：切工程必须一起换，不能把上一份的注入带过来。
+    ST.inject = projClone(data.inject) || null;
+    try { if (typeof libInjectEnsure === 'function') libInjectEnsure(); } catch (e) {}
     ST.msgs = null;                        // 会话上下文不持久化；「重跑该步」会按 ST.results 重建
     ST.lkSnapshot = null;                  // 交火快照属于「当前这份草稿」，切工程必须作废，否则会把上一份写进来
     ST.lkReport = "";
@@ -81,6 +85,7 @@ function projApply(type, data) {
     try { renderSteps(); } catch (e) { opfErr("projApply preset renderSteps", e); }
     try { renderJsonOut(ST.finalJson, ST.finalJson ? validatePreset(ST.finalJson) : []); } catch (e) {}
     try { renderMetaStatus(); } catch (e) {}
+    try { if (typeof libRenderInjectCard === 'function') libRenderInjectCard(); } catch (e) {}
     try { var _ub = getEl("opf-lk-undo"); if (_ub) _ub.disabled = true; } catch (e) {}
     try { var _ls = getEl("opf-lk-status"); if (_ls) _ls.textContent = ""; } catch (e) {}
     try { renderDirsStatus("已载入草稿：可继续精修，或点「⟳ 重新汇总」重建 JSON。"); } catch (e) {}
