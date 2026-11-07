@@ -1227,6 +1227,8 @@ function libEditorRead() {
 }
 
 // ---------------- 捏物收藏扩展（fated-opening-templates）导入 ----------------
+// 这里只按对方公开的导出格式做互操作（读 JSON、字段映射），不复制它的代码、样式或文案；
+// 「捏物收藏扩展」由 @whity 制作，格式与版权归原作者。
 // 该扩展导出的 JSON 长这样：
 //   { format:"fated-opening-templates", schemaVersion:1, templates:[
 //       { id, name, updatedAt, library:{ equipment:[{id,payload}], item:[…], asset:[…],

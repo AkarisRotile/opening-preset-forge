@@ -94,6 +94,7 @@ SillyTavern/data/<你的用户名>/extensions/opening-preset-forge/
 - 模型调用只走 `SillyTavern.getContext().generateRaw`，**不保存也不使用 API Key**
 - 不依赖第三方库，不分包，不发请求到第三方域名
 - 数据只在本地（localStorage / IndexedDB），没有云端、没有账号
+- 捏物包导入只按「捏物收藏扩展」（作者 @whity）公开的导出格式做互操作，不含对方的代码、样式或文案
 - 导出格式与 `destiny_AI一键生成开局预设格式.preset.json` 同构
 
 ## 常见问题
