@@ -72,11 +72,19 @@ function projApply(type, data) {
     ST.finalJson = projClone(data.finalJson) || null;
     ST.finalText = data.finalText || "";
     ST.msgs = null;                        // 会话上下文不持久化；「重跑该步」会按 ST.results 重建
+    ST.lkSnapshot = null;                  // 交火快照属于「当前这份草稿」，切工程必须作废，否则会把上一份写进来
+    ST.lkReport = "";
+    ST.dirty = false;
+    ST.modified = {};
     projSetVal("opf-demand", data.demand || "");
     projSetVal("opf-pname", data.pname || "【自定义开局】");
     try { renderSteps(); } catch (e) { opfErr("projApply preset renderSteps", e); }
     try { renderJsonOut(ST.finalJson, ST.finalJson ? validatePreset(ST.finalJson) : []); } catch (e) {}
     try { renderMetaStatus(); } catch (e) {}
+    try { var _ub = getEl("opf-lk-undo"); if (_ub) _ub.disabled = true; } catch (e) {}
+    try { var _ls = getEl("opf-lk-status"); if (_ls) _ls.textContent = ""; } catch (e) {}
+    try { renderDirsStatus("已载入草稿：可继续精修，或点「⟳ 重新汇总」重建 JSON。"); } catch (e) {}
+    try { renderResum(); } catch (e) {}
     return;
   }
   if (type === "char") {
@@ -223,6 +231,38 @@ function renderProjList() {
 // ---------------- 自动存档 ----------------
 // 不往三条流水线里塞钩子（那要动它们的内部），改成低频轮询：
 // 每 2.5 秒把「当前类型」的运行时状态与工程里存着的对比，变了才写。
+// 空快照不能覆盖有内容的工程：新会话启动时运行时是空的，旧版会在这里把草稿写空。
+function projSnapIsEmpty(type, snap) {
+  if (!snap) return true;
+  if (type === "preset") {
+    var hasRes = snap.results && Object.keys(snap.results).length;
+    return !hasRes && !snap.finalJson && !(snap.demand && String(snap.demand).trim());
+  }
+  if (type === "char") {
+    var c = snap.char || {};
+    return !(c.segs && Object.keys(c.segs).length) && !(c.demand && String(c.demand).trim());
+  }
+  if (type === "destiny") {
+    var d = snap.dest || {};
+    return !(d.segs && Object.keys(d.segs).length) && !(d.demand && String(d.demand).trim());
+  }
+  return true;
+}
+function projRuntimeEmpty(type) { try { return projSnapIsEmpty(type, projSnap(type)); } catch (e) { return true; } }
+// 启动时恢复「当前类型的活跃工程」；运行时已有内容（例如刚恢复了旧草稿缓存）就不动
+function projRestoreActive() {
+  PROJ_TYPES.forEach(function (t) {
+    var g = projGroup(t);
+    if (!g.active) return;
+    var p = projActive(t);
+    if (!p || !p.data) return;
+    if (!projRuntimeEmpty(t)) return;
+    if (projSnapIsEmpty(t, p.data)) return;
+    try { projApply(t, p.data); opfLog("已恢复草稿", PROJ_TYPE_LABEL[t], p.name); }
+    catch (e) { opfErr("projRestoreActive", t, e); }
+  });
+  try { renderProjList(); } catch (e) {}
+}
 function projTick() {
   try {
     var t = currentPage();
@@ -231,6 +271,7 @@ function projTick() {
     var cur = projActive(t);
     if (!cur) { projCommit(t); renderProjList(); projPersist(); return; }
     var snap = projSnap(t);
+    if (projSnapIsEmpty(t, snap) && !projSnapIsEmpty(t, cur.data || {})) return;  // 空快照不覆盖有内容的工程
     if (JSON.stringify(snap) !== JSON.stringify(cur.data || {})) {
       cur.data = snap; cur.updatedAt = Date.now();
       projPersist(); renderProjList();

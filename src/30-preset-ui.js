@@ -107,7 +107,7 @@ function bindPanel(root){
   root.querySelector("#opf-cap").addEventListener("change", syncFromControl);
   root.querySelector("#opf-pname").addEventListener("change", syncFromControl);
   var fi = document.createElement("input"); fi.type = "file"; fi.accept = ".json,application/json"; ST.fileInput = fi;
-  fi.addEventListener("change", function(){ var f = fi.files && fi.files[0]; if (!f) return; loadWorldFromFile(f).then(function(res){ applyWorldResult(res); renderMetaStatus(); toast("世界书已从文件载入：" + (res.fileName || "")); try { switchPage("world"); } catch (e) {} }).catch(function(e){ toast("世界书文件解析失败：" + (e && e.message ? e.message : e), "error"); }); fi.value = ""; });
+  fi.addEventListener("change", function(){ var f = fi.files && fi.files[0]; if (!f) return; loadWorldFromFile(f).then(function(res){ var ok = applyWorldResult(res); renderMetaStatus(); if (!ok) return; toast("世界书已从文件载入：" + (res.fileName || "")); try { switchPage("world"); } catch (e) {} }).catch(function(e){ toast("世界书文件解析失败：" + (e && e.message ? e.message : e), "error"); }); fi.value = ""; });
   root.querySelector("#opf-wload").addEventListener("click", function(){ fi.click(); });
   root.querySelector("#opf-wclear").addEventListener("click", function(){ clearWorldbook(); });
   window.addEventListener("resize", keepPanelInView);
@@ -245,9 +245,17 @@ async function runFrom(pid){
   if (start === 0) { renderSteps(); await runAll(); return; }
   ST.running = true; ST.stopReq = false;
   ST._freshDraft = (start === 0);
+  ST.finalJson = null; ST.finalText = "";      // 从中间重跑后旧汇总已经过期，不能留在导出/复制里
+  try { renderJsonOut(null, []); } catch (e) {}
   dirsReset();
   try {
     ST.userName = currentUserName();
+    // 角色卡 / 世界书上下文：runFrom 以前完全不重建，刷新后重跑会按空世界观写
+    var s = getSettings();
+    try { ST.contextText = s.includeCard ? collectCardText() : (ST.contextText || ""); } catch (e) { opfErr('runFrom context', e); }
+    if (s.includeWorld && ST.worldSource === 'none') {
+      try { var wr = await loadWorldFromST(); applyWorldResult(wr); } catch (e) { opfErr('runFrom world', e); }
+    }
     var msgs = sxPresetMessages();
     for (var k = 0; k < start; k++) {
       var ph = PHASES[k];
@@ -311,9 +319,12 @@ function markSummarized(){
 function renderResum(){
   var b = getEl("opf-resum");
   if (!b) return;
-  var can = !!ST.finalJson || (ST.msgs && ST.msgs.length > 0);
+  // 快出模式只产出 final 一栏，没有分步结果可汇总：按钮置灰并说明原因，别让人点了只得到一句死路提示
+  var quickOnly = !!ST.quickDraft && !ST.results.skill && !ST.results.equip;
+  var can = !quickOnly && (!!ST.finalJson || (ST.msgs && ST.msgs.length > 0));
   b.disabled = !can;
-  b.textContent = ST.dirty ? "⟳ 重新汇总（有分步修改）" : "⟳ 重新汇总";
+  b.title = quickOnly ? "快出模式没有分步内容，无法重新汇总；请取消「快出模式(单次)」后重新生成" : "";
+  b.textContent = quickOnly ? "⟳ 重新汇总（快出模式不可用）" : (ST.dirty ? "⟳ 重新汇总（有分步修改）" : "⟳ 重新汇总");
 }
 function phaseRow(pid){ return getEl("opf-ph-" + pid); }
 function enablePhaseRefine(pid){
@@ -338,6 +349,11 @@ async function refinePhase(pid, direction){
   if (!dir) dir = "整体打磨：修正设定漏洞、提升与角色/背景的契合度与文笔，条目数量与格式保持不变。";
   ST.running = true; ST.stopReq = false; setPhase(pid, "run"); renderRunButtons();
   try {
+    var s = getSettings();
+    try { ST.contextText = s.includeCard ? collectCardText() : (ST.contextText || ""); } catch (e) { opfErr('refine context', e); }
+    if (s.includeWorld && ST.worldSource === 'none') {
+      try { var wr = await loadWorldFromST(); applyWorldResult(wr); } catch (e) { opfErr('refine world', e); }
+    }
     var msgs = sxPresetMessages();
     for (var k = 0; k < idx; k++) {
       var pp = PHASES[k];
@@ -349,6 +365,14 @@ async function refinePhase(pid, direction){
     var refineTask = phasePrompt(phase) + nl + nl + "【本步精修指令】" + nl + "方向：" + dir + nl + nl + "[世界规则·创作限制]" + nl + WORLD_RULES + nl + nl + "要求：只输出【" + phase.title + "】这一栏的修订内容（沿用本步的书条目格式与数量，可增删但要有理由），不要改动其它栏目，也不要输出整份 JSON。**方向里点名要改或要删的条目/字段必须真的改掉、删掉**——不许把旧条目留在原位而把新条目接在后面（叠加＝没改）；除本次方向点名的部分外，其余保持原样。若确实无需修改，原样输出“无”。";
     sxTurn(refineTask, '按上面的任务与方向，只修订「' + phase.title + '」这一栏。').forEach(function (m) { msgs.push(m); });
     var resp = await callModel(msgs);
+    // 落地守门：模型回「无」或明显不是正文时，绝不覆盖原有栏目
+    var g = opfSegApplyGuard(ST.results[pid], resp, phase.title, function () { return false; });
+    if (g.action !== "write") {
+      setPhase(pid, "ok");
+      toast(g.reason === "blocked" ? ("本步精修被拦下：" + (g.note || "内容偏短或丢结构") + "（原文已保留）") : "模型认为无需修改，本栏保持原样", g.reason === "blocked" ? "warning" : "info");
+      return;
+    }
+    resp = g.text;
     ST.results[pid] = resp;
     if (ST.elPre && ST.elPre[pid]) ST.elPre[pid].textContent = (resp || "").slice(0, 4000) + ((resp && resp.length > 4000) ? " ……(截断显示)" : "");
     setPhase(pid, "ok"); enablePhaseRefine(pid);

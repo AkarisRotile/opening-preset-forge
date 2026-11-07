@@ -1,4 +1,4 @@
-﻿//@module 40-shell — 分页外壳（PAGE_DEFS/建壳/切页）+ 本地缓存
+//@module 40-shell — 分页外壳（PAGE_DEFS/建壳/切页）+ 本地缓存
 // ============================================================================
 // v1.7.0 全屏分页壳 + 本地缓存 + 二创角色工坊
 // ============================================================================
@@ -182,6 +182,7 @@ function buildShell(){
   try { bindRefinePage(); } catch (e) { opfErr("refine page", e); }
   try { bindAtelierPage(); } catch (e) { opfErr("atelier page", e); }
   try { buildWorldSide(); } catch (e) { opfErr("buildWorldSide", e); }
+  try { opfSkinBoot(); } catch (e) { opfErr("skin boot", e); }
   if (getSettings().visible) showPanel();
 }
 // 页内子标签栏：按当前页所属「领域」渲染；不在任何领域里的页就隐藏它。
@@ -225,6 +226,8 @@ function switchPage(id, force){
     t.classList.toggle("active", (t.id === "opf-tab-" + id) || !!(dn && dn.pages.indexOf(id) >= 0));
   });
   renderSubbar(id);
+  try { opfSkinSubbar(); } catch (e) { opfErr("skin subbar", e); }
+  try { opfSkinNavSync(); } catch (e) { opfErr("skin nav", e); }
   try { renderProjList(); } catch (e) { opfErr("renderProjList", e); }
   if (id === "world") { try { buildWorldSide(); renderWorldSide(); } catch (e) {} }
   if (id === "char") { try { renderCharPage(); } catch (e) {} }

@@ -47,7 +47,8 @@ var DEFAULT_SETTINGS = {
   storyTone: 'default',      // 故事基调：sunny | default | gloomy（必选其一）
   storyType: '',             // 开局题材 id（11 选一，空=不指定）
   storySchool: 'normal',     // 校园题材的子项：normal | magic
-  storyRole: ''              // 血族真祖题材的子项：''(按人设) | butler | maid
+  storyRole: '',             // 血族真祖题材的子项：''(按人设) | butler | maid
+  uiTheme: 'frost'           // 界面风格：frost(霜玻璃·默认) | clock(古典机械) | astral(神殿几何)
 };
 
 // ---------------- 始弦人设（唯一真源 · 原版预设原文，一字不改） ----------------
@@ -204,7 +205,7 @@ var ST = {
 function resetPhase(pid) { ST.status[pid] = 'wait'; }
 function setPhase(pid, st) {
   ST.status[pid] = st;
-  var ui = getEl('ph-' + pid);
+  var ui = getEl('opf-ph-' + pid);       // 行 id 是 opf-ph-<id>；写成 ph-<id> 会让状态永远不刷新
   if (ui) {
     ui.setAttribute('data-st', st);
     var dot = ui.querySelector('.opf-dot');
@@ -341,10 +342,15 @@ function loadWorldFromFile(file) {
 }
 
 function applyWorldResult(res) {
-  if (!res || !res.entries || !res.entries.length) { clearWorldbook(); return; }
+  if (!res || !res.entries || !res.entries.length) {
+    // 解析不出条目时**不能**清空现场：用户可能只是选错了文件，清掉会把已有世界书与所有勾选缓存一起毁掉
+    toast("这个文件里没有解析到世界书条目（可能不是世界书 JSON），已保留当前世界书不动", "warning");
+    return false;
+  }
   var r = importWorldEntries(res.entries, res.sourceName || 'file', res.fileName || null);
   opfLog('世界书载入条目数：', r.total, '默认勾选常驻：', r.selConst);
   try { if (!getEl("opf-lside")) buildWorldSide(); } catch (e) {}
+  return true;
 }
 
 // ============================================================================
@@ -849,6 +855,7 @@ async function runAll() {
     if (s.quickMode) {
       await runQuick();
     } else {
+      ST.quickDraft = false;
       var msgs = sxPresetMessages();
       ST.msgs = msgs;
       for (var i = 0; i < PHASES.length; i++) {
@@ -881,6 +888,7 @@ async function runQuick() {
   try {
     var resp = await callModel(msgs);
     ST.results.final = resp;
+    ST.quickDraft = true;               // 快出模式只产出 final，渲染「重新汇总」时据此置灰
     setPhase('final', 'ok');
     if (ST.elPre && ST.elPre.final) ST.elPre.final.textContent = (resp || '').slice(0, 6000);
     handleModelReply(resp);
@@ -1098,7 +1106,7 @@ function buildExportDoc() {
   if (s.metaMode === 'full') {
     var now = Date.now();
     return {
-      name: obj.name || presetNameValue(),
+      name: presetNameFor(obj),
       createdAt: now,
       updatedAt: now,
       character: obj.character,
@@ -1111,7 +1119,22 @@ function buildExportDoc() {
       customInjectionSettings: obj.customInjectionSettings || { equipment: true, item: true, asset: true, skill: true, partner: true }
     };
   }
-  return obj;
+  // core 模式：只留 character 起，把模板里的元数据（name/createdAt/updatedAt）剥掉
+  var out = {};
+  Object.keys(obj).forEach(function (k) {
+    if (k === 'name' || k === 'createdAt' || k === 'updatedAt') return;
+    out[k] = obj[k];
+  });
+  return out;
+}
+// 导出名：用户改过「名称」就以输入框为准，否则用模型给的 name，再退回默认
+function presetNameFor(obj) {
+  var v = '';
+  try { var el = getEl('opf-pname'); v = el && el.value ? String(el.value).trim() : ''; } catch (e) {}
+  var def = '【自定义开局】';
+  if (v && v !== def) return v;
+  if (obj && obj.name) return obj.name;
+  return v || def;
 }
 function safeName(n) {
   return String(n || 'preset').replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 40) || 'preset';
@@ -1429,7 +1452,7 @@ function bindPanel(root){
   root.querySelector("#opf-cap").addEventListener("change", syncFromControl);
   root.querySelector("#opf-pname").addEventListener("change", syncFromControl);
   var fi = document.createElement("input"); fi.type = "file"; fi.accept = ".json,application/json"; ST.fileInput = fi;
-  fi.addEventListener("change", function(){ var f = fi.files && fi.files[0]; if (!f) return; loadWorldFromFile(f).then(function(res){ applyWorldResult(res); renderMetaStatus(); toast("世界书已从文件载入：" + (res.fileName || "")); try { switchPage("world"); } catch (e) {} }).catch(function(e){ toast("世界书文件解析失败：" + (e && e.message ? e.message : e), "error"); }); fi.value = ""; });
+  fi.addEventListener("change", function(){ var f = fi.files && fi.files[0]; if (!f) return; loadWorldFromFile(f).then(function(res){ var ok = applyWorldResult(res); renderMetaStatus(); if (!ok) return; toast("世界书已从文件载入：" + (res.fileName || "")); try { switchPage("world"); } catch (e) {} }).catch(function(e){ toast("世界书文件解析失败：" + (e && e.message ? e.message : e), "error"); }); fi.value = ""; });
   root.querySelector("#opf-wload").addEventListener("click", function(){ fi.click(); });
   root.querySelector("#opf-wclear").addEventListener("click", function(){ clearWorldbook(); });
   window.addEventListener("resize", keepPanelInView);
@@ -1567,9 +1590,17 @@ async function runFrom(pid){
   if (start === 0) { renderSteps(); await runAll(); return; }
   ST.running = true; ST.stopReq = false;
   ST._freshDraft = (start === 0);
+  ST.finalJson = null; ST.finalText = "";      // 从中间重跑后旧汇总已经过期，不能留在导出/复制里
+  try { renderJsonOut(null, []); } catch (e) {}
   dirsReset();
   try {
     ST.userName = currentUserName();
+    // 角色卡 / 世界书上下文：runFrom 以前完全不重建，刷新后重跑会按空世界观写
+    var s = getSettings();
+    try { ST.contextText = s.includeCard ? collectCardText() : (ST.contextText || ""); } catch (e) { opfErr('runFrom context', e); }
+    if (s.includeWorld && ST.worldSource === 'none') {
+      try { var wr = await loadWorldFromST(); applyWorldResult(wr); } catch (e) { opfErr('runFrom world', e); }
+    }
     var msgs = sxPresetMessages();
     for (var k = 0; k < start; k++) {
       var ph = PHASES[k];
@@ -1633,9 +1664,12 @@ function markSummarized(){
 function renderResum(){
   var b = getEl("opf-resum");
   if (!b) return;
-  var can = !!ST.finalJson || (ST.msgs && ST.msgs.length > 0);
+  // 快出模式只产出 final 一栏，没有分步结果可汇总：按钮置灰并说明原因，别让人点了只得到一句死路提示
+  var quickOnly = !!ST.quickDraft && !ST.results.skill && !ST.results.equip;
+  var can = !quickOnly && (!!ST.finalJson || (ST.msgs && ST.msgs.length > 0));
   b.disabled = !can;
-  b.textContent = ST.dirty ? "⟳ 重新汇总（有分步修改）" : "⟳ 重新汇总";
+  b.title = quickOnly ? "快出模式没有分步内容，无法重新汇总；请取消「快出模式(单次)」后重新生成" : "";
+  b.textContent = quickOnly ? "⟳ 重新汇总（快出模式不可用）" : (ST.dirty ? "⟳ 重新汇总（有分步修改）" : "⟳ 重新汇总");
 }
 function phaseRow(pid){ return getEl("opf-ph-" + pid); }
 function enablePhaseRefine(pid){
@@ -1660,6 +1694,11 @@ async function refinePhase(pid, direction){
   if (!dir) dir = "整体打磨：修正设定漏洞、提升与角色/背景的契合度与文笔，条目数量与格式保持不变。";
   ST.running = true; ST.stopReq = false; setPhase(pid, "run"); renderRunButtons();
   try {
+    var s = getSettings();
+    try { ST.contextText = s.includeCard ? collectCardText() : (ST.contextText || ""); } catch (e) { opfErr('refine context', e); }
+    if (s.includeWorld && ST.worldSource === 'none') {
+      try { var wr = await loadWorldFromST(); applyWorldResult(wr); } catch (e) { opfErr('refine world', e); }
+    }
     var msgs = sxPresetMessages();
     for (var k = 0; k < idx; k++) {
       var pp = PHASES[k];
@@ -1671,6 +1710,14 @@ async function refinePhase(pid, direction){
     var refineTask = phasePrompt(phase) + nl + nl + "【本步精修指令】" + nl + "方向：" + dir + nl + nl + "[世界规则·创作限制]" + nl + WORLD_RULES + nl + nl + "要求：只输出【" + phase.title + "】这一栏的修订内容（沿用本步的书条目格式与数量，可增删但要有理由），不要改动其它栏目，也不要输出整份 JSON。**方向里点名要改或要删的条目/字段必须真的改掉、删掉**——不许把旧条目留在原位而把新条目接在后面（叠加＝没改）；除本次方向点名的部分外，其余保持原样。若确实无需修改，原样输出“无”。";
     sxTurn(refineTask, '按上面的任务与方向，只修订「' + phase.title + '」这一栏。').forEach(function (m) { msgs.push(m); });
     var resp = await callModel(msgs);
+    // 落地守门：模型回「无」或明显不是正文时，绝不覆盖原有栏目
+    var g = opfSegApplyGuard(ST.results[pid], resp, phase.title, function () { return false; });
+    if (g.action !== "write") {
+      setPhase(pid, "ok");
+      toast(g.reason === "blocked" ? ("本步精修被拦下：" + (g.note || "内容偏短或丢结构") + "（原文已保留）") : "模型认为无需修改，本栏保持原样", g.reason === "blocked" ? "warning" : "info");
+      return;
+    }
+    resp = g.text;
     ST.results[pid] = resp;
     if (ST.elPre && ST.elPre[pid]) ST.elPre[pid].textContent = (resp || "").slice(0, 4000) + ((resp && resp.length > 4000) ? " ……(截断显示)" : "");
     setPhase(pid, "ok"); enablePhaseRefine(pid);
@@ -1995,19 +2042,21 @@ function importWorldEntries(rawEntries, sourceName, fileName){
 function updateSendText(){
   var s = getSettings();
   var wb = ST.wb || { entries: [] };
-  if (!s.includeWorld || !wb.entries || !wb.entries.length) { ST.worldInfo = ""; return; }
+  if (!s.includeWorld || !wb.entries || !wb.entries.length) { ST.worldInfo = ""; ST.worldTrunc = false; return; }
   var nl2 = String.fromCharCode(10) + String.fromCharCode(10);
-  var parts = []; var total = 0; var cap = s.capChars || 30000;
+  var parts = []; var total = 0; var cap = s.capChars || 30000; var cut = false;
   for (var i = 0; i < wb.entries.length; i++) {
     var e = wb.entries[i];
     if (!e.sel) continue;
     if (s.worldConstantOnly && !e.constant) continue;
     var head = e.comment || e.key || "";
     var line = (head ? "【" + String(head).slice(0, 60) + "】" : "") + e.content;
-    if (total + line.length > cap) { parts.push("……(超过" + cap + "字注入上限，其余未发送)"); break; }
+    if (total + line.length > cap) { cut = true; break; }
     parts.push(line); total += line.length;
   }
+  if (cut) parts.push("……(超过" + cap + "字注入上限，其余未发送)");
   ST.worldInfo = parts.join(nl2);
+  ST.worldTrunc = cut;   // 真被截断时要能在界面上看出来（字数没超过上限也可能被截）
   worldCachePersistSel();
   try { if (typeof qsRender === 'function' && getEl('opf-qs-list')) qsRender(); } catch (e) {}
 }
@@ -2017,6 +2066,7 @@ function clearWorldbook(){
   ST.regionOpen = null;
   ST.worldSource = "none";
   ST.worldInfo = "";
+  ST.worldTrunc = false;
   worldCacheClearSel();
   try { renderWorldSide(); } catch (e) {}
   renderMetaStatus();
@@ -2233,7 +2283,7 @@ var QS_TOPIC_LABEL = {
   overview: '国家总览', culture: '文化', politics: '政治与社会', festival: '节庆',
   rule: '生成规则'
 };
-var QS = { marks: [], built: false };
+var QS = { marks: [], priorMarks: [], built: false };
 
 // ---------------- 解析 ----------------
 /** 去掉条目名末尾的 (作者) */
@@ -2422,12 +2472,22 @@ function qsApply(silent) {
   } else {
     QS.marks = qsPlan(wb.entries, locComment);
   }
+  // 换地点 / 重新计算：先撤掉上一次由本功能勾上的条目，避免两个地点的设定混在一起
+  var nextIds = {};
+  QS.marks.forEach(function (m) { nextIds[m.id] = true; });
+  var prevMarks = QS.priorMarks || [];
+  prevMarks.forEach(function (m) {
+    if (nextIds[m.id]) return;
+    var e = qsEntryById(m.id);
+    if (e && e.sel) e.sel = false;
+  });
   var applied = 0;
   QS.marks.forEach(function (m) {
     var e = qsEntryById(m.id);
     if (!e) return;
     if (!e.sel) { e.sel = true; applied++; }
   });
+  QS.priorMarks = QS.marks.slice();
   if (!s.includeWorld) {
     s.includeWorld = true;
     var cw = getEl('opf-ck-world'); if (cw) cw.checked = true;
@@ -2560,9 +2620,11 @@ function qsRender() {
     var head = '本功能 ' + QS.marks.length + ' 条 / 约 ' + Math.round(mine / 1000) + 'k 字';
     var tail = ' · 世界书已选 ' + c.selN + '/' + c.total + ' 条（约 ' + Math.round(c.chars / 1000) + 'k 字，上限 ' + Math.round(cap / 1000) + 'k）';
     statEl.textContent = head + tail;
-    statEl.className = 'opf-dim' + (c.chars >= cap ? ' warn' : '');
+    var truncated = !!ST.worldTrunc;
+    if (truncated) tail += ' · 有内容被截断';
+    statEl.className = 'opf-dim' + ((c.chars >= cap || truncated) ? ' warn' : '');
     var raise = getEl('opf-qs-raise');
-    if (raise) raise.style.display = (c.chars >= cap) ? '' : 'none';
+    if (raise) raise.style.display = (c.chars >= cap || truncated) ? '' : 'none';
   }
 }
 function qsSize(n) {
@@ -2726,7 +2788,9 @@ async function runCompliance(){
   renderDirsStatus("🔍 正在按《技能装备道具生成规则》自检修复…");
   try {
     var prev = JSON.stringify(ST.finalJson);
-    var cur = prev.length > 12000 ? prev.slice(0, 12000) + "……(截断)" : prev;
+    // 以前超过 12000 字符会截断再发给模型，模型只能照着半截 JSON 编后半段，回来还无条件覆盖。
+    // 现在原样发；结果先做「条目数不能变少」的比对，丢条目就拒绝写回。
+    var cur = prev;
     var complyTask = "【合规自检与修复】请用下面“技能/装备/道具/资产生成规范”逐类检查开局预设 JSON：字段是否齐全、品质是否为七等、标签/消耗/效果/结算/总空间/内部资产等是否符合规范；只修正不合规处，其余内容保持原样，最后完整输出修订后的开局预设 JSON，放在 " + fence() + "text 代码块中。\n\n[生成规范]\n" + COMPLIANCE_SPEC + '\n\n' + buildSystemContent();
     var complyUser = "[当前开局预设 JSON]\n" + cur;
     var msgs = sxMessages(complyTask, complyUser);
@@ -2735,6 +2799,17 @@ async function runCompliance(){
       var resp = await callModel(msgs);
       var ex = extractJson(resp);
       if (ex.ok && ex.obj) {
+        var lost = 0;
+        ['equipments', 'items', 'assets', 'skills', 'partners'].forEach(function (k) {
+          var before = (ST.finalJson && Array.isArray(ST.finalJson[k])) ? ST.finalJson[k].length : 0;
+          var after = Array.isArray(ex.obj[k]) ? ex.obj[k].length : 0;
+          if (after < before) lost += before - after;
+        });
+        if (lost > 0) {
+          renderDirsStatus("⚠ 自检返回的 JSON 比原稿少 " + lost + " 条条目，已放弃写回（避免丢内容）");
+          toast("自检结果疑似丢条目，已保留原 JSON", "warning");
+          return;
+        }
         var changed = JSON.stringify(ex.obj) !== prev;
         ST.finalJson = ex.obj;
         var warns = validatePreset(ex.obj);
@@ -3109,11 +3184,19 @@ function projApply(type, data) {
     ST.finalJson = projClone(data.finalJson) || null;
     ST.finalText = data.finalText || "";
     ST.msgs = null;                        // 会话上下文不持久化；「重跑该步」会按 ST.results 重建
+    ST.lkSnapshot = null;                  // 交火快照属于「当前这份草稿」，切工程必须作废，否则会把上一份写进来
+    ST.lkReport = "";
+    ST.dirty = false;
+    ST.modified = {};
     projSetVal("opf-demand", data.demand || "");
     projSetVal("opf-pname", data.pname || "【自定义开局】");
     try { renderSteps(); } catch (e) { opfErr("projApply preset renderSteps", e); }
     try { renderJsonOut(ST.finalJson, ST.finalJson ? validatePreset(ST.finalJson) : []); } catch (e) {}
     try { renderMetaStatus(); } catch (e) {}
+    try { var _ub = getEl("opf-lk-undo"); if (_ub) _ub.disabled = true; } catch (e) {}
+    try { var _ls = getEl("opf-lk-status"); if (_ls) _ls.textContent = ""; } catch (e) {}
+    try { renderDirsStatus("已载入草稿：可继续精修，或点「⟳ 重新汇总」重建 JSON。"); } catch (e) {}
+    try { renderResum(); } catch (e) {}
     return;
   }
   if (type === "char") {
@@ -3260,6 +3343,38 @@ function renderProjList() {
 // ---------------- 自动存档 ----------------
 // 不往三条流水线里塞钩子（那要动它们的内部），改成低频轮询：
 // 每 2.5 秒把「当前类型」的运行时状态与工程里存着的对比，变了才写。
+// 空快照不能覆盖有内容的工程：新会话启动时运行时是空的，旧版会在这里把草稿写空。
+function projSnapIsEmpty(type, snap) {
+  if (!snap) return true;
+  if (type === "preset") {
+    var hasRes = snap.results && Object.keys(snap.results).length;
+    return !hasRes && !snap.finalJson && !(snap.demand && String(snap.demand).trim());
+  }
+  if (type === "char") {
+    var c = snap.char || {};
+    return !(c.segs && Object.keys(c.segs).length) && !(c.demand && String(c.demand).trim());
+  }
+  if (type === "destiny") {
+    var d = snap.dest || {};
+    return !(d.segs && Object.keys(d.segs).length) && !(d.demand && String(d.demand).trim());
+  }
+  return true;
+}
+function projRuntimeEmpty(type) { try { return projSnapIsEmpty(type, projSnap(type)); } catch (e) { return true; } }
+// 启动时恢复「当前类型的活跃工程」；运行时已有内容（例如刚恢复了旧草稿缓存）就不动
+function projRestoreActive() {
+  PROJ_TYPES.forEach(function (t) {
+    var g = projGroup(t);
+    if (!g.active) return;
+    var p = projActive(t);
+    if (!p || !p.data) return;
+    if (!projRuntimeEmpty(t)) return;
+    if (projSnapIsEmpty(t, p.data)) return;
+    try { projApply(t, p.data); opfLog("已恢复草稿", PROJ_TYPE_LABEL[t], p.name); }
+    catch (e) { opfErr("projRestoreActive", t, e); }
+  });
+  try { renderProjList(); } catch (e) {}
+}
 function projTick() {
   try {
     var t = currentPage();
@@ -3268,6 +3383,7 @@ function projTick() {
     var cur = projActive(t);
     if (!cur) { projCommit(t); renderProjList(); projPersist(); return; }
     var snap = projSnap(t);
+    if (projSnapIsEmpty(t, snap) && !projSnapIsEmpty(t, cur.data || {})) return;  // 空快照不覆盖有内容的工程
     if (JSON.stringify(snap) !== JSON.stringify(cur.data || {})) {
       cur.data = snap; cur.updatedAt = Date.now();
       projPersist(); renderProjList();
@@ -3489,7 +3605,7 @@ function addPresetLinkageUI(root) {
 }
 
 
-﻿//@module 40-shell — 分页外壳（PAGE_DEFS/建壳/切页）+ 本地缓存
+//@module 40-shell — 分页外壳（PAGE_DEFS/建壳/切页）+ 本地缓存
 // ============================================================================
 // v1.7.0 全屏分页壳 + 本地缓存 + 二创角色工坊
 // ============================================================================
@@ -3673,6 +3789,7 @@ function buildShell(){
   try { bindRefinePage(); } catch (e) { opfErr("refine page", e); }
   try { bindAtelierPage(); } catch (e) { opfErr("atelier page", e); }
   try { buildWorldSide(); } catch (e) { opfErr("buildWorldSide", e); }
+  try { opfSkinBoot(); } catch (e) { opfErr("skin boot", e); }
   if (getSettings().visible) showPanel();
 }
 // 页内子标签栏：按当前页所属「领域」渲染；不在任何领域里的页就隐藏它。
@@ -3716,6 +3833,8 @@ function switchPage(id, force){
     t.classList.toggle("active", (t.id === "opf-tab-" + id) || !!(dn && dn.pages.indexOf(id) >= 0));
   });
   renderSubbar(id);
+  try { opfSkinSubbar(); } catch (e) { opfErr("skin subbar", e); }
+  try { opfSkinNavSync(); } catch (e) { opfErr("skin nav", e); }
   try { renderProjList(); } catch (e) { opfErr("renderProjList", e); }
   if (id === "world") { try { buildWorldSide(); renderWorldSide(); } catch (e) {} }
   if (id === "char") { try { renderCharPage(); } catch (e) {} }
@@ -11972,6 +12091,450 @@ function shxPickFile() {
   inp.click();
 }
 
+﻿//@module 95-ui-skin — 视觉皮肤（阅览台 · 雪松黄铜 + 始弦红）
+// ============================================================================
+// 只做「看起来怎样」：配色、页头、左右分栏、按钮分级。不碰任何业务逻辑。
+// 全部以覆盖层形式工作：
+//   · 一份样式表在 buildShell 末尾注入，排在所有老样式之后，靠顺序覆盖同权重规则；
+//   · 页头 / 分栏 / 按钮文案由本文件在 shell 建好后补到 DOM 上，不改各页 HTML 常量。
+// 想退回去：删掉 95 这块与 40-shell 里那两处 opfSkin* 调用即可。
+// ============================================================================
+var OPF_SKIN_CSS = "/* =====================================================================\n   95-ui-skin 样式层（由预览稿合并而来）\n   阅览台 · 雪松黄铜底 + 始弦红记忆点；只覆盖视觉，不动业务\n   ===================================================================== */\n﻿/* ==========================================================================\n   重设计层 · 阅览台 direction（预览用，未进 src）\n   目标：压掉红色噪点，把层级交给「金线 + 纸色文字 + 衬线标题」，\n   红色只留给主操作；统一页头、卡片、按钮、状态与导航。\n   ========================================================================== */\n:root{\n  --ink-0:#0c0609;\n  --ink-1:#120910;\n  --ink-2:#180d13;\n  --ink-3:#21131a;\n  --line:rgba(216,178,116,.13);\n  --line-2:rgba(216,178,116,.26);\n  --tx:#f2e7de;\n  --tx-2:#c9ada6;\n  --tx-3:#94787a;\n  --gold:#d8b274;\n  --gold-2:#a88450;\n  --red:#d9485b;\n  --red-2:#b12a3c;\n  --ok:#7fc9a0;\n  --warn:#e2b46a;\n  --err:#e07a63;\n  --serif:\"Noto Serif SC\",\"Source Han Serif SC\",\"Songti SC\",\"SimSun\",serif;\n  --sans:\"Noto Sans SC\",\"Microsoft YaHei\",sans-serif;\n}\n\n/* ---------- 外壳 ---------- */\n#opf-shell{\n  background:\n    radial-gradient(1100px 460px at 24% -12%, rgba(216,178,116,.070), transparent 62%),\n    radial-gradient(900px 500px at 88% 0%, rgba(217,72,91,.10), transparent 58%),\n    linear-gradient(180deg,#10070c 0%,#0b0509 60%,#090408 100%) !important;\n  font-family:var(--sans) !important;\n  letter-spacing:0 !important;\n}\n#opf-shell-head{\n  height:58px; padding:0 18px !important; gap:12px !important;\n  background:linear-gradient(180deg, rgba(28,14,21,.92), rgba(20,10,16,.92)) !important;\n  border-bottom:1px solid var(--line) !important;\n  backdrop-filter:blur(10px);\n}\n#opf-shell-head::before{\n  height:1px !important;\n  background:linear-gradient(90deg, transparent, rgba(216,178,116,.55) 20%, rgba(217,72,91,.55) 62%, transparent) !important;\n  box-shadow:none !important;\n}\n#opf-shell-title{\n  font-family:var(--serif) !important;\n  font-size:18px !important; font-weight:600 !important;\n  letter-spacing:2px !important; color:var(--tx) !important;\n  text-shadow:none !important;\n  display:flex; align-items:center; gap:11px;\n}\n#opf-shell-title::after{\n  content:\"OPENING ARCHIVE\";\n  font-family:var(--sans); font-size:9px; font-weight:500;\n  letter-spacing:2.6px; color:rgba(216,178,116,.45);\n  padding-left:12px; border-left:1px solid var(--line-2);\n}\n\n#opf-shell-close{\n  width:34px !important; height:34px !important; min-width:34px !important;\n  border-radius:9px !important; font-size:14px !important;\n  border:1px solid var(--line) !important; background:rgba(255,255,255,.03) !important;\n  color:var(--tx-2) !important;\n}\n#opf-shell-close:hover{background:rgba(217,72,91,.20) !important; color:#fff !important; border-color:rgba(217,72,91,.5) !important;}\n.opf-chrome-btn{\n  height:32px; padding:0 12px !important;\n  border-radius:8px !important; font-size:12.5px !important;\n  border:1px solid var(--line) !important;\n  background:rgba(255,255,255,.028) !important;\n  color:var(--tx-2) !important; letter-spacing:.4px;\n}\n.opf-chrome-btn:hover{background:rgba(216,178,116,.10) !important; color:var(--tx) !important; border-color:var(--line-2) !important;}\n#opf-chrome-settings{width:34px; padding:0 !important; font-size:15px !important;}\n/* 传输状态：紧凑药丸 + 状态点 */\n#opf-tx-status.opf-tx-status{\n  margin-left:auto !important;\n  height:30px; padding:0 12px !important;\n  font-size:12px !important; letter-spacing:.3px;\n  color:var(--tx-2) !important;\n  background:rgba(255,255,255,.025) !important;\n  border:1px solid var(--line) !important;\n  border-radius:999px !important;\n  display:inline-flex; align-items:center; gap:7px;\n}\n#opf-tx-status::before{\n  content:\"\"; width:6px; height:6px; border-radius:50%; flex:none;\n  background:var(--ok); box-shadow:0 0 6px rgba(127,201,160,.7);\n}\n#opf-tx-status.opf-tx-stream::before{background:var(--warn); box-shadow:0 0 6px rgba(226,180,106,.7);}\n#opf-tx-status:hover{background:rgba(216,178,116,.10) !important; color:var(--tx) !important;}\n\n/* ---------- 左侧导航 ---------- */\n#opf-nav{\n  width:236px !important; padding:10px 12px 18px !important;\n  gap:1px !important;\n  border-right:1px solid var(--line) !important;\n  background:linear-gradient(180deg, rgba(255,255,255,.014), transparent 40%) !important;\n}\n.opf-nav-group{\n  font-family:var(--sans); font-size:9.5px !important; font-weight:600;\n  letter-spacing:2.8px !important; color:rgba(216,178,116,.52) !important;\n  padding:16px 10px 7px !important;\n}\n#opf-nav .opf-tab{\n  height:36px; padding:0 10px !important;\n  border-radius:8px !important; border:1px solid transparent !important;\n  background:transparent !important;\n  color:var(--tx-2) !important; font-size:13.5px !important;\n  letter-spacing:.6px; transition:background .13s ease,color .13s ease;\n  display:flex; align-items:center;\n}\n#opf-nav .opf-tab:hover{background:rgba(255,255,255,.045) !important; color:var(--tx) !important;}\n#opf-nav .opf-tab.active{\n  background:linear-gradient(90deg, rgba(216,178,116,.13), rgba(216,178,116,.035)) !important;\n  color:#fbf1e4 !important;\n  border-color:transparent !important;\n  box-shadow:inset 2px 0 0 var(--gold) !important;\n}\n/* 草稿区 */\n#opf-projlist{padding:10px 2px 0 !important; margin-top:10px; border-top:1px solid var(--line);}\n.opf-proj-head{\n  padding:2px 8px 6px !important; font-size:9.5px !important; letter-spacing:2.2px;\n  color:rgba(216,178,116,.52) !important; text-transform:uppercase;\n}\n.opf-proj-add{\n  border:1px solid var(--line) !important; background:rgba(255,255,255,.03) !important;\n  color:var(--tx-2) !important; border-radius:6px !important;\n  width:20px; height:20px; padding:0 !important; line-height:18px !important; font-size:12px !important;\n}\n.opf-proj-add:hover{background:rgba(216,178,116,.16) !important; color:#fff !important;}\n.opf-proj-row{\n  height:30px; padding:0 8px !important; border-radius:7px !important;\n  font-size:12.5px !important; color:var(--tx-3) !important;\n}\n.opf-proj-row:hover{background:rgba(255,255,255,.04) !important; color:var(--tx-2) !important;}\n.opf-proj-row.active{\n  background:rgba(216,178,116,.08) !important; color:var(--tx) !important;\n  box-shadow:inset 2px 0 0 rgba(216,178,116,.55) !important;\n}\n.opf-proj-empty{font-size:11.5px !important; color:var(--tx-3) !important;}\n\n/* ---------- 页面容器与页头 ---------- */\n.opf-page{padding:0 !important;}\n.opf-ph{\n  max-width:1500px; margin:0 auto; padding:26px 30px 14px;\n  display:flex; align-items:flex-end; justify-content:space-between; gap:24px;\n}\n.opf-ph-eyebrow{\n  display:flex; align-items:center; gap:8px;\n  font-size:10.5px; letter-spacing:2.4px; color:rgba(216,178,116,.62);\n  text-transform:uppercase; margin-bottom:9px;\n}\n.opf-ph-eyebrow::before{content:\"\"; width:18px; height:1px; background:rgba(216,178,116,.55);}\n.opf-ph-title{\n  margin:0; font-family:var(--serif); font-size:28px; font-weight:600;\n  letter-spacing:2px; color:var(--tx); line-height:1.15;\n}\n.opf-ph-desc{\n  margin:8px 0 0; font-size:13px; line-height:1.7; color:var(--tx-3); max-width:64ch;\n}\n.opf-ph-side{flex:none; display:flex; flex-direction:column; align-items:flex-end; gap:8px; padding-bottom:2px;}\n.opf-ph-rule{\n  height:1px; max-width:1500px; margin:0 auto; background:linear-gradient(90deg, rgba(216,178,116,.28), rgba(216,178,116,.05) 60%, transparent);\n}\n/* 顶部 meta 标签（从预设页正文迁出） */\n.opf-ph-side #opf-meta{\n  display:flex !important; flex-wrap:wrap; justify-content:flex-end; gap:6px !important;\n  padding:0 !important; background:none !important; border:none !important;\n  font-size:12px !important; color:var(--tx-3) !important;\n}\n#opf-meta .tag{\n  display:inline-flex; align-items:center; gap:6px;\n  height:26px; padding:0 10px !important;\n  border-radius:999px !important; font-size:11.5px !important; letter-spacing:.3px;\n  color:var(--tx-2) !important; background:rgba(255,255,255,.028) !important;\n  border:1px solid var(--line) !important;\n}\n#opf-meta .tag::before{content:\"\"; width:5px; height:5px; border-radius:50%; background:var(--gold-2); flex:none;}\n#opf-meta .tag.ok{color:#bfe8d0 !important; border-color:rgba(127,201,160,.32) !important; background:rgba(127,201,160,.07) !important;}\n#opf-meta .tag.ok::before{background:var(--ok);}\n#opf-meta .tag.err{color:#f0c9a8 !important; border-color:rgba(226,180,106,.34) !important; background:rgba(226,180,106,.07) !important;}\n#opf-meta .tag.err::before{background:var(--warn);}\n\n/* ---------- 内容区排版 ---------- */\n#opf-page-preset #opf-body{\n  max-width:1500px; margin:0 auto; width:100% !important;\n  padding:6px 30px 18px !important;\n  gap:16px 22px !important;\n  grid-template-columns:minmax(310px,392px) minmax(0,1fr) !important;\n}\n.opf-char-wrap, .opf-char-wrap.opf-2col{\n  max-width:1500px; margin:0 auto; padding:6px 30px 40px;\n}\n.opf-char-wrap.opf-2col{grid-template-columns:minmax(320px,400px) minmax(0,1fr) !important; gap:16px 24px !important;}\n.opf-char-wrap > .opf-col, .opf-char-wrap.opf-2col .opf-col{gap:12px !important;}\n.opf-char-wrap:not(.opf-2col){display:block; max-width:980px;}\n\n/* ---------- 卡片 ---------- */\n.opf-card{\n  background:linear-gradient(180deg, rgba(255,255,255,.030), rgba(255,255,255,.012)) !important;\n  border:1px solid var(--line) !important;\n  border-radius:12px !important;\n  box-shadow:none !important;\n  padding:14px 16px 15px !important;\n  gap:10px !important;\n}\n.opf-card-hd{\n  gap:10px !important; padding-bottom:10px !important;\n  border-bottom:1px solid rgba(216,178,116,.10);\n  align-items:baseline !important;\n}\n.opf-card-no{\n  font-family:var(--serif); font-size:12px !important; font-weight:600;\n  color:var(--gold) !important; background:transparent !important;\n  border:1px solid var(--line-2) !important; border-radius:5px !important;\n  min-width:24px; height:22px; display:inline-flex !important; align-items:center; justify-content:center;\n  padding:0 5px !important; letter-spacing:0 !important;\n}\n.opf-card-t{\n  font-family:var(--serif) !important; font-size:16px !important; font-weight:600 !important;\n  letter-spacing:1.2px; color:var(--tx) !important;\n}\n.opf-card-sub{font-size:11.5px !important; color:var(--tx-3) !important; letter-spacing:.2px;}\n\n/* 分区小标题 */\n.opf-sec-label{\n  font-size:11px !important; letter-spacing:2px !important;\n  color:rgba(216,178,116,.68) !important;\n  text-transform:none !important;\n  margin-bottom:7px !important;\n}\n.opf-sec-label::after{background:linear-gradient(90deg, rgba(216,178,116,.22), transparent) !important;}\n.opf-dim{font-size:12px !important; color:var(--tx-3) !important; line-height:1.65 !important;}\n\n/* ---------- 表单 ---------- */\n#opf-demand, .opf-char-input, .opf-ref-input, .opf-qs-loc{\n  background:rgba(9,4,7,.72) !important;\n  border:1px solid rgba(216,178,116,.16) !important;\n  border-radius:8px !important;\n  color:var(--tx) !important;\n  font-family:var(--sans) !important;\n  font-size:13px !important;\n  line-height:1.65 !important;\n  transition:border-color .14s ease, box-shadow .14s ease;\n}\n#opf-demand:focus, .opf-char-input:focus, .opf-ref-input:focus, .opf-qs-loc:focus{\n  border-color:rgba(216,178,116,.52) !important;\n  box-shadow:0 0 0 3px rgba(216,178,116,.10) !important;\n  outline:none !important;\n}\n#opf-demand::placeholder, .opf-char-input::placeholder, .opf-ref-input::placeholder{color:rgba(200,175,170,.42) !important;}\n.opf-char-input{padding:9px 11px !important;}\n.opf-opt{font-size:12.5px !important; color:var(--tx-2) !important; gap:6px !important;}\n.opf-opt input[type=checkbox]{accent-color:var(--gold) !important; width:14px; height:14px;}\n.opf-num, #opf-pname{\n  background:rgba(9,4,7,.72) !important; border:1px solid rgba(216,178,116,.16) !important;\n  border-radius:7px !important; color:var(--tx) !important; font-size:12.5px !important;\n}\n#opf-pname{width:190px !important;}\n.opf-ref-tag{font-size:11px !important; border-radius:999px !important; color:var(--gold) !important; background:rgba(216,178,116,.08) !important; border-color:var(--line-2) !important;}\n.opf-ref-tag.dirty{color:var(--warn) !important; background:rgba(226,180,106,.08) !important; border-color:rgba(226,180,106,.28) !important;}\n\n/* ---------- 按钮：毛玻璃薄片 ---------- */\n.opf-btn{\n  position:relative;\n  font-family:var(--sans); font-size:13px !important; letter-spacing:.9px;\n  height:34px !important; min-height:0 !important; padding:0 15px !important;\n  border-radius:9px !important;\n  border:1px solid rgba(255,255,255,.13) !important;\n  background:\n    linear-gradient(180deg, rgba(255,255,255,.085), rgba(255,255,255,.026) 55%, rgba(255,255,255,.045)) !important;\n  backdrop-filter:blur(12px) saturate(125%); -webkit-backdrop-filter:blur(12px) saturate(125%);\n  color:#efe3d8 !important;\n  box-shadow:inset 0 1px 0 rgba(255,255,255,.17), inset 0 -1px 0 rgba(0,0,0,.28), 0 6px 18px rgba(0,0,0,.28) !important;\n  display:inline-flex; align-items:center; justify-content:center; gap:7px;\n  transition:background .16s ease, border-color .16s ease, color .16s ease, transform .12s ease, box-shadow .16s ease;\n}\n.opf-btn:hover{\n  background:\n    linear-gradient(180deg, rgba(255,255,255,.125), rgba(255,255,255,.04) 55%, rgba(255,255,255,.06)) !important;\n  border-color:rgba(255,255,255,.22) !important;\n  color:#fff5ec !important;\n  box-shadow:inset 0 1px 0 rgba(255,255,255,.22), 0 8px 22px rgba(0,0,0,.32) !important;\n}\n.opf-btn:active{transform:translateY(1px) scale(.995);}\n.opf-btn.primary{\n  background:\n    linear-gradient(180deg, rgba(214,96,106,.62), rgba(150,44,56,.52) 58%, rgba(120,32,44,.55)) !important;\n  border:1px solid rgba(255,190,180,.30) !important;\n  color:#fff3ee !important;\n  font-weight:600 !important;\n  text-shadow:0 1px 0 rgba(0,0,0,.28) !important;\n  box-shadow:inset 0 1px 0 rgba(255,222,208,.28), inset 0 -1px 0 rgba(0,0,0,.3), 0 8px 24px rgba(120,24,36,.38) !important;\n}\n.opf-btn.primary:hover{\n  background:\n    linear-gradient(180deg, rgba(226,110,120,.70), rgba(160,50,62,.58) 58%, rgba(130,36,48,.6)) !important;\n  border-color:rgba(255,200,190,.4) !important;\n}\n.opf-btn.ghost{\n  background:\n    linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.012)) !important;\n  border:1px solid rgba(255,255,255,.10) !important;\n  color:rgba(240,226,216,.8) !important;\n}\n.opf-btn.ghost:hover{\n  background:linear-gradient(180deg, rgba(255,255,255,.085), rgba(255,255,255,.022)) !important;\n  border-color:rgba(255,255,255,.18) !important;\n  color:#fff3ea !important;\n}\n.opf-btn:disabled{opacity:.36 !important;}\n/* 小按钮 */\n.opf-step-act{\n  height:26px; padding:0 9px !important; border-radius:6px !important;\n  font-size:11.5px !important; letter-spacing:.3px;\n  border:1px solid rgba(255,255,255,.08) !important;\n  background:rgba(255,255,255,.035) !important;\n  color:rgba(238,222,212,.72) !important;\n  display:inline-flex; align-items:center;\n  transition:background .14s ease, color .14s ease, border-color .14s ease;\n}\n.opf-step-act:hover{background:rgba(255,255,255,.08) !important; color:#fff3ea !important; border-color:rgba(255,255,255,.16) !important; box-shadow:none !important;}\n\n/* ---------- 步骤列表 ---------- */\n.opf-steps{gap:7px !important; padding:0 !important; max-height:none !important;}\n.opf-step{\n  border-radius:9px !important;\n  border:1px solid rgba(216,178,116,.11) !important;\n  background:rgba(255,255,255,.018) !important;\n}\n.opf-step[data-st=run]{\n  background:linear-gradient(90deg, rgba(217,72,91,.10), rgba(255,255,255,.018)) !important;\n  border-color:rgba(217,72,91,.38) !important;\n  box-shadow:inset 2px 0 0 var(--red) !important;\n}\n.opf-step[data-st=ok]{background:rgba(127,201,160,.045) !important; border-color:rgba(127,201,160,.20) !important;}\n.opf-step[data-st=err]{border-color:rgba(226,180,106,.38) !important;}\n.opf-step-head{padding:8px 10px !important; gap:8px !important;}\n.opf-idx{\n  width:20px !important; height:20px !important; border-radius:5px !important;\n  font-family:var(--serif); font-size:11px !important;\n  color:var(--gold) !important;\n  background:rgba(216,178,116,.07) !important;\n  border:1px solid var(--line-2) !important;\n  box-shadow:none !important;\n}\n.opf-step-title{font-size:13.5px !important; color:var(--tx) !important; letter-spacing:.4px;}\n.opf-step-sub{font-size:11.5px !important; color:var(--tx-3) !important;}\n.opf-dot{font-size:12px !important; color:rgba(216,178,116,.4) !important;}\n.opf-step-body{font-size:13px !important; color:var(--tx-2) !important; line-height:1.7 !important;}\n\n/* ---------- 故事基调 / 题材 ---------- */\n.opf-story-tone{gap:10px !important;}\n.opf-tone-btn{\n  height:56px !important; border-radius:9px !important;\n  background:rgba(255,255,255,.025) !important;\n  border:1px solid var(--line) !important;\n  color:var(--tx-2) !important; font-size:13.5px !important;\n  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;\n}\n.opf-tone-btn:hover{background:rgba(216,178,116,.08) !important; border-color:var(--line-2) !important;}\n.opf-tone-btn.active{\n  background:linear-gradient(180deg, rgba(216,178,116,.20), rgba(168,132,80,.10)) !important;\n  border-color:rgba(216,178,116,.58) !important;\n  color:#fff6ea !important; box-shadow:inset 0 0 0 1px rgba(255,232,190,.08) !important;\n}\n.opf-tone-btn .t{font-size:10.5px !important; letter-spacing:1px; opacity:.62 !important; margin-top:0 !important;}\n.opf-story-list{\n  display:grid !important; grid-template-columns:repeat(2,minmax(0,1fr));\n  gap:4px 8px !important; max-height:none !important; padding:0 !important;\n}\n@media (min-width:1240px){.opf-story-list{grid-template-columns:repeat(3,minmax(0,1fr)) !important;}}\n.opf-story-item{min-width:0;}\n.opf-story-item .bf{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}\n.opf-story-item{\n  padding:6px 9px !important; border-radius:7px !important;\n  font-size:12.5px !important; align-items:center !important;\n  border:1px solid transparent !important;\n  color:var(--tx-2) !important;\n}\n.opf-story-item:hover{background:rgba(255,255,255,.045) !important;}\n.opf-story-item.on{background:rgba(216,178,116,.09) !important; border-color:rgba(216,178,116,.28) !important; color:var(--tx) !important;}\n.opf-story-item input{margin-top:0 !important; accent-color:var(--gold) !important;}\n.opf-story-item .nm{font-weight:600 !important; font-size:12.5px !important;}\n.opf-story-item .bf{font-size:11px !important; color:var(--tx-3) !important;}\n.opf-story-now{font-size:12px !important; color:var(--tx-3) !important;}\n.opf-story-sub{padding:4px 6px 2px 24px !important;}\n\n/* ---------- 快速开局 ---------- */\n.opf-qs-toggle{font-size:13px !important;}\n.opf-qs-item{font-size:12.5px !important; color:var(--tx-2) !important; border-radius:6px !important;}\n.opf-qs-item:hover{background:rgba(255,255,255,.04) !important;}\n.opf-qs-group{color:var(--gold) !important; border-left-color:rgba(216,178,116,.5) !important; font-size:11.5px !important;}\n.opf-qs-stat, #opf-qs-stat{font-size:11.5px !important;}\n\n/* ---------- 底部操作条（常驻，不随滚动消失） ---------- */\n#opf-shell #opf-actions{\n  position:fixed !important; left:236px; right:0; bottom:14px !important; z-index:9;\n  max-width:1440px; width:calc(100% - 236px - 48px) !important; margin:0 auto !important;\n  padding:10px 12px 10px 18px !important;\n  border:1px solid var(--line-2) !important; border-radius:12px !important;\n  background:linear-gradient(180deg, rgba(30,16,23,.94), rgba(18,9,14,.95)) !important;\n  backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);\n  box-shadow:0 12px 40px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.05) !important;\n  display:flex !important; align-items:center; gap:8px !important;\n}\n#opf-actions::before{\n  content:\"六段管线 · 全部完成后可导出预设\";\n  font-size:11.5px; letter-spacing:.6px; color:var(--tx-3); margin-right:auto;\n  padding-left:4px;\n}\n#opf-actions .opf-btn{flex:0 0 auto !important;}\n#opf-actions .opf-btn.primary{min-width:150px;}\n#opf-actions #opf-btn-quick, #opf-actions #opf-btn-save, #opf-actions #opf-btn-copy{min-width:0;}\n#opf-page-preset #opf-body{padding-bottom:120px !important;}\n/* 本地动作（导出/封装/存条目）用黄铜描边，不再用满金块压过主操作 */\n#opf-btn-save, #opf-char-final, #opf-dest-final, #opf-atl-save, #opf-atl-download{\n  background:\n    linear-gradient(180deg, rgba(222,190,142,.20), rgba(180,144,96,.07)) !important;\n  border:1px solid rgba(222,190,142,.34) !important;\n  color:#f0d9b6 !important; font-weight:600 !important;\n  box-shadow:inset 0 1px 0 rgba(255,240,214,.20), 0 6px 18px rgba(0,0,0,.26) !important;\n  text-shadow:none !important;\n}\n#opf-btn-save:hover, #opf-char-final:hover, #opf-dest-final:hover, #opf-atl-save:hover, #opf-atl-download:hover{\n  background:linear-gradient(180deg, rgba(232,200,152,.28), rgba(190,152,102,.10)) !important;\n  border-color:rgba(232,200,152,.48) !important;\n  color:#fff2dc !important;\n}\n#opf-btn-save:hover, #opf-char-final:hover, #opf-dest-final:hover, #opf-atl-save:hover, #opf-atl-download:hover{\n  background:\n    linear-gradient(180deg, rgba(211,177,132,.18), rgba(211,177,132,.03) 55%),\n    linear-gradient(180deg,#221c18,#171312) !important;\n  border-color:rgba(211,177,132,.52) !important;\n  color:#fff1d8 !important;\n}\n#opf-btn-save:hover, #opf-char-final:hover, #opf-dest-final:hover, #opf-atl-save:hover, #opf-atl-download:hover{filter:brightness(1.06);}\n\n/* ---------- 输出面板 ---------- */\n#opf-json-out, .opf-box, #opf-char-report, #opf-char-out, #opf-dest-reviewbox{\n  background:rgba(9,4,7,.62) !important;\n  border:1px solid var(--line) !important;\n  border-radius:9px !important;\n  color:var(--tx-2) !important;\n  font-family:\"Cascadia Code\",\"Consolas\",monospace !important;\n  font-size:12px !important; line-height:1.7 !important;\n  box-shadow:none !important;\n}\n#opf-json-out{color:#e6cfae !important;}\n\n/* ---------- 空态 / 占位 ---------- */\n.opf-page-ph{color:var(--tx-3) !important;}\n.atl-empty{color:var(--tx-3) !important; line-height:1.8 !important;}\n\n/* ---------- 滚动条 ---------- */\n#opf-shell ::-webkit-scrollbar{width:8px; height:8px;}\n#opf-shell ::-webkit-scrollbar-track{background:transparent;}\n#opf-shell ::-webkit-scrollbar-thumb{background:rgba(216,178,116,.16); border-radius:8px;}\n#opf-shell ::-webkit-scrollbar-thumb:hover{background:rgba(216,178,116,.30);}\n\n/* ---------- 页内子标签（命定系统）：安静的段标签，不再是一排红药丸 ---------- */\n#opf-subbar{\n  padding:0 30px !important; max-width:1500px; margin:0 auto !important;\n  background:transparent !important; border:none !important;\n  gap:2px !important; align-items:center !important;\n}\n.opf-subbar-label{\n  display:none !important;\n}\n.opf-subtab{\n  height:30px; padding:0 13px !important; border-radius:7px !important;\n  border:1px solid transparent !important; background:transparent !important;\n  color:var(--tx-3) !important; font-size:12.5px !important; letter-spacing:.5px;\n  display:inline-flex; align-items:center;\n}\n.opf-subtab:hover{background:rgba(255,255,255,.045) !important; color:var(--tx-2) !important;}\n.opf-subtab.active{\n  background:rgba(216,178,116,.10) !important;\n  border-color:rgba(216,178,116,.26) !important;\n  color:var(--gold) !important;\n}\n\n/* ---------- 快速开局：压成一行开关 ---------- */\n#opf-qs-card{\n  flex-direction:row !important; flex-wrap:wrap; align-items:center !important;\n  gap:6px 16px !important; padding:11px 16px 11px !important;\n}\n#opf-qs-card .opf-card-hd{\n  flex:1 1 auto; border-bottom:none !important; padding-bottom:0 !important;\n}\n#opf-qs-card .opf-qs-toggle{\n  flex:none; margin-left:auto; font-size:12.5px !important; color:var(--tx-2) !important;\n  padding:5px 10px 5px 12px; border:1px solid var(--line); border-radius:999px;\n  background:rgba(255,255,255,.02);\n}\n#opf-qs-card .opf-qs-body{flex:1 1 100%;}\n#opf-qs-card .opf-card-sub{display:none;}\n\n/* ---------- 工具按钮组：排成整齐的工具条 ---------- */\n.opf-char-tools{\n  display:flex !important; flex-wrap:wrap; justify-content:flex-start;\n  gap:8px !important;\n}\n.opf-char-tools .opf-btn{\n  flex:0 0 auto !important; min-height:32px !important; height:32px !important;\n  font-size:12.5px !important; letter-spacing:.3px; width:auto;\n  padding:0 12px !important;\n}\n.opf-char-tools .opf-btn.ghost{\n  background:rgba(255,255,255,.02) !important;\n  color:var(--tx-2) !important;\n}\n/* 「先跑出本步后可精修」原本被拉成整条输入框 —— 收成小状态标记 */\n\n.opf-ref-tag{\n  align-self:flex-start; display:inline-flex; align-items:center; gap:5px;\n  font-size:11px !important; letter-spacing:.4px;\n  color:var(--tx-3) !important; background:transparent !important;\n  border:none !important; padding:0 !important; line-height:1.6 !important;\n}\n.opf-ref-tag::before{content:\"\"; width:5px; height:5px; border-radius:50%; background:rgba(216,178,116,.5); flex:none;}\n.opf-ref-tag.dirty{color:var(--warn) !important; background:transparent !important;}\n.opf-ref-tag.dirty::before{background:var(--warn);}\n\n/* ---------- 设置页：分成一张真正的配置卡 ---------- */\n#opf-page-settings .opf-char-wrap{\n  background:linear-gradient(180deg, rgba(255,255,255,.030), rgba(255,255,255,.012));\n  border:1px solid var(--line); border-radius:12px;\n  padding:20px 22px 22px; max-width:920px;\n}\n#opf-page-settings .opf-shx-cfg{\n  display:flex; flex-wrap:wrap; align-items:center; gap:10px 18px;\n  padding:12px 0; border-top:1px solid rgba(216,178,116,.10);\n}\n#opf-page-settings .opf-shx-cfg .opf-opt{font-size:12.5px !important;}\n#opf-page-settings .opf-ref-input{height:34px; padding:0 10px !important; min-width:260px; max-width:420px;}\n#opf-page-settings select.opf-ref-input{height:34px; padding:0 8px !important;}\n#opf-page-settings #opf-rx-txnote{flex:1 1 100%; margin:0; font-size:12px; color:var(--tx-3);}\n#opf-page-settings #opf-set-status{\n  display:inline-flex; align-items:center; gap:7px; height:26px; padding:0 10px;\n  border-radius:999px; border:1px solid rgba(127,201,160,.28); background:rgba(127,201,160,.07);\n  color:#bfe8d0 !important; font-size:11.5px !important; margin-top:14px;\n}\n#opf-page-settings #opf-set-status::before{content:\"\"; width:5px; height:5px; border-radius:50%; background:var(--ok);}\n#opf-page-settings #opf-rx-modelall-wrap{margin-top:16px;}\n#opf-page-settings #opf-rx-modelall{\n  background:rgba(9,4,7,.55) !important; border:1px solid var(--line) !important; border-radius:8px !important;\n}\n#opf-page-settings .opf-sec{margin-top:14px; padding-top:4px;}\n\n\n/* ---------- 窄屏 ---------- */\n@media (max-width:1100px){\n  .opf-ph{padding:20px 18px 12px; flex-direction:column; align-items:flex-start; gap:12px;}\n  .opf-ph-side{align-items:flex-start;}\n  #opf-page-preset #opf-body, .opf-char-wrap, .opf-char-wrap.opf-2col{padding-left:18px !important; padding-right:18px !important;}\n  #opf-shell #opf-actions{left:236px; width:calc(100% - 236px - 28px) !important;}\n}\n@media (max-width:860px){\n  #opf-nav{width:150px !important;}\n  .opf-ph-title{font-size:22px;}\n  .opf-story-list{grid-template-columns:1fr !important;}\n  #opf-shell #opf-actions{left:150px; width:calc(100% - 150px - 24px) !important;}\n  #opf-actions::before{display:none;}\n}\n/* ---------- EJS 进阶开关：从蓝色虚线框改成一条克制的提示行 ---------- */\n#opf-dest-ejswrap{\n  display:flex; align-items:flex-start; gap:8px;\n  font-size:12px !important; line-height:1.65 !important; color:var(--tx-2) !important;\n  background:rgba(226,180,106,.05) !important;\n  border:1px solid rgba(226,180,106,.20) !important;\n  border-left:2px solid rgba(226,180,106,.55) !important;\n  border-radius:7px !important; padding:9px 11px !important;\n}\n#opf-dest-ejswrap input{accent-color:var(--warn) !important;}\n\n/* ---------- 单列页面：段落之间给出呼吸 ---------- */\n#opf-page-regex .opf-char-wrap > .opf-sec,\n#opf-page-atelier .opf-char-wrap > .opf-sec,\n#opf-page-refine .opf-char-wrap > .opf-sec,\n#opf-page-shixian .opf-char-wrap > .opf-sec{margin-top:18px; padding-top:2px;}\n#opf-page-regex .opf-char-wrap, #opf-page-atelier .opf-char-wrap{max-width:1040px;}\n#opf-rx-core{min-height:112px !important;}\n\n/* ---------- 状态行：统一成「小圆点 + 灰字」 ---------- */\n#opf-rx-statusline, #opf-atl-status, #opf-atl-bind, #opf-atl-ctxnote, #opf-char-outnote{\n  display:flex; align-items:center; gap:7px;\n  font-size:11.5px !important; color:var(--tx-3) !important; margin-top:4px;\n}\n#opf-rx-statusline::before, #opf-atl-status::before, #opf-atl-bind::before, #opf-atl-ctxnote::before, #opf-char-outnote::before{\n  content:\"\"; width:5px; height:5px; border-radius:50%; flex:none; background:rgba(216,178,116,.55);\n}\n\n/* ---------- 一行式字段（类型 / 条目名 / 工作区） ---------- */\n.opf-step-ref-row{display:flex; flex-wrap:wrap; align-items:center; gap:8px 16px !important;}\n.opf-step-ref-row .opf-opt{white-space:nowrap; gap:8px !important;}\n.opf-step-ref-row .opf-ref-input{flex:0 1 280px; height:34px; padding:0 10px !important;}\n.opf-step-ref-row select.opf-ref-input{flex:0 0 auto; min-width:170px;}\n\n/* ---------- 题材列表再压一点，主操作更早出现 ---------- */\n.opf-story-item{padding:4px 9px !important;}\n.opf-story-item .nm{font-weight:600 !important;}\n\n/* ---------- 二创角色 / 命定系统：左侧输入区收成一张卡 ---------- */\n#opf-page-char .opf-char-wrap.opf-2col > .opf-col-a,\n#opf-page-destiny .opf-char-wrap.opf-2col > .opf-col-a{\n  background:linear-gradient(180deg, rgba(255,255,255,.030), rgba(255,255,255,.012));\n  border:1px solid var(--line); border-radius:12px;\n  padding:16px; gap:10px !important; align-self:start;\n}\n#opf-page-char .opf-char-wrap.opf-2col > .opf-col-a .opf-char-tools{margin-top:2px;}\n\n/* ---------- 禁用态：未解锁的精修输入不要看起来可点 ---------- */\n.opf-ref-input:disabled{opacity:.5; cursor:not-allowed;}\n.opf-step-act:disabled{opacity:.4;}\n\n/* ==========================================================================\n   结构优化层\n   ① 预设页也改成「左栏设定 / 右栏产出」，和角色、命定两页同一套骨架\n   ② 未解锁的精修行整行收掉，步骤列表不再有 6 条死输入框\n   ③ 工具条按钮降为「安静」层级，只留主操作与导出\n   ④ 破坏性动作单独一种颜色\n   ========================================================================== */\n#opf-page-preset #opf-body{\n  grid-template-columns:minmax(340px,404px) minmax(0,1fr) !important;\n  align-items:start;\n}\n#opf-page-preset #opf-body > .opf-col-a{grid-column:1; grid-row:1; min-width:0;}\n#opf-page-preset #opf-body > #opf-qs-card{grid-column:1; grid-row:2;}\n#opf-page-preset #opf-body > #opf-story-card{grid-column:1; grid-row:3;}\n#opf-page-preset #opf-body > .opf-col-b{grid-column:2; grid-row:1 / span 3;}\n/* 窄栏里的基调按钮改成横向三行，题材改单列 */\n#opf-page-preset .opf-story-tone{flex-direction:column !important; gap:6px !important;}\n#opf-page-preset .opf-tone-btn{\n  height:44px !important; flex-direction:row !important; justify-content:flex-start !important;\n  padding:0 14px !important; gap:9px !important; text-align:left;\n}\n#opf-page-preset .opf-tone-btn .t{display:inline !important; opacity:.55 !important; font-size:11px !important;}\n#opf-page-preset .opf-story-list{grid-template-columns:minmax(0,1fr) !important;}\n#opf-page-preset .opf-story-item{padding:5px 7px !important;}\n#opf-page-preset .opf-story-item .bf{display:none;}\n#opf-page-preset #opf-qs-card .opf-qs-toggle{margin-left:0;}\n\n/* 未解锁的精修行整行消失，只留「先跑出本步后可精修」一行小字 */\n.opf-step-ref-row:has(.opf-ref-input:disabled){display:none !important;}\n\n/* 步骤行里的小动作不再描边，保持安静 */\n.opf-step-head .opf-step-act{\n  background:transparent !important;\n  border-color:transparent !important;\n  color:var(--tx-2) !important;\n}\n.opf-step-head .opf-step-act:hover{\n  background:rgba(255,255,255,.06) !important;\n  border-color:var(--line) !important;\n  color:var(--tx) !important;\n}\n/* 破坏性动作 */\n.opf-btn.opf-danger{\n  background:transparent !important;\n  border-color:rgba(207,70,88,.26) !important;\n  color:#dd8f97 !important;\n}\n.opf-btn.opf-danger:hover{\n  background:rgba(194,59,75,.14) !important;\n  border-color:rgba(207,70,88,.55) !important;\n  color:#fff !important;\n}\n/* 左右两栏的输入区在滚动步骤时留在视野里 */\n#opf-page-char .opf-char-wrap.opf-2col > .opf-col-a,\n#opf-page-destiny .opf-char-wrap.opf-2col > .opf-col-a{\n  position:sticky; top:12px;\n  max-height:calc(100vh - 24px); overflow:auto;\n}\n\n/* 左栏收窄后的细节：开关文案换行、基调三行、题材两列 */\n#opf-page-preset #opf-qs-card .opf-qs-toggle{\n  min-width:0; white-space:normal; text-align:left; line-height:1.55;\n  align-items:flex-start;\n}\n#opf-page-preset #opf-qs-card .opf-qs-toggle input{margin-top:3px;}\n#opf-page-preset .opf-tone-btn{\n  height:52px !important; flex-direction:column !important;\n  align-items:flex-start !important; justify-content:center !important;\n  gap:2px !important; padding:0 14px !important;\n}\n#opf-page-preset .opf-tone-btn .t{display:block !important; font-size:10.5px !important; margin-top:1px !important;}\n#opf-page-preset .opf-story-list{grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:3px 6px !important;}\n#opf-page-preset .opf-story-item .nm{font-size:12px !important;}\n/* 分步精修说明压小一点，别抢步骤列表 */\n#opf-page-preset .opf-resum-note, #opf-page-preset .opf-resum-row + .opf-dim{color:var(--tx-3) !important;}\n\n/* 按钮不再各自撑满整行 */\n.opf-btn{flex:0 1 auto !important;}\n#opf-page-preset .opf-tone-btn{flex:0 0 52px !important;}\n#opf-resum-row .opf-btn, .opf-sec .opf-btn{min-width:132px;}\n\n/* ---------- 正则工坊：改成「左输入 / 右产出」两栏 ---------- */\n.opf-split{\n  display:grid; grid-template-columns:minmax(380px,460px) minmax(0,1fr);\n  gap:16px 24px; align-items:start; width:100%;\n}\n.opf-split-l{\n  background:linear-gradient(180deg, rgba(255,255,255,.030), rgba(255,255,255,.012));\n  border:1px solid var(--line); border-radius:12px; padding:16px;\n  display:flex; flex-direction:column; gap:10px; min-width:0;\n}\n.opf-split-r{display:flex; flex-direction:column; gap:12px; min-width:0;}\n.opf-split-l .opf-char-input{min-height:200px;}\n.opf-split-r .opf-sec{margin:0 !important;}\n.opf-split-r .opf-box{min-height:120px; margin:0 !important;}\n@media (max-width:1100px){ .opf-split{grid-template-columns:minmax(0,1fr) !important;} }\n\n/* 空状态行不要留一个孤零零的圆点 */\n#opf-char-outnote:empty, #opf-atl-bind:empty, #opf-rx-statusline:empty{display:none !important;}\r\n\n/* ---------- 操作条：安静动作 + 主操作 ---------- */\n#opf-actions{gap:4px !important;}\n#opf-actions .opf-btn.primary{min-width:142px; margin-left:6px;}\n#opf-btn-quick, #opf-btn-copy{\n  background:transparent !important;\n  border-color:transparent !important;\n  box-shadow:none !important;\n  color:rgba(232,216,206,.62) !important;\n  padding:0 10px !important;\n  backdrop-filter:none !important;\n}\n#opf-btn-quick:hover, #opf-btn-copy:hover{\n  background:rgba(255,255,255,.055) !important;\n  color:#fff2e9 !important;\n  border-color:transparent !important;\n}\n\n/* 拆分页的左栏：滚动时固定 */\n.opf-split-l{position:sticky; top:12px; max-height:calc(100vh - 24px); overflow:auto;}\n#opf-page-atelier .opf-split-l .opf-char-input{min-height:96px;}\n#opf-page-atelier .opf-split-r .opf-char-input{min-height:140px;}\n#opf-page-refine .opf-split-l .opf-char-input{min-height:150px;}\n#opf-page-refine .opf-split-r .opf-char-input{min-height:96px;}\n.opf-split-r .opf-sec{margin-top:16px !important;}\n.opf-split-r .opf-sec:first-child{margin-top:0 !important;}\r\n\n/* 拆分页放开宽度，工作区不挤在 1040 里 */\n#opf-page-atelier .opf-char-wrap, #opf-page-refine .opf-char-wrap{max-width:1500px !important;}\n/* 精修页的三步：分析类走黄铜描边，只有「置入」是红色 */\n#opf-rf-analyze, #opf-rf-plan{\n  background:rgba(211,177,132,.07) !important;\n  border:1px solid rgba(211,177,132,.46) !important;\n  color:#e6cda6 !important; font-weight:600 !important;\n  box-shadow:none !important;\n}\n#opf-rf-analyze:hover, #opf-rf-plan:hover{background:rgba(211,177,132,.16) !important; color:#fff3df !important;}\r\n\n/* ---------- 极薄的颗粒感：让大面积暗色不至于死平 ---------- */\n#opf-shell::after{\n  content:\"\"; position:fixed; inset:0; pointer-events:none; z-index:2147480004;\n  opacity:.045; mix-blend-mode:overlay;\n  background-image:url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23n)' opacity='0.55'/></svg>\");\n  background-size:180px 180px;\n}\r\n\n/* ---------- 左侧导航：可展开子面板 + 最近草稿 ---------- */\n#opf-nav .opf-tab{position:relative; padding-right:26px !important;}\n#opf-nav .opf-tab.active::after{\n  content:\"\"; position:absolute; right:10px; top:50%; width:5px; height:5px;\n  margin-top:-3px; border-right:1px solid rgba(232,206,170,.8); border-bottom:1px solid rgba(232,206,170,.8);\n  transform:rotate(45deg); transition:transform .22s cubic-bezier(.2,.8,.2,1), opacity .18s ease;\n  opacity:.75;\n}\n#opf-nav.opf-sub-closed .opf-tab.active::after{transform:rotate(-45deg);}\n#opf-nav-sub{\n  margin:2px 0 4px; overflow:hidden; max-height:0; opacity:0;\n  transform:translateY(-4px);\n  transition:max-height .28s cubic-bezier(.2,.8,.2,1), opacity .22s ease, transform .28s cubic-bezier(.2,.8,.2,1);\n}\n#opf-nav-sub.open{max-height:340px; opacity:1; transform:translateY(0);}\n#opf-nav-sub #opf-projlist{padding:2px 2px 6px 6px !important; margin:0 !important; border-top:none !important;}\n#opf-nav-recent{margin-top:auto; padding:14px 8px 6px; border-top:1px solid rgba(211,177,132,.12);}\n#opf-nav-recent .nr-head{font-size:9.5px; letter-spacing:2.2px; color:rgba(211,177,132,.5); padding:0 2px 6px;}\n#opf-nav-recent .nr-row{\n  display:flex; align-items:center; gap:7px; height:28px; padding:0 6px; border-radius:6px;\n  font-size:12px; color:rgba(210,190,180,.62); cursor:pointer; white-space:nowrap; overflow:hidden;\n  transition:background .14s ease, color .14s ease;\n}\n#opf-nav-recent .nr-row:hover{background:rgba(255,255,255,.05); color:#f5e7dc;}\n#opf-nav-recent .nr-type{flex:none; font-size:9.5px; letter-spacing:1px; color:rgba(211,177,132,.55); border:1px solid rgba(211,177,132,.22); border-radius:4px; padding:0 4px; line-height:1.5;}\n#opf-nav-recent .nr-name{flex:1 1 auto; overflow:hidden; text-overflow:ellipsis;}\n#opf-nav-recent .nr-empty{font-size:11.5px; color:rgba(200,180,170,.38); padding:2px 6px;}\n#opf-nav-hint{margin-top:10px; padding:0 8px; font-size:10.5px; line-height:1.6; color:rgba(200,180,170,.32);}\n\n\n/* ==========================================================================\n   可选界面风格\n   1 霜玻璃（默认，本文件上半部分）\n   2 古典机械（二重螺旋式：黄铜、切角、不对称角标、齿轮眉标）\n   3 神殿几何（星铁式：双层对称线、金属渐变、菱形、药丸按钮）\n   ========================================================================== */\n\n/* ---------- 2 古典机械 ---------- */\n.opf-theme-clock #opf-shell{\n  background:\n    radial-gradient(760px 380px at 10% -12%, rgba(206,150,86,.16), transparent 64%),\n    repeating-linear-gradient(118deg, rgba(255,255,255,.013) 0 1px, rgba(255,255,255,0) 1px 6px),\n    linear-gradient(180deg,#181310 0%,#110d0b 58%,#0b0908 100%) !important;\n}\n.opf-theme-clock #opf-shell-head{border-bottom-color:rgba(198,150,96,.26) !important;}\n.opf-theme-clock #opf-nav{border-right-color:rgba(198,150,96,.20) !important;}\n.opf-theme-clock .opf-ph-eyebrow{color:rgba(214,168,110,.75) !important;}\n.opf-theme-clock .opf-ph-eyebrow::before{\n  width:13px !important; height:13px !important; border-radius:50% !important;\n  background:\n    repeating-conic-gradient(rgba(224,178,120,.95) 0 7deg, rgba(224,178,120,0) 7deg 30deg),\n    radial-gradient(circle, rgba(20,12,8,.95) 34%, rgba(224,178,120,.95) 36%, rgba(224,178,120,.28) 58%, rgba(224,178,120,0) 60%) !important;\n  box-shadow:0 0 10px rgba(224,160,90,.28) !important;\n}\n.opf-theme-clock .opf-ph-rule{background:linear-gradient(90deg, rgba(214,168,110,.55), rgba(214,168,110,.10) 46%, transparent 78%) !important;}\n/* 卡片：黄铜边 + 右下单侧角标（不对称） */\n.opf-theme-clock .opf-card, .opf-theme-clock .opf-split-l{\n  border-color:rgba(198,150,96,.24) !important;\n  background:\n    linear-gradient(158deg, rgba(190,132,70,.10), rgba(255,255,255,.012) 42%, rgba(0,0,0,.16)) !important;\n  border-radius:10px !important; position:relative;\n}\n.opf-theme-clock .opf-card::after, .opf-theme-clock .opf-split-l::after{\n  content:\"\"; position:absolute; right:9px; bottom:9px; width:20px; height:20px; pointer-events:none;\n  border-right:1px solid rgba(224,178,120,.5); border-bottom:1px solid rgba(224,178,120,.5);\n  box-shadow:2px 2px 0 -1px rgba(224,178,120,.14);\n}\n.opf-theme-clock .opf-card-hd{border-bottom-color:rgba(214,168,110,.16) !important;}\n.opf-theme-clock .opf-card-no{\n  color:#e6c48f !important; border-color:rgba(214,168,110,.38) !important; border-radius:0 !important;\n  clip-path:polygon(0 0,100% 0,100% calc(100% - 5px),calc(100% - 5px) 100%,0 100%);\n}\n/* 按钮：切角 + 黄铜玻璃 */\n.opf-theme-clock .opf-btn{\n  border-radius:0 !important;\n  clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,10px 100%,0 calc(100% - 10px));\n  border-color:rgba(214,168,110,.26) !important;\n  background:linear-gradient(160deg, rgba(210,158,96,.16), rgba(60,38,22,.35) 55%, rgba(20,14,10,.5)) !important;\n  color:#f1dcc0 !important;\n}\n.opf-theme-clock .opf-btn:hover{background:linear-gradient(160deg, rgba(226,176,112,.26), rgba(76,48,28,.4) 55%, rgba(24,16,10,.55)) !important;}\n.opf-theme-clock .opf-btn.primary{\n  background:\n    linear-gradient(160deg, rgba(226,170,106,.30), rgba(150,80,44,.55) 52%, rgba(96,44,28,.6)) !important;\n  border-color:rgba(240,196,140,.42) !important;\n}\n.opf-theme-clock .opf-btn.primary::after{\n  content:\"\"; position:absolute; left:10px; right:10px; bottom:0; height:1px;\n  background:linear-gradient(90deg, transparent, rgba(255,214,160,.55), transparent);\n}\n.opf-theme-clock #opf-actions{border-color:rgba(214,168,110,.28) !important;}\n.opf-theme-clock #opf-nav .opf-tab.active{\n  background:linear-gradient(90deg, rgba(214,168,110,.18), rgba(214,168,110,.03)) !important;\n  box-shadow:inset 2px 0 0 rgba(226,178,110,.85) !important;\n}\n.opf-theme-clock .opf-btn.opf-danger{border-color:rgba(214,120,96,.34) !important; color:#e5a08c !important;}\n\n/* ---------- 3 神殿几何 ---------- */\n.opf-theme-astral #opf-shell{\n  background:\n    radial-gradient(720px 420px at 50% -14%, rgba(226,232,246,.12), transparent 62%),\n    radial-gradient(900px 520px at 50% 120%, rgba(184,150,110,.07), transparent 60%),\n    linear-gradient(180deg,#111218 0%,#0c0d12 58%,#08090d 100%) !important;\n}\n.opf-theme-astral #opf-shell-head{\n  border-bottom-color:rgba(226,232,246,.14) !important;\n  background:linear-gradient(180deg, rgba(28,30,38,.94), rgba(17,18,24,.94)) !important;\n}\n.opf-theme-astral #opf-shell-head::before{\n  background:linear-gradient(90deg, transparent, rgba(236,240,250,.55) 26%, rgba(214,178,130,.55) 74%, transparent) !important;\n  box-shadow:0 0 14px rgba(220,228,244,.22) !important;\n}\n.opf-theme-astral #opf-nav{border-right-color:rgba(226,232,246,.10) !important;}\n.opf-theme-astral .opf-nav-group{color:rgba(226,232,246,.42) !important;}\n.opf-theme-astral .opf-ph-eyebrow{color:rgba(226,232,246,.55) !important;}\n.opf-theme-astral .opf-ph-eyebrow::before{\n  width:26px !important; height:1px !important;\n  background:linear-gradient(90deg, rgba(236,240,250,.7), rgba(236,240,250,0)) !important;\n}\n.opf-theme-astral .opf-ph-title{\n  background:linear-gradient(180deg,#fbf8f2,#d9cfbe);\n  -webkit-background-clip:text; background-clip:text; color:transparent !important;\n}\n.opf-theme-astral .opf-ph-rule{\n  height:5px !important; background:none !important; position:relative;\n}\n.opf-theme-astral .opf-ph-rule::before{\n  content:\"\"; position:absolute; left:0; right:0; top:2px; height:1px;\n  background:linear-gradient(90deg, rgba(236,240,250,.30), rgba(214,178,130,.34) 50%, rgba(236,240,250,.10));\n}\n.opf-theme-astral .opf-ph-rule::after{\n  content:\"\"; position:absolute; left:50%; top:0; width:6px; height:6px; transform:translateX(-50%) rotate(45deg);\n  background:linear-gradient(135deg,#f6f2ea,#c8b48f); box-shadow:0 0 10px rgba(240,236,226,.35);\n}\n/* 卡片：双层对称细线 + 顶部菱形 */\n.opf-theme-astral .opf-card, .opf-theme-astral .opf-split-l{\n  border:1px solid rgba(236,240,250,.12) !important;\n  background:linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.012)) !important;\n  border-radius:14px !important; position:relative;\n}\n.opf-theme-astral .opf-card::before, .opf-theme-astral .opf-split-l::before{\n  content:\"\"; position:absolute; inset:4px; border-radius:10px; pointer-events:none;\n  border:1px solid rgba(236,240,250,.06);\n}\n.opf-theme-astral .opf-card::after, .opf-theme-astral .opf-split-l::after{\n  content:\"\"; position:absolute; top:-4px; left:50%; width:7px; height:7px; transform:translateX(-50%) rotate(45deg);\n  background:linear-gradient(135deg,#f8f4ec,#c9b590); box-shadow:0 0 12px rgba(240,236,226,.35);\n}\n.opf-theme-astral .opf-card-hd{border-bottom-color:rgba(236,240,250,.10) !important;}\n/* 按钮：药丸 + 金属渐变 + 双环 */\n.opf-theme-astral .opf-btn{\n  border-radius:999px !important;\n  background:linear-gradient(180deg, rgba(240,240,248,.16), rgba(196,190,180,.06) 55%, rgba(120,116,110,.10)) !important;\n  border:1px solid rgba(240,240,248,.18) !important;\n  box-shadow:inset 0 1px 0 rgba(255,255,255,.30), inset 0 0 0 1px rgba(255,255,255,.05), 0 6px 18px rgba(0,0,0,.30) !important;\n  color:#f4efe6 !important;\n}\n.opf-theme-astral .opf-btn:hover{\n  background:linear-gradient(180deg, rgba(246,246,252,.22), rgba(206,200,190,.08) 55%, rgba(130,126,120,.12)) !important;\n  border-color:rgba(246,246,252,.28) !important;\n}\n.opf-theme-astral .opf-btn.primary{\n  background:linear-gradient(180deg, rgba(206,96,108,.62), rgba(150,44,56,.55)) !important;\n  border-color:rgba(248,214,206,.38) !important;\n  box-shadow:inset 0 1px 0 rgba(255,232,224,.40), inset 0 0 0 1px rgba(255,255,255,.08), 0 8px 22px rgba(120,24,36,.34) !important;\n}\n.opf-theme-astral #opf-nav .opf-tab{border-radius:999px !important;}\n.opf-theme-astral #opf-nav .opf-tab.active{\n  background:linear-gradient(90deg, rgba(240,240,248,.12), rgba(240,240,248,.02)) !important;\n  box-shadow:inset 0 0 0 1px rgba(240,240,248,.16), inset 2px 0 0 rgba(248,240,228,.55) !important;\n}\n.opf-theme-astral #opf-shell #opf-actions{\n  border-color:rgba(236,240,250,.16) !important;\n  background:linear-gradient(180deg, rgba(30,32,40,.94), rgba(17,18,24,.95)) !important;\n}\n\n/* ---------- 风格选择器 ---------- */\n#opf-ui-theme{border-top:none !important; padding-top:2px !important;}\n#opf-ui-theme .opf-theme-pick{display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 4px;}\n#opf-ui-theme .opf-theme-chip{\n  cursor:pointer; border-radius:999px; padding:6px 14px; font-size:12.5px; letter-spacing:.6px;\n  border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.04); color:rgba(240,228,218,.72);\n  transition:background .14s ease, border-color .14s ease, color .14s ease;\n}\n#opf-ui-theme .opf-theme-chip:hover{background:rgba(255,255,255,.08); color:#fff4ea;}\n#opf-ui-theme .opf-theme-chip.on{border-color:rgba(232,206,170,.5); background:rgba(232,206,170,.12); color:#fff3e2;}\n\n\n/* ==========================================================================\n   风格强化：让三套看起来是三个界面，而不是同一套换配色\n   ========================================================================== */\n#opf-shell, #opf-shell-head, #opf-nav, .opf-card, .opf-btn, .opf-ph-title, .opf-ph, #opf-actions{\n  transition:background .28s ease, background-color .28s ease, border-color .28s ease, color .28s ease, box-shadow .28s ease;\n}\n\n/* ---------- 1 霜玻璃：更冷、更透 ---------- */\n.opf-theme-frost #opf-shell{\n  background:\n    radial-gradient(900px 480px at 20% -14%, rgba(150,180,210,.10), transparent 62%),\n    radial-gradient(700px 420px at 86% 4%, rgba(196,150,120,.07), transparent 60%),\n    linear-gradient(180deg,#0c1015 0%,#090c11 60%,#07090d 100%) !important;\n}\n.opf-theme-frost .opf-card, .opf-theme-frost .opf-split-l{\n  background:linear-gradient(180deg, rgba(210,228,244,.10), rgba(210,228,244,.028) 55%, rgba(255,255,255,.03)) !important;\n  border-color:rgba(206,226,244,.16) !important;\n  box-shadow:inset 0 1px 0 rgba(255,255,255,.20), 0 8px 26px rgba(0,0,0,.32) !important;\n  backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);\n}\n.opf-theme-frost .opf-ph-title{color:#f2f6fa !important; letter-spacing:2px;}\n\n/* ---------- 2 古典机械：方、铜、铆钉 ---------- */\n.opf-theme-clock #opf-shell{\n  background:\n    radial-gradient(760px 400px at 12% -12%, rgba(214,150,80,.20), transparent 62%),\n    repeating-linear-gradient(90deg, rgba(255,255,255,.010) 0 1px, rgba(255,255,255,0) 1px 3px),\n    linear-gradient(180deg,#1c130c 0%,#130d08 58%,#0a0705 100%) !important;\n}\n.opf-theme-clock #opf-shell-head{\n  height:60px !important; background:linear-gradient(180deg,#2b1d12,#1a1109) !important;\n  border-bottom:2px solid rgba(190,132,72,.42) !important;\n}\n.opf-theme-clock #opf-shell-head::before{\n  height:1px !important; background:linear-gradient(90deg, transparent, rgba(240,196,140,.7) 30%, rgba(150,96,48,.4) 70%, transparent) !important;\n}\n.opf-theme-clock #opf-shell-title{\n  font-family:var(--serif) !important; font-size:17px !important; letter-spacing:3.4px !important;\n  color:#f6dcb2 !important; text-shadow:0 1px 0 rgba(0,0,0,.9), 0 0 12px rgba(214,150,80,.25) !important;\n}\n.opf-theme-clock #opf-nav{\n  background:linear-gradient(180deg,#1a120b,#100a06) !important;\n  border-right:2px solid rgba(150,100,56,.34) !important;\n}\n.opf-theme-clock .opf-nav-group{\n  color:rgba(226,174,112,.66) !important; letter-spacing:3px !important; font-size:9px !important;\n  border-bottom:1px solid rgba(150,100,56,.28); padding-bottom:5px !important; margin:0 8px;\n}\n.opf-theme-clock #opf-nav .opf-tab{\n  border-radius:0 !important; height:38px; margin:0 4px; padding:0 12px !important;\n  color:#d6b68c !important; font-size:13px !important; letter-spacing:1.4px;\n  border:1px solid transparent !important;\n}\n.opf-theme-clock #opf-nav .opf-tab.active{\n  background:linear-gradient(180deg, rgba(176,116,58,.38), rgba(110,68,30,.22)) !important;\n  border:1px solid rgba(214,160,100,.48) !important;\n  color:#ffe8c6 !important;\n  box-shadow:inset 0 0 0 1px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,224,178,.30) !important;\n}\n.opf-theme-clock .opf-card, .opf-theme-clock .opf-split-l{\n  border-radius:0 !important;\n  border:1px solid rgba(150,104,60,.45) !important;\n  background:linear-gradient(180deg, rgba(120,82,44,.20), rgba(22,15,10,.62)) !important;\n  box-shadow:inset 0 0 0 1px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,214,158,.16), 0 2px 0 rgba(0,0,0,.45) !important;\n  clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px));\n}\n.opf-theme-clock .opf-card::before, .opf-theme-clock .opf-split-l::before{\n  content:\"\"; position:absolute; inset:5px; pointer-events:none; opacity:.5;\n  background:\n    radial-gradient(circle, rgba(240,206,160,.85) 0 1px, rgba(0,0,0,0) 1.8px) left top/6px 6px no-repeat,\n    radial-gradient(circle, rgba(240,206,160,.85) 0 1px, rgba(0,0,0,0) 1.8px) right top/6px 6px no-repeat,\n    radial-gradient(circle, rgba(240,206,160,.85) 0 1px, rgba(0,0,0,0) 1.8px) left bottom/6px 6px no-repeat,\n    radial-gradient(circle, rgba(240,206,160,.85) 0 1px, rgba(0,0,0,0) 1.8px) right bottom/6px 6px no-repeat;\n}\n.opf-theme-clock .opf-card-t, .opf-theme-clock .opf-ph-title{\n  font-family:var(--serif) !important; color:#f6ddb8 !important; letter-spacing:2px !important;\n}\n.opf-theme-clock .opf-btn{\n  border-radius:0 !important;\n  clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,10px 100%,0 calc(100% - 10px));\n  border:1px solid rgba(214,160,100,.48) !important;\n  background:linear-gradient(180deg, rgba(196,134,74,.38), rgba(112,68,34,.34) 55%, rgba(58,34,16,.5)) !important;\n  color:#ffe3ba !important; letter-spacing:1.4px; font-weight:600;\n  box-shadow:inset 0 1px 0 rgba(255,226,180,.30), inset 0 -2px 0 rgba(0,0,0,.45) !important;\n  backdrop-filter:none !important;\n}\n.opf-theme-clock .opf-btn:hover{background:linear-gradient(180deg, rgba(214,150,86,.48), rgba(128,80,40,.42) 55%, rgba(68,40,20,.55)) !important;}\n.opf-theme-clock .opf-btn.primary{\n  background:linear-gradient(180deg,#a8422e,#7a2a1c 55%,#5a1c12) !important;\n  border-color:rgba(255,206,150,.55) !important; color:#fff2e2 !important;\n}\n.opf-theme-clock .opf-btn.primary:hover{background:linear-gradient(180deg,#bc4c36,#8a3020 55%,#66200f) !important;}\n.opf-theme-clock #opf-actions{border:1px solid rgba(190,132,72,.35) !important; background:linear-gradient(180deg,#22170e,#150e08) !important;}\n.opf-theme-clock .opf-scale, .opf-theme-clock .opf-tone-btn{border-radius:0 !important;}\n\n/* ---------- 3 神殿几何：居中、对称、银蓝 ---------- */\n.opf-theme-astral #opf-shell{\n  background:\n    radial-gradient(1px 1px at 18% 24%, rgba(255,255,255,.22) 50%, transparent 51%),\n    radial-gradient(1px 1px at 72% 62%, rgba(255,255,255,.16) 50%, transparent 51%),\n    radial-gradient(820px 460px at 50% -16%, rgba(214,226,246,.16), transparent 62%),\n    radial-gradient(900px 520px at 50% 118%, rgba(196,168,126,.08), transparent 60%),\n    linear-gradient(180deg,#101319 0%,#0b0d12 58%,#07080c 100%) !important;\n  background-size:240px 240px, 320px 320px, auto, auto, auto !important;\n}\n.opf-theme-astral .opf-ph{\n  flex-direction:column !important; align-items:center !important; text-align:center;\n  padding-top:30px !important; gap:10px !important;\n}\n.opf-theme-astral .opf-ph-main{display:flex; flex-direction:column; align-items:center;}\n.opf-theme-astral .opf-ph-title{\n  font-size:32px !important; letter-spacing:10px !important;\n  background:linear-gradient(180deg,#ffffff,#d7c9b2) !important;\n  -webkit-background-clip:text !important; background-clip:text !important; color:transparent !important;\n}\n.opf-theme-astral .opf-ph-desc{max-width:52ch; color:rgba(226,232,246,.55) !important;}\n.opf-theme-astral .opf-ph-side{align-items:center !important;}\n.opf-theme-astral .opf-ph-rule::after{width:8px; height:8px;}\n.opf-theme-astral .opf-card, .opf-theme-astral .opf-split-l{\n  border-radius:18px !important;\n  border:1px solid rgba(226,236,250,.16) !important;\n  background:linear-gradient(180deg, rgba(226,236,250,.10), rgba(226,236,250,.02) 52%, rgba(255,255,255,.03)) !important;\n  box-shadow:inset 0 1px 0 rgba(255,255,255,.26), 0 10px 34px rgba(0,0,0,.36) !important;\n  backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);\n}\n.opf-theme-astral .opf-card::before, .opf-theme-astral .opf-split-l::before{\n  content:\"\"; position:absolute; inset:7px; border-radius:12px; pointer-events:none; opacity:.55;\n  border:1px solid rgba(236,240,250,.10);\n  background:none !important;\n}\n.opf-theme-astral .opf-card::after, .opf-theme-astral .opf-split-l::after{\n  content:\"\"; position:absolute; top:-5px; left:50%; width:8px; height:8px; transform:translateX(-50%) rotate(45deg);\n  background:linear-gradient(135deg,#fffdf8,#cdb994); box-shadow:0 0 14px rgba(240,236,226,.45);\n}\n.opf-theme-astral #opf-nav .opf-tab{\n  border-radius:999px !important; height:36px; font-size:13px !important; letter-spacing:2px;\n  color:rgba(226,232,246,.58) !important;\n}\n.opf-theme-astral #opf-nav .opf-tab.active{\n  background:linear-gradient(90deg, rgba(240,244,252,.14), rgba(240,244,252,.02)) !important;\n  color:#fff !important;\n  box-shadow:inset 0 0 0 1px rgba(240,244,252,.22), inset 0 0 18px rgba(220,232,250,.10) !important;\n  border-color:transparent !important;\n}\n.opf-theme-astral .opf-btn{\n  border-radius:999px !important;\n  background:linear-gradient(180deg, rgba(246,248,252,.22), rgba(198,196,190,.07) 50%, rgba(120,118,112,.10)) !important;\n  border:1px solid rgba(246,248,252,.24) !important;\n  color:#f8f4ec !important; letter-spacing:1.6px;\n  box-shadow:inset 0 1px 0 rgba(255,255,255,.42), inset 0 0 0 1px rgba(255,255,255,.06), 0 8px 20px rgba(0,0,0,.3) !important;\n}\n.opf-theme-astral .opf-btn:hover{background:linear-gradient(180deg, rgba(252,252,255,.30), rgba(206,204,198,.10) 50%, rgba(130,128,122,.12)) !important;}\n.opf-theme-astral .opf-btn.primary{\n  background:linear-gradient(180deg, rgba(216,110,120,.66), rgba(158,52,64,.58)) !important;\n  border-color:rgba(255,226,218,.45) !important;\n  box-shadow:inset 0 1px 0 rgba(255,236,230,.45), inset 0 0 0 1px rgba(255,255,255,.10), 0 10px 26px rgba(120,24,36,.36) !important;\n}\n.opf-theme-astral #opf-actions{\n  border-radius:999px !important; padding-left:24px !important;\n  border-color:rgba(236,240,250,.18) !important;\n  background:linear-gradient(180deg, rgba(34,36,44,.94), rgba(19,20,26,.96)) !important;\n}\n.opf-theme-astral .opf-card-hd{border-bottom:1px solid rgba(236,240,250,.10) !important;}\n.opf-theme-astral .opf-tone-btn{border-radius:12px !important;}\n.opf-theme-astral .opf-ph-eyebrow{letter-spacing:4px !important;}\n\n\n/* ==========================================================================\n   1 号风格定调：魔法大图书馆\n   暖色琉璃 = 暖底 + 烛光 + 纸色玻璃 + 黄铜细线；雾面但不冷。\n   （覆盖掉上一段给 1 号加的冷蓝测试配色）\n   ========================================================================== */\n.opf-theme-frost #opf-shell{\n  background:\n    radial-gradient(980px 480px at 14% -12%, rgba(222,176,116,.20), transparent 64%),\n    radial-gradient(780px 440px at 88% 2%, rgba(150,48,62,.14), transparent 62%),\n    radial-gradient(2px 2px at 18% 26%, rgba(255,236,206,.13) 50%, rgba(0,0,0,0) 51%),\n    radial-gradient(2px 2px at 64% 48%, rgba(255,236,206,.10) 50%, rgba(0,0,0,0) 51%),\n    radial-gradient(900px 520px at 50% 120%, rgba(120,70,40,.12), transparent 62%),\n    linear-gradient(180deg,#171110 0%,#110c0c 58%,#0b0808 100%) !important;\n  background-size:auto, auto, 220px 220px, 300px 300px, auto, auto !important;\n}\n.opf-theme-frost .opf-card, .opf-theme-frost .opf-split-l{\n  background:\n    linear-gradient(180deg, rgba(255,238,218,.105), rgba(255,238,218,.030) 55%, rgba(255,255,255,.028)) !important;\n  border-color:rgba(226,196,158,.20) !important;\n  box-shadow:inset 0 1px 0 rgba(255,246,232,.24), 0 10px 30px rgba(0,0,0,.38) !important;\n  backdrop-filter:blur(14px) saturate(115%); -webkit-backdrop-filter:blur(14px) saturate(115%);\n}\n.opf-theme-frost .opf-ph-title{\n  color:#f8eedf !important; letter-spacing:3px !important;\n  text-shadow:0 0 22px rgba(214,168,110,.20);\n}\n.opf-theme-frost .opf-ph-desc{color:rgba(226,206,186,.56) !important;}\n.opf-theme-frost .opf-ph-eyebrow{color:rgba(226,190,142,.62) !important;}\n.opf-theme-frost .opf-ph-rule{\n  background:linear-gradient(90deg, rgba(226,196,158,.34), rgba(226,196,158,.08) 62%, transparent) !important;\n}\n.opf-theme-frost .opf-btn{\n  border-color:rgba(255,238,218,.16) !important;\n  background:linear-gradient(180deg, rgba(255,240,224,.10), rgba(255,240,224,.030) 55%, rgba(255,255,255,.035)) !important;\n  color:#f7eadc !important;\n}\n.opf-theme-frost .opf-btn:hover{\n  background:linear-gradient(180deg, rgba(255,244,230,.145), rgba(255,240,224,.05) 55%, rgba(255,255,255,.05)) !important;\n  border-color:rgba(255,238,218,.24) !important;\n  color:#fff6ec !important;\n}\n.opf-theme-frost .opf-btn.primary{\n  background:linear-gradient(180deg, rgba(206,92,102,.62), rgba(146,42,54,.55) 58%, rgba(112,30,40,.58)) !important;\n  border-color:rgba(255,196,186,.32) !important;\n}\n.opf-theme-frost .opf-card-t, .opf-theme-frost .opf-card-no{color:#f2e2cd !important;}\n.opf-theme-frost .opf-card-no{border-color:rgba(226,196,158,.30) !important;}\n.opf-theme-frost #opf-actions{\n  border-color:rgba(226,196,158,.22) !important;\n  background:linear-gradient(180deg, rgba(38,28,24,.94), rgba(20,15,13,.95)) !important;\n}\n.opf-theme-frost #opf-nav .opf-tab.active{\n  background:linear-gradient(90deg, rgba(226,196,158,.14), rgba(226,196,158,.03)) !important;\n  box-shadow:inset 2px 0 0 rgba(226,180,120,.75) !important;\n}\n\n\n/* ==========================================================================\n   放开限制：2 号与 3 号不再受「暗红 + 黄铜」约束\n   2 = 铜绿机匣（氧化铜 + 铜 + 绿锈）\n   3 = 圣银神殿（冷银 + 珍珠金，结构改成浮空导航 + 八角玻璃板 + 居中页头）\n   ========================================================================== */\n\n/* ---------- 2 铜绿机匣 ---------- */\n.opf-theme-clock #opf-shell{\n  background:\n    radial-gradient(720px 400px at 10% -12%, rgba(96,148,124,.20), transparent 62%),\n    radial-gradient(620px 360px at 92% 4%, rgba(176,120,66,.14), transparent 60%),\n    repeating-linear-gradient(90deg, rgba(255,255,255,.008) 0 1px, rgba(255,255,255,0) 1px 3px),\n    linear-gradient(180deg,#111a15 0%,#0d1310 58%,#080c09 100%) !important;\n}\n.opf-theme-clock #opf-shell-head{\n  background:linear-gradient(180deg,#1d2a22,#121b16) !important;\n  border-bottom:2px solid rgba(178,132,80,.46) !important;\n}\n.opf-theme-clock #opf-shell-title{color:#f0dcb9 !important;}\n.opf-theme-clock #opf-nav{background:linear-gradient(180deg,#101a15,#0b120e) !important; border-right:2px solid rgba(150,120,74,.38) !important;}\n.opf-theme-clock #opf-nav .opf-tab{\n  border-left:2px solid transparent; letter-spacing:1.6px;\n}\n.opf-theme-clock #opf-nav .opf-tab::before{\n  content:\"\"; width:3px; height:3px; flex:none; margin-right:9px;\n  background:rgba(150,190,168,.55); transform:rotate(45deg);\n}\n.opf-theme-clock #opf-nav .opf-tab.active{\n  background:linear-gradient(180deg, rgba(96,148,124,.26), rgba(150,104,58,.18)) !important;\n  border:1px solid rgba(178,132,80,.46) !important;\n  border-left:2px solid rgba(214,168,110,.9) !important;\n  color:#ffeccb !important;\n}\n.opf-theme-clock #opf-nav .opf-tab.active::before{background:rgba(240,206,150,.95);}\n.opf-theme-clock .opf-card, .opf-theme-clock .opf-split-l{\n  border:1px solid rgba(150,124,78,.42) !important;\n  background:linear-gradient(170deg, rgba(66,96,80,.26), rgba(14,20,16,.66) 62%, rgba(10,14,11,.72)) !important;\n  clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px));\n}\n.opf-theme-clock .opf-card::before, .opf-theme-clock .opf-split-l::before{\n  content:\"\"; position:absolute; left:0; top:0; bottom:0; width:3px; opacity:.9;\n  background:linear-gradient(180deg, rgba(214,168,110,.85), rgba(96,148,124,.35) 55%, rgba(214,168,110,.15));\n  box-shadow:0 0 12px rgba(150,190,168,.18);\n  inset:auto;\n}\n.opf-theme-clock .opf-card::after, .opf-theme-clock .opf-split-l::after{\n  content:\"\"; position:absolute; right:9px; bottom:9px; width:18px; height:18px;\n  border-right:1px solid rgba(150,190,168,.55); border-bottom:1px solid rgba(150,190,168,.55);\n}\n.opf-theme-clock .opf-card-t, .opf-theme-clock .opf-ph-title{color:#f3e2c2 !important;}\n.opf-theme-clock .opf-btn{\n  background:linear-gradient(180deg, rgba(96,148,124,.34), rgba(60,96,80,.30) 52%, rgba(28,44,34,.5) 88%, rgba(176,120,66,.34) 100%) !important;\n  border:1px solid rgba(150,190,168,.34) !important;\n  color:#eef6ee !important;\n  clip-path:polygon(0 0,calc(100% - 11px) 0,100% 11px,100% 100%,11px 100%,0 calc(100% - 11px));\n}\n.opf-theme-clock .opf-btn:hover{background:linear-gradient(180deg, rgba(112,166,140,.44), rgba(70,110,92,.36) 52%, rgba(30,48,38,.55) 88%, rgba(196,138,82,.40) 100%) !important;}\n.opf-theme-clock .opf-btn.primary{\n  background:linear-gradient(180deg,#c08a52,#8d5a34 55%,#6b3f24) !important;\n  border-color:rgba(255,220,176,.5) !important;\n  color:#2a180c !important; text-shadow:0 1px 0 rgba(255,240,214,.35) !important;\n}\n.opf-theme-clock .opf-btn.primary:hover{background:linear-gradient(180deg,#d29a5e,#9a6438 55%,#764527) !important;}\n.opf-theme-clock #opf-btn-save{background:linear-gradient(180deg, rgba(96,148,124,.30), rgba(28,44,34,.5)) !important; border-color:rgba(150,190,168,.4) !important; color:#e8f4ec !important;}\n.opf-theme-clock #opf-actions{background:linear-gradient(180deg,#1b2620,#101813) !important; border:1px solid rgba(150,124,78,.4) !important; border-radius:0 !important;}\n\n/* ---------- 3 圣银神殿：结构也换 ---------- */\n.opf-theme-astral #opf-shell{\n  background:\n    radial-gradient(1px 1px at 12% 18%, rgba(220,236,255,.26) 50%, rgba(0,0,0,0) 51%),\n    radial-gradient(1px 1px at 68% 42%, rgba(220,236,255,.18) 50%, rgba(0,0,0,0) 51%),\n    radial-gradient(820px 480px at 50% -18%, rgba(198,222,255,.18), transparent 64%),\n    linear-gradient(180deg,#0c1018 0%,#080b12 60%,#05070b 100%) !important;\n  background-size:260px 260px, 340px 340px, auto, auto !important;\n}\n/* 浮空导航：一条玻璃胶囊，不再贴边到底 */\n.opf-theme-astral #opf-nav{\n  width:214px !important;\n  margin:16px 0 16px 14px !important;\n  padding:12px 8px !important;\n  border:1px solid rgba(214,232,252,.16) !important;\n  border-radius:18px !important;\n  background:linear-gradient(180deg, rgba(214,232,252,.07), rgba(214,232,252,.015)) !important;\n  backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);\n  box-shadow:inset 0 1px 0 rgba(255,255,255,.22), 0 14px 40px rgba(0,0,0,.4) !important;\n}\n.opf-theme-astral #opf-nav .opf-tab{justify-content:center; letter-spacing:3px; font-size:12.5px !important;}\n.opf-theme-astral #opf-shell-body{gap:6px;}\n.opf-theme-astral .opf-nav-group{text-align:center; letter-spacing:4px !important; font-size:8.5px !important;}\n/* 八角玻璃板 */\n.opf-theme-astral .opf-card, .opf-theme-astral .opf-split-l{\n  border-radius:0 !important;\n  clip-path:polygon(16px 0,calc(100% - 16px) 0,100% 16px,100% calc(100% - 16px),calc(100% - 16px) 100%,16px 100%,0 calc(100% - 16px),0 16px);\n  background:linear-gradient(180deg, rgba(222,236,255,.11), rgba(222,236,255,.025) 55%, rgba(255,255,255,.035)) !important;\n  border:1px solid rgba(222,236,255,.20) !important;\n  box-shadow:inset 0 1px 0 rgba(255,255,255,.3), inset 0 0 40px rgba(160,200,240,.06), 0 16px 44px rgba(0,0,0,.42) !important;\n}\n.opf-theme-astral .opf-card::before, .opf-theme-astral .opf-split-l::before{\n  content:\"\"; position:absolute; inset:5px; pointer-events:none; opacity:.5;\n  clip-path:inherit; border:1px solid rgba(222,236,255,.12); border-radius:0; background:none !important;\n}\n.opf-theme-astral .opf-card::after, .opf-theme-astral .opf-split-l::after{\n  content:\"\"; position:absolute; top:-5px; left:50%; width:8px; height:8px; transform:translateX(-50%) rotate(45deg);\n  background:linear-gradient(135deg,#ffffff,#b8cbe4); box-shadow:0 0 16px rgba(200,224,255,.55);\n}\n/* 主操作：珍珠金玻璃，不再用红 */\n.opf-theme-astral .opf-btn{\n  background:linear-gradient(180deg, rgba(244,246,252,.26), rgba(200,206,216,.09) 52%, rgba(126,134,146,.12)) !important;\n  border:1px solid rgba(246,248,252,.30) !important;\n  color:#fbf8f2 !important; letter-spacing:2px;\n  box-shadow:inset 0 1px 0 rgba(255,255,255,.48), 0 8px 22px rgba(0,0,0,.32) !important;\n}\n.opf-theme-astral .opf-btn.primary{\n  background:linear-gradient(180deg,#f6efe0,#d9c7a4 55%,#bda884) !important;\n  border-color:rgba(255,250,236,.75) !important;\n  color:#221d16 !important; font-weight:700 !important;\n  text-shadow:0 1px 0 rgba(255,255,255,.5) !important;\n  box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 0 26px rgba(226,236,250,.35), 0 10px 26px rgba(0,0,0,.35) !important;\n}\n.opf-theme-astral .opf-btn.primary:hover{\n  background:linear-gradient(180deg,#fffaf0,#e6d6b6 55%,#c9b491) !important;\n}\n.opf-theme-astral #opf-btn-save{\n  background:linear-gradient(180deg, rgba(244,246,252,.20), rgba(150,170,196,.10)) !important;\n  border-color:rgba(222,236,255,.34) !important; color:#f2f6ff !important;\n}\n.opf-theme-astral #opf-actions{\n  border-radius:20px !important;\n  border:1px solid rgba(222,236,255,.18) !important;\n  background:linear-gradient(180deg, rgba(20,26,36,.92), rgba(10,13,19,.95)) !important;\n  box-shadow:inset 0 1px 0 rgba(255,255,255,.16), 0 16px 44px rgba(0,0,0,.45) !important;\n}\n.opf-theme-astral .opf-tone-btn.active{\n  background:linear-gradient(180deg, rgba(222,236,255,.18), rgba(222,236,255,.04)) !important;\n  border-color:rgba(222,236,255,.42) !important;\n}\n.opf-theme-astral .opf-step[data-st=run]{background:linear-gradient(90deg, rgba(160,200,240,.14), rgba(255,255,255,.02)) !important; border-color:rgba(160,200,240,.4) !important; box-shadow:inset 2px 0 0 rgba(190,220,255,.7) !important;}\n\n\n/* ==========================================================================\n   前卫层：品牌标记分主题 + 3 号改成线性时间线结构 + 动效\n   ========================================================================== */\n\n/* ---------- 品牌星标：不再固定是红的 ---------- */\n.opf-theme-frost .opf-brand-mark{color:#e0505f; text-shadow:0 0 12px rgba(224,80,95,.6);}\n.opf-theme-clock .opf-brand-mark{\n  color:#a9d3b8; font-size:15px;\n  text-shadow:0 0 10px rgba(126,186,152,.65), 0 1px 0 rgba(0,0,0,.8);\n  transform:rotate(45deg) scale(.92);\n}\n.opf-theme-astral .opf-brand-mark{\n  color:#f2f7ff; font-size:19px;\n  text-shadow:0 0 12px rgba(206,228,255,.9), 0 0 30px rgba(150,190,240,.55);\n  transform:scale(1.02);\n}\n\n/* ---------- 3 号：线性神殿（时间线 + 扫描线） ---------- */\n.opf-theme-astral .opf-card, .opf-theme-astral .opf-split-l{\n  border:1px solid rgba(214,232,255,.16) !important;\n  box-shadow:inset 0 0 0 1px rgba(214,232,255,.06), inset 0 1px 0 rgba(255,255,255,.22), 0 18px 50px rgba(0,0,0,.45) !important;\n  background:linear-gradient(180deg, rgba(214,232,255,.075), rgba(214,232,255,.012) 60%, rgba(255,255,255,.02)) !important;\n}\n.opf-theme-astral .opf-card-hd{position:relative; border-bottom-color:rgba(214,232,255,.14) !important;}\n.opf-theme-astral .opf-card-hd::after{\n  content:\"\"; position:absolute; left:0; bottom:-1px; width:34%; height:1px;\n  background:linear-gradient(90deg, transparent, rgba(198,224,255,.9), transparent);\n  animation:opfScan 7s linear infinite;\n}\n@keyframes opfScan{\n  0%{transform:translateX(-40%); opacity:0;}\n  12%{opacity:1;}\n  88%{opacity:1;}\n  100%{transform:translateX(340%); opacity:0;}\n}\n@media (prefers-reduced-motion: reduce){\n  .opf-theme-astral .opf-card-hd::after{animation:none; opacity:.4;}\n}\n\n/* 步骤列表 → 中轴时间线 */\n.opf-theme-astral .opf-steps,\n.opf-theme-astral #opf-char-steps,\n.opf-theme-astral #opf-dest-steps{position:relative; padding-left:18px !important; gap:2px !important;}\n.opf-theme-astral .opf-steps::before,\n.opf-theme-astral #opf-char-steps::before,\n.opf-theme-astral #opf-dest-steps::before{\n  content:\"\"; position:absolute; left:5px; top:8px; bottom:8px; width:1px;\n  background:linear-gradient(180deg, rgba(198,224,255,.55), rgba(198,224,255,.10) 70%, transparent);\n}\n.opf-theme-astral .opf-step{\n  position:relative; border:none !important; border-radius:0 !important;\n  background:transparent !important;\n  border-bottom:1px solid rgba(214,232,255,.10) !important;\n  box-shadow:none !important;\n}\n.opf-theme-astral .opf-step::before{\n  content:\"\"; position:absolute; left:-17px; top:15px; width:6px; height:6px;\n  transform:rotate(45deg); background:rgba(198,224,255,.55);\n  box-shadow:0 0 10px rgba(198,224,255,.35);\n}\n.opf-theme-astral .opf-step[data-st=ok]::before{background:#dff0ff; box-shadow:0 0 12px rgba(198,224,255,.8);}\n.opf-theme-astral .opf-step[data-st=run]::before{background:#ffe9b8; box-shadow:0 0 14px rgba(255,220,160,.9); animation:opfPulse 1.2s infinite;}\n.opf-theme-astral .opf-step[data-st=err]::before{background:#ffb59a; box-shadow:0 0 12px rgba(255,150,120,.7);}\n.opf-theme-astral .opf-step-head{padding:10px 4px !important;}\n.opf-theme-astral .opf-step-title{letter-spacing:1.2px;}\n.opf-theme-astral .opf-idx{\n  background:transparent !important; border:none !important; box-shadow:none !important;\n  color:rgba(214,232,255,.55) !important; font-size:10.5px !important; width:16px !important;\n}\n/* 操作条：胶囊 + 悬停扫光 */\n.opf-theme-astral #opf-actions{position:relative; overflow:hidden;}\n.opf-theme-astral #opf-actions::after{\n  content:\"\"; position:absolute; top:0; bottom:0; left:-40%; width:35%; pointer-events:none;\n  background:linear-gradient(100deg, transparent, rgba(214,236,255,.16), transparent);\n  transform:skewX(-18deg); transition:left .55s ease;\n}\n.opf-theme-astral #opf-actions:hover::after{left:120%;}\n/* 页头：标题下的细光带 */\n.opf-theme-astral .opf-ph-title{position:relative;}\n.opf-theme-astral .opf-ph-main::after{\n  content:\"\"; display:block; width:120px; height:1px; margin:14px auto 0;\n  background:linear-gradient(90deg, transparent, rgba(214,232,255,.65), transparent);\n}\n\n/* ---------- 2 号：机匣铭牌化 ---------- */\n.opf-theme-clock #opf-shell-head{position:relative;}\n.opf-theme-clock #opf-shell-head::after{\n  content:\"\"; position:absolute; left:0; right:0; bottom:-2px; height:2px;\n  background:repeating-linear-gradient(90deg, rgba(150,190,168,.55) 0 6px, rgba(0,0,0,0) 6px 12px);\n  opacity:.55;\n}\n.opf-theme-clock .opf-card-no{\n  border:1px solid rgba(150,190,168,.38) !important; color:#bfe0cb !important;\n  background:rgba(20,34,26,.6) !important;\n}\n.opf-theme-clock .opf-btn:active{transform:translateY(2px);}\n/* 导航当前项：左侧铜齿 */\n.opf-theme-clock #opf-nav .opf-tab.active{\n  box-shadow:inset 3px 0 0 rgba(214,168,110,.95), inset 0 0 18px rgba(96,148,124,.18) !important;\n}\n\n\n/* 2 号的步骤状态：铜/绿锈，不用红 */\n.opf-theme-clock .opf-step[data-st=run]{\n  background:linear-gradient(90deg, rgba(96,148,124,.16), rgba(255,255,255,.02)) !important;\n  border-color:rgba(150,190,168,.42) !important;\n  box-shadow:inset 2px 0 0 rgba(214,168,110,.85) !important;\n}\n.opf-theme-clock .opf-step[data-st=ok]{\n  background:rgba(120,180,150,.06) !important; border-color:rgba(120,180,150,.24) !important;\n}\n.opf-theme-clock .opf-step[data-st=err]{\n  border-color:rgba(214,120,80,.42) !important;\n}\n.opf-theme-clock .opf-ph-title{letter-spacing:3px !important;}\n\n\n/* ==========================================================================\n   换布局：\n   3 号 = 顶栏导航（横向胶囊 + 下拉草稿），内容满宽\n   2 号 = 竖排机械脊（导航竖排文字，草稿面板从侧边弹出）\n   ========================================================================== */\n\n/* ---------- 3 号：导航挪到顶部 ---------- */\n.opf-theme-astral #opf-shell-body{flex-direction:column !important;}\n.opf-theme-astral #opf-nav{\n  position:relative; width:auto !important;\n  margin:12px 20px 0 !important; padding:6px 10px !important;\n  flex-direction:row !important; align-items:center !important;\n  gap:4px !important; overflow:visible !important;\n  border:1px solid rgba(214,232,255,.18) !important; border-radius:999px !important;\n  background:linear-gradient(180deg, rgba(214,232,255,.08), rgba(214,232,255,.02)) !important;\n  backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px);\n  box-shadow:inset 0 1px 0 rgba(255,255,255,.24), 0 12px 34px rgba(0,0,0,.4) !important;\n}\n.opf-theme-astral .opf-nav-group{display:none !important;}\n.opf-theme-astral #opf-nav .opf-tab{\n  height:34px; padding:0 16px !important; flex:none; justify-content:center;\n  font-size:12.5px !important; letter-spacing:3px;\n}\n.opf-theme-astral #opf-nav .opf-tab.active{background:linear-gradient(180deg, rgba(240,244,252,.18), rgba(240,244,252,.04)) !important;}\n.opf-theme-astral #opf-nav-sub{\n  position:absolute; top:calc(100% + 8px); left:0; right:0;\n  padding:6px 8px !important; margin:0 !important;\n  border:1px solid rgba(214,232,255,.18); border-radius:14px;\n  background:linear-gradient(180deg, rgba(18,24,34,.98), rgba(10,13,19,.98));\n  box-shadow:0 18px 40px rgba(0,0,0,.5);\n  max-height:0; opacity:0; pointer-events:none; transform:translateY(-6px);\n}\n.opf-theme-astral #opf-nav-sub.open{max-height:300px; opacity:1; pointer-events:auto; transform:translateY(0);}\n.opf-theme-astral #opf-nav-sub #opf-projlist{flex-direction:row !important; flex-wrap:wrap; gap:6px !important;}\n.opf-theme-astral #opf-projlist .opf-proj-row{width:auto; padding:0 10px !important; border-radius:999px !important;}\n.opf-theme-astral #opf-projlist .opf-proj-head{width:100%;}\n.opf-theme-astral #opf-nav-recent{display:none !important;}\n.opf-theme-astral #opf-nav-hint{display:none !important;}\n.opf-theme-astral #opf-page-preset #opf-body{max-width:1280px !important;}\n.opf-theme-astral .opf-split{max-width:1280px; margin:0 auto;}\n.opf-theme-astral #opf-shell-body{overflow:hidden;}\n\n/* ---------- 2 号：竖排机械脊 ---------- */\n.opf-theme-clock #opf-nav{\n  position:relative; width:104px !important; min-width:104px;\n  padding:14px 6px !important; gap:6px !important;\n  overflow:visible !important;\n  align-items:stretch !important;\n}\n.opf-theme-clock .opf-nav-group{display:none !important;}\n.opf-theme-clock #opf-nav .opf-tab{\n  writing-mode:vertical-rl; text-orientation:upright;\n  height:118px; min-height:118px; padding:0 !important;\n  display:flex !important; align-items:center; justify-content:center;\n  letter-spacing:5px; font-size:13px !important;\n  border:1px solid rgba(150,124,78,.28) !important;\n  background:linear-gradient(90deg, rgba(96,148,124,.10), rgba(20,28,22,.35)) !important;\n}\n.opf-theme-clock #opf-nav .opf-tab.active{\n  background:linear-gradient(90deg, rgba(96,148,124,.26), rgba(150,104,58,.20)) !important;\n  border-color:rgba(214,168,110,.55) !important;\n  box-shadow:inset 2px 0 0 rgba(214,168,110,.9), inset 0 0 20px rgba(96,148,124,.25) !important;\n}\n.opf-theme-clock #opf-nav-sub{\n  position:absolute; left:calc(100% + 10px); top:0; width:250px;\n  margin:0 !important; padding:8px !important;\n  border:1px solid rgba(150,124,78,.4); border-radius:0;\n  background:linear-gradient(180deg,#16211b,#0d1410);\n  box-shadow:0 18px 44px rgba(0,0,0,.55);\n  max-height:0; opacity:0; pointer-events:none; transform:translateX(-6px);\n}\n.opf-theme-clock #opf-nav-sub.open{max-height:340px; opacity:1; pointer-events:auto; transform:translateX(0);}\n.opf-theme-clock #opf-nav-recent{display:none !important;}\n.opf-theme-clock #opf-nav-hint{display:none !important;}\n\n\n/* 顶栏/竖脊两种布局的收尾 */\n.opf-theme-astral #opf-nav{flex-wrap:wrap !important;}\n.opf-theme-astral #opf-nav .opf-tab{flex:0 0 auto !important;}\n.opf-theme-astral #opf-nav-sub{\n  position:static !important; flex:1 0 100%;\n  max-height:0; opacity:0; pointer-events:none; transform:none;\n  background:transparent !important; border:none !important; box-shadow:none !important;\n  padding:0 !important; margin:0 !important;\n}\n.opf-theme-astral #opf-nav-sub.open{\n  max-height:220px; opacity:1; pointer-events:auto;\n  padding:6px 2px 2px !important;\n}\n.opf-theme-astral #opf-nav-sub #opf-projlist{border-top:none !important;}\n.opf-theme-clock #opf-nav-sub{z-index:40;}\n.opf-theme-clock #opf-nav{z-index:5;}\n\n\n/* 3 号改成「右侧控制栏 + 全宽内容」：导航靠右，内容占满左侧 */\n.opf-theme-astral #opf-shell-body{flex-direction:row-reverse !important;}\n.opf-theme-astral #opf-shell #opf-nav{\n  flex-direction:column !important; flex-wrap:nowrap !important;\n  width:216px !important; min-width:216px !important;\n  margin:16px 14px 16px 0 !important; padding:12px 8px !important;\n  overflow:auto !important; align-items:stretch !important;\n  border:1px solid rgba(214,232,255,.16) !important; border-radius:18px !important;\n  background:linear-gradient(180deg, rgba(214,232,255,.07), rgba(214,232,255,.015)) !important;\n  backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);\n  box-shadow:inset 0 1px 0 rgba(255,255,255,.22), 0 14px 40px rgba(0,0,0,.4) !important;\n  position:relative; z-index:5;\n}\n.opf-theme-astral #opf-shell #opf-nav .opf-tab{\n  flex:0 0 auto !important; width:auto !important; min-width:0 !important;\n}\n.opf-theme-astral #opf-nav-sub{\n  position:static !important; flex:0 0 auto !important;\n  max-height:none !important; opacity:1 !important; pointer-events:auto !important;\n  padding:2px 2px 6px !important; margin:0 !important;\n  background:transparent !important; border:none !important; box-shadow:none !important;\n  transform:none !important;\n}\n.opf-theme-astral #opf-nav-sub.open{max-height:none !important;}\n.opf-theme-astral #opf-nav-sub #opf-projlist{flex-direction:column !important; gap:2px !important;}\n.opf-theme-astral #opf-projlist .opf-proj-row{width:auto !important; border-radius:8px !important;}\n.opf-theme-astral #opf-page-preset #opf-body{max-width:1240px !important; margin:0 auto !important;}\n.opf-theme-astral .opf-split{max-width:1240px; margin:0 auto;}\n\n\n/* 3 号收敛为「浮空玻璃导轨 + 居中内容」（右侧栏试验回退） */\n.opf-theme-astral #opf-shell-body{flex-direction:row !important;}\n.opf-theme-astral #opf-shell #opf-nav{\n  flex:0 0 auto !important;\n  width:214px !important; min-width:214px !important;\n  margin:16px 0 16px 14px !important; padding:12px 8px !important;\n  flex-direction:column !important; flex-wrap:nowrap !important;\n  border-radius:18px !important; overflow:auto !important;\n  position:relative !important; z-index:5 !important;\n}\n.opf-theme-astral #opf-nav-sub{\n  position:static !important; flex:0 0 auto !important;\n  max-height:none !important; opacity:1 !important; pointer-events:auto !important;\n  padding:2px 2px 6px !important; margin:0 !important;\n  background:transparent !important; border:none !important; box-shadow:none !important;\n  transform:none !important;\n}\n\n\n/* 3 号导航：最终态（普通左侧浮空导轨，最高优先级压掉前面的试验） */\n#opf-shell.opf-theme-astral #opf-shell-body #opf-nav{\n  flex:0 0 216px !important; width:216px !important; min-width:216px !important; max-width:none !important;\n  flex-direction:column !important; flex-wrap:nowrap !important; align-items:stretch !important;\n  margin:12px !important; padding:10px !important; height:auto !important;\n  border-radius:14px !important; overflow:auto !important;\n  border:1px solid rgba(214,232,255,.16) !important;\n  background:linear-gradient(180deg, rgba(214,232,255,.07), rgba(214,232,255,.015)) !important;\n  backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);\n  box-shadow:inset 0 1px 0 rgba(255,255,255,.22), 0 14px 40px rgba(0,0,0,.4) !important;\n  position:relative !important; z-index:5 !important;\n}\n#opf-shell.opf-theme-astral #opf-shell-body #opf-nav .opf-tab{\n  flex:0 0 auto !important; width:auto !important; min-width:0 !important; height:36px !important;\n}\n#opf-shell.opf-theme-astral #opf-nav #opf-nav-sub{\n  position:static !important; flex:0 0 auto !important; width:auto !important; max-height:none !important;\n  opacity:1 !important; pointer-events:auto !important; transform:none !important;\n  background:transparent !important; border:none !important; box-shadow:none !important; padding:0 !important;\n}\n\n\n/* ==========================================================================\n   1 号定稿：把「魔法大图书馆」做足\n   暖木底 + 烛光 + 纸页玻璃 + 压印菱形 + 金字 + 朱红火漆按钮\n   ========================================================================== */\n.opf-theme-frost #opf-shell{\n  background:\n    radial-gradient(1000px 540px at 12% -16%, rgba(238,186,118,.24), transparent 66%),\n    radial-gradient(760px 420px at 88% -2%, rgba(150,46,60,.18), transparent 62%),\n    radial-gradient(1.5px 1.5px at 22% 26%, rgba(255,232,198,.18) 50%, rgba(0,0,0,0) 51%),\n    radial-gradient(1.5px 1.5px at 62% 54%, rgba(255,224,184,.12) 50%, rgba(0,0,0,0) 51%),\n    radial-gradient(130% 100% at 50% 46%, rgba(0,0,0,0) 38%, rgba(0,0,0,.48) 100%),\n    linear-gradient(180deg,#1a1211 0%,#120d0c 55%,#0a0706 100%) !important;\n  background-size:auto, auto, 240px 240px, 380px 380px, auto, auto !important;\n}\n.opf-theme-frost #opf-nav{\n  background:linear-gradient(180deg, rgba(120,74,42,.16), rgba(20,14,12,.5)) !important;\n  border-right:1px solid rgba(228,196,152,.16) !important;\n}\n.opf-theme-frost .opf-nav-group{color:rgba(226,186,132,.58) !important; letter-spacing:3px !important;}\n.opf-theme-frost #opf-nav .opf-tab{color:rgba(238,218,196,.72) !important;}\n.opf-theme-frost #opf-nav .opf-tab.active{\n  background:linear-gradient(90deg, rgba(216,172,112,.18), rgba(216,172,112,.03)) !important;\n  color:#fff2dd !important;\n  box-shadow:inset 2px 0 0 rgba(244,206,150,.95), inset 0 0 24px rgba(200,140,80,.10) !important;\n}\n.opf-theme-frost .opf-card, .opf-theme-frost .opf-split-l{\n  position:relative;\n  background:\n    linear-gradient(180deg, rgba(255,240,218,.115), rgba(255,232,204,.032) 52%, rgba(255,255,255,.022)) !important;\n  border:1px solid rgba(230,198,154,.26) !important;\n  box-shadow:inset 0 1px 0 rgba(255,248,232,.28), inset 0 0 70px rgba(140,86,44,.10), 0 12px 34px rgba(0,0,0,.42) !important;\n}\n.opf-theme-frost .opf-card::after, .opf-theme-frost .opf-split-l::after{\n  content:\"\"; position:absolute; top:-4px; left:50%; width:6px; height:6px;\n  transform:translateX(-50%) rotate(45deg);\n  background:linear-gradient(135deg,#f8e6c6,#bb9058);\n  box-shadow:0 0 10px rgba(240,206,150,.4);\n}\n.opf-theme-frost .opf-card-hd{border-bottom-color:rgba(230,198,154,.18) !important;}\n.opf-theme-frost .opf-ph-eyebrow::before{\n  width:9px !important; height:9px !important; transform:rotate(45deg);\n  background:linear-gradient(135deg,#f3dcb4,#b4894f) !important;\n  box-shadow:0 0 10px rgba(240,206,150,.45) !important;\n}\n.opf-theme-frost .opf-ph-title{\n  color:#fdf2e0 !important;\n  text-shadow:0 1px 0 rgba(0,0,0,.7), 0 0 34px rgba(228,178,112,.28) !important;\n}\n.opf-theme-frost .opf-ph-desc{color:rgba(238,216,192,.62) !important;}\n.opf-theme-frost .opf-ph-rule{\n  height:5px !important; background:none !important; position:relative;\n}\n.opf-theme-frost .opf-ph-rule::before{\n  content:\"\"; position:absolute; left:0; right:0; top:2px; height:1px;\n  background:linear-gradient(90deg, rgba(234,200,150,.55), rgba(234,200,150,.12) 55%, transparent);\n}\n.opf-theme-frost .opf-ph-rule::after{\n  content:\"\"; position:absolute; left:2px; top:0; width:6px; height:6px; transform:rotate(45deg);\n  background:rgba(240,206,150,.6); box-shadow:0 0 8px rgba(240,206,150,.35);\n}\n.opf-theme-frost .opf-card-no{\n  color:#f3d9ac !important; border-color:rgba(230,198,154,.4) !important;\n  background:rgba(60,34,18,.45) !important;\n}\n.opf-theme-frost .opf-btn.primary{\n  background:linear-gradient(180deg, rgba(210,92,100,.66), rgba(146,40,52,.58) 58%, rgba(112,28,38,.60)) !important;\n  border-color:rgba(248,212,166,.40) !important;\n  box-shadow:inset 0 1px 0 rgba(255,230,204,.34), 0 10px 26px rgba(120,24,36,.40) !important;\n}\n.opf-theme-frost #opf-actions{\n  border-color:rgba(230,198,154,.26) !important;\n  background:linear-gradient(180deg, rgba(46,30,24,.94), rgba(24,16,14,.95)) !important;\n}\n.opf-theme-frost .opf-tone-btn.active{\n  background:linear-gradient(180deg, rgba(226,186,132,.22), rgba(226,186,132,.05)) !important;\n  border-color:rgba(238,204,156,.55) !important;\n}\n\n\n/* 1 号加「书」的意象：书脊、书签、双线压印 */\n.opf-theme-frost .opf-card::before, .opf-theme-frost .opf-split-l::before{\n  content:\"\"; position:absolute; left:6px; top:12px; bottom:12px; width:3px; border-radius:3px;\n  background:linear-gradient(180deg, rgba(246,214,160,.9), rgba(206,148,86,.45) 58%, rgba(150,46,60,.5));\n  box-shadow:0 0 12px rgba(240,200,140,.28);\n}\n.opf-theme-frost .opf-card, .opf-theme-frost .opf-split-l{padding-left:20px !important;}\n.opf-theme-frost #opf-nav .opf-tab{position:relative;}\n.opf-theme-frost #opf-nav .opf-tab.active::before{\n  content:\"\"; position:absolute; right:9px; top:8px; bottom:8px; width:3px; border-radius:2px;\n  background:linear-gradient(180deg, rgba(206,74,92,.95), rgba(206,74,92,.25));\n  box-shadow:0 0 10px rgba(206,74,92,.4);\n}\n/* 页头：双线 + 中央菱形，像扉页压印 */\n.opf-theme-frost .opf-ph-rule{height:9px !important;}\n.opf-theme-frost .opf-ph-rule::before{\n  content:\"\"; position:absolute; left:0; right:0; top:3px; height:1px;\n  background:linear-gradient(90deg, rgba(238,206,156,.6), rgba(238,206,156,.18) 50%, transparent);\n  box-shadow:0 4px 0 -3px rgba(238,206,156,.28);\n}\n.opf-theme-frost .opf-ph-rule::after{\n  content:\"\"; position:absolute; left:50%; top:0; width:7px; height:7px; margin-left:-3.5px;\n  transform:rotate(45deg);\n  background:linear-gradient(135deg,#fbe9c8,#bd9257);\n  box-shadow:0 0 12px rgba(240,206,150,.45);\n}\n/* 更明显的烛光与桌面暗角 */\n.opf-theme-frost #opf-shell{\n  background:\n    radial-gradient(1100px 600px at 10% -18%, rgba(240,186,116,.30), transparent 64%),\n    radial-gradient(620px 380px at 46% -6%, rgba(226,150,110,.10), transparent 62%),\n    radial-gradient(760px 420px at 90% 0%, rgba(150,46,60,.20), transparent 60%),\n    radial-gradient(1.5px 1.5px at 22% 26%, rgba(255,232,198,.20) 50%, rgba(0,0,0,0) 51%),\n    radial-gradient(1.5px 1.5px at 64% 56%, rgba(255,224,184,.14) 50%, rgba(0,0,0,0) 51%),\n    radial-gradient(140% 110% at 50% 44%, rgba(0,0,0,0) 34%, rgba(0,0,0,.55) 100%),\n    linear-gradient(180deg,#1d1412 0%,#130d0c 55%,#090606 100%) !important;\n  background-size:auto, auto, auto, 240px 240px, 380px 380px, auto, auto !important;\n}\n/* 主标题：纸墨感 */\n.opf-theme-frost .opf-ph-title{\n  font-family:var(--serif) !important;\n  color:#fff4e2 !important; letter-spacing:4px !important;\n  text-shadow:0 2px 0 rgba(0,0,0,.55), 0 0 40px rgba(232,182,116,.32) !important;\n}\n.opf-theme-frost .opf-ph-eyebrow{letter-spacing:3px !important;}\n.opf-theme-frost #opf-actions{\n  border-color:rgba(230,198,154,.32) !important;\n  background:linear-gradient(180deg, rgba(50,33,26,.96), rgba(24,16,14,.96)) !important;\n}\n\n\n/* ==========================================================================\n   3 号：彻底去红，往「圣所」推\n   ========================================================================== */\n.opf-theme-astral .opf-btn.primary{\n  background:linear-gradient(180deg,#fbf6ea,#dfcfae 52%,#c4ae85) !important;\n  border:1px solid rgba(255,252,244,.8) !important;\n  color:#221d16 !important; font-weight:700 !important;\n  text-shadow:0 1px 0 rgba(255,255,255,.55) !important;\n  box-shadow:inset 0 1px 0 rgba(255,255,255,.95), 0 0 34px rgba(226,238,255,.40), 0 10px 28px rgba(0,0,0,.35) !important;\n}\n.opf-theme-astral .opf-btn.primary:hover{\n  background:linear-gradient(180deg,#fffdf7,#eadcbe 52%,#cdb892) !important;\n  box-shadow:inset 0 1px 0 #fff, 0 0 44px rgba(226,238,255,.55), 0 12px 30px rgba(0,0,0,.34) !important;\n}\n.opf-theme-astral .opf-step[data-st=run]{\n  background:linear-gradient(90deg, rgba(186,220,255,.14), rgba(255,255,255,.015)) !important;\n  border-color:rgba(198,226,255,.34) !important;\n  box-shadow:inset 2px 0 0 rgba(206,232,255,.8) !important;\n}\n.opf-theme-astral .opf-step[data-st=err]{border-color:rgba(240,216,176,.42) !important;}\n.opf-theme-astral .opf-btn.opf-danger{\n  border-color:rgba(214,228,248,.28) !important; color:#c9d6e6 !important;\n}\n.opf-theme-astral .opf-btn.opf-danger:hover{\n  background:rgba(214,228,248,.10) !important; border-color:rgba(214,228,248,.45) !important; color:#fff !important;\n}\n.opf-theme-astral .opf-proj-row.active{\n  background:rgba(206,228,255,.09) !important;\n  box-shadow:inset 2px 0 0 rgba(206,232,255,.75) !important;\n  color:#f4f9ff !important;\n}\n.opf-theme-astral .opf-ref-tag.dirty{color:#efdcb8 !important;}\n\n/* 圣所：页头拱形光、光柱、卡片外光环 */\n.opf-theme-astral .opf-ph{position:relative; z-index:1;}\n.opf-theme-astral .opf-ph::before{\n  content:\"\"; position:absolute; left:50%; top:-14px; width:min(620px,86%); height:230px;\n  transform:translateX(-50%); pointer-events:none; z-index:0;\n  border:1px solid rgba(214,232,255,.12); border-bottom:none;\n  border-radius:50% 50% 0 0 / 96px 96px 0 0;\n  background:radial-gradient(62% 86% at 50% 0%, rgba(214,232,255,.12), rgba(214,232,255,0) 72%);\n}\n.opf-theme-astral .opf-ph-main{position:relative; z-index:1;}\n.opf-theme-astral .opf-card, .opf-theme-astral .opf-split-l{\n  box-shadow:\n    inset 0 1px 0 rgba(255,255,255,.26),\n    inset 0 0 44px rgba(170,206,246,.07),\n    0 0 0 1px rgba(214,232,255,.10),\n    0 0 46px rgba(150,190,240,.12),\n    0 18px 50px rgba(0,0,0,.45) !important;\n}\n.opf-theme-astral .opf-card::after, .opf-theme-astral .opf-split-l::after{\n  box-shadow:0 0 20px rgba(216,236,255,.65);\n}\n.opf-theme-astral .opf-step-title{letter-spacing:1.6px;}\n.opf-theme-astral .opf-step::before{box-shadow:0 0 14px rgba(198,224,255,.5);}\n.opf-theme-astral #opf-nav{\n  box-shadow:inset 0 1px 0 rgba(255,255,255,.24), 0 0 40px rgba(150,190,240,.12), 0 14px 40px rgba(0,0,0,.4) !important;\n}\n.opf-theme-astral #opf-nav .opf-tab.active{\n  box-shadow:inset 0 0 0 1px rgba(240,246,255,.24), inset 0 0 22px rgba(206,230,255,.16), 0 0 18px rgba(180,212,250,.18) !important;\n}\n.opf-theme-astral #opf-shell-head::before{\n  background:linear-gradient(90deg, transparent, rgba(240,246,255,.7) 30%, rgba(214,190,150,.55) 70%, transparent) !important;\n}\n.opf-theme-astral .opf-ph-title{\n  text-shadow:0 0 40px rgba(206,230,255,.35) !important;\n}\n\n\n/* 品牌标记：压过 theme-v3 里带 id 的旧颜色 */\n#opf-shell.opf-theme-frost #opf-shell-head #opf-shell-title .opf-brand-mark{\n  color:#e0505f !important; text-shadow:0 0 12px rgba(224,80,95,.6) !important;\n}\n#opf-shell.opf-theme-clock #opf-shell-head #opf-shell-title .opf-brand-mark{\n  color:#a9d3b8 !important;\n  text-shadow:0 0 10px rgba(126,186,152,.65), 0 1px 0 rgba(0,0,0,.8) !important;\n  transform:rotate(45deg) scale(.92);\n}\n#opf-shell.opf-theme-astral #opf-shell-head #opf-shell-title .opf-brand-mark{\n  color:#f4f9ff !important;\n  text-shadow:0 0 14px rgba(206,228,255,.95), 0 0 34px rgba(150,190,240,.6) !important;\n}\n\n\n/* ==========================================================================\n   ① 2 号：抽屉式卡片（点标题栏收起/展开）\n   ② 3 号：导航缩成光点，悬停展开\n   ③ 3 号：鼠标跟随的镜面高光\n   ========================================================================== */\n/* —— 2 号抽屉 —— */\n.opf-theme-clock .opf-card{overflow:hidden;}\n.opf-theme-clock .opf-card-hd{cursor:pointer; position:relative;}\n.opf-theme-clock .opf-card-hd::before{\n  content:\"\"; width:26px; height:4px; flex:none; border-radius:2px;\n  background:linear-gradient(90deg,#d9b07a,#8a5a30);\n  box-shadow:0 0 8px rgba(210,160,100,.5), inset 0 1px 0 rgba(255,230,190,.5);\n}\n.opf-theme-clock .opf-card.opf-drawer-closed > *:not(.opf-card-hd){display:none !important;}\n.opf-theme-clock .opf-card.opf-drawer-closed .opf-card-hd::before{\n  background:linear-gradient(90deg,#8a5a30,#d9b07a);\n  box-shadow:0 0 12px rgba(214,168,110,.7);\n}\n.opf-theme-clock .opf-card.opf-drawer-closed:hover{border-color:rgba(214,168,110,.6) !important;}\n\n/* —— 3 号：光点导航（悬停展开） —— */\n.opf-theme-astral #opf-shell #opf-nav{\n  width:64px !important; min-width:64px !important; padding:10px 6px !important;\n  overflow:hidden !important;\n  transition:width .26s cubic-bezier(.2,.8,.2,1), min-width .26s cubic-bezier(.2,.8,.2,1), padding .26s ease;\n}\n.opf-theme-astral #opf-shell #opf-nav:hover,\n.opf-theme-astral #opf-shell #opf-nav:focus-within{\n  width:216px !important; min-width:216px !important; padding:10px !important;\n}\n.opf-theme-astral #opf-nav .opf-tab{\n  font-size:0 !important; letter-spacing:0 !important; gap:0 !important;\n  justify-content:center !important; padding:0 !important; height:40px !important;\n  white-space:nowrap;\n}\n.opf-theme-astral #opf-nav .opf-tab::before{\n  content:\"\"; width:7px; height:7px; border-radius:50%; flex:none;\n  background:radial-gradient(circle, #f2f8ff 0 40%, #9cc3ea 55%, rgba(156,195,234,0) 72%);\n  box-shadow:0 0 12px rgba(170,208,248,.75);\n}\n.opf-theme-astral #opf-nav:hover .opf-tab{\n  font-size:12.5px !important; letter-spacing:3px !important; gap:10px !important;\n  justify-content:flex-start !important; padding:0 12px !important;\n}\n.opf-theme-astral #opf-nav:hover .opf-tab::before{\n  width:5px; height:5px; background:rgba(206,228,255,.55); box-shadow:none;\n}\n.opf-theme-astral #opf-nav .opf-tab.active::after{display:none !important;}\n.opf-theme-astral .opf-nav-group{\n  font-size:0 !important; letter-spacing:0 !important; padding:8px 0 2px !important; text-align:center;\n}\n.opf-theme-astral .opf-nav-group::before{\n  content:\"\"; display:inline-block; width:12px; height:1px;\n  background:rgba(206,228,255,.35); vertical-align:middle;\n}\n.opf-theme-astral #opf-nav-sub{display:none !important;}\n.opf-theme-astral #opf-nav:hover #opf-nav-sub,\n.opf-theme-astral #opf-nav:focus-within #opf-nav-sub{display:block !important;}\n\n/* —— 3 号：镜面高光 —— */\n.opf-theme-astral .opf-card, .opf-theme-astral .opf-split-l{overflow:hidden;}\n.opf-theme-astral .opf-sheen{\n  position:absolute; inset:0; pointer-events:none; border-radius:inherit; opacity:0;\n  transition:opacity .28s ease;\n  background:radial-gradient(240px circle at var(--mx,50%) var(--my,0%),\n    rgba(238,248,255,.16), rgba(238,248,255,.05) 42%, rgba(238,248,255,0) 68%);\n}\n.opf-theme-astral .opf-card:hover > .opf-sheen,\n.opf-theme-astral .opf-split-l:hover > .opf-sheen{opacity:1;}\n\n\n/* 3 号光点导航：用更高优先级压过先前写死的 216px */\n#opf-shell.opf-theme-astral #opf-shell-body #opf-nav{\n  flex:0 0 64px !important; width:64px !important; min-width:64px !important; max-width:64px !important;\n  padding:10px 6px !important; overflow:hidden !important;\n  transition:flex-basis .26s cubic-bezier(.2,.8,.2,1), width .26s cubic-bezier(.2,.8,.2,1), padding .26s ease;\n}\n#opf-shell.opf-theme-astral #opf-shell-body #opf-nav:hover,\n#opf-shell.opf-theme-astral #opf-shell-body #opf-nav:focus-within{\n  flex:0 0 216px !important; width:216px !important; min-width:216px !important; max-width:216px !important;\n  padding:10px !important;\n}\n#opf-shell.opf-theme-astral #opf-shell-body #opf-nav .opf-tab{\n  font-size:0 !important; letter-spacing:0 !important; gap:0 !important;\n  justify-content:center !important; padding:0 !important; height:40px !important;\n}\n#opf-shell.opf-theme-astral #opf-shell-body #opf-nav:hover .opf-tab{\n  font-size:12.5px !important; letter-spacing:3px !important; gap:10px !important;\n  justify-content:flex-start !important; padding:0 12px !important;\n}\n\n\n/* 默认预设：菱形全部换掉——页头用火漆印，卡片用书签签条，眉标用小火漆点 */\n.opf-theme-frost .opf-ph-rule::after{\n  left:50%; margin-left:-5px; width:10px; height:10px; transform:none; border-radius:50%;\n  background:radial-gradient(circle at 34% 28%, #f9e3ba 0 24%, #cf9450 58%, #8a5726 100%);\n  box-shadow:0 0 0 1px rgba(246,214,160,.55), 0 0 12px rgba(226,170,100,.45);\n}\n.opf-theme-frost .opf-ph-eyebrow::before{\n  width:8px !important; height:8px !important; border-radius:50% !important; transform:none !important;\n  background:radial-gradient(circle at 34% 28%, #f9e3ba, #b8863f 72%) !important;\n  box-shadow:0 0 8px rgba(230,180,110,.5) !important;\n}\n.opf-theme-frost .opf-card::after, .opf-theme-frost .opf-split-l::after{\n  top:-8px; left:50%; width:11px; height:15px;\n  transform:translateX(-50%) !important; border-radius:2px 2px 0 0;\n  background:linear-gradient(180deg,#e05a6b,#a3283a) !important;\n  clip-path:polygon(0 0,100% 0,100% 100%,50% 72%,0 100%);\n  box-shadow:0 0 10px rgba(204,64,84,.45) !important;\n}\n\n\n/* ==========================================================================\n   ① 2 号抽屉：滑轨位移 + 回弹\n   ② 3 号切页：淡入 + 轻微上浮\n   ========================================================================== */\n.opf-theme-clock .opf-card.opf-drawer-anim{\n  overflow:hidden;\n  transition:max-height .30s cubic-bezier(.2,.8,.2,1);\n}\n.opf-theme-clock .opf-card.opf-rail-hit{animation:opfRailHit .34s cubic-bezier(.2,.8,.2,1);}\n@keyframes opfRailHit{\n  0%{transform:translateY(0);}\n  35%{transform:translateY(1.5px);}\n  70%{transform:translateY(-0.5px);}\n  100%{transform:translateY(0);}\n}\n.opf-theme-clock .opf-card.opf-rail-hit .opf-card-hd::before{\n  box-shadow:0 0 14px rgba(240,190,130,.85), inset 0 1px 0 rgba(255,236,200,.7);\n  background:linear-gradient(90deg,#f0c690,#a06a38);\n}\n@media (prefers-reduced-motion: reduce){\n  .opf-theme-clock .opf-card.opf-drawer-anim{transition:none;}\n  .opf-theme-clock .opf-card.opf-rail-hit{animation:none;}\n}\n\n/* 3 号切页动画 */\n@keyframes opfPageFade{from{opacity:0;} to{opacity:1;}}\n@keyframes opfPageRise{from{opacity:0; transform:translateY(12px);} to{opacity:1; transform:translateY(0);}}\n.opf-theme-astral .opf-page.active{animation:opfPageFade .3s ease both;}\n.opf-theme-astral .opf-page.active .opf-ph{animation:opfPageRise .38s cubic-bezier(.2,.8,.2,1) both;}\n.opf-theme-astral .opf-page.active .opf-card,\n.opf-theme-astral .opf-page.active .opf-split-l{animation:opfPageRise .42s cubic-bezier(.2,.8,.2,1) both;}\n.opf-theme-astral .opf-page.active .opf-card:nth-of-type(2),\n.opf-theme-astral .opf-page.active .opf-split-l:nth-of-type(2){animation-delay:.05s;}\n.opf-theme-astral .opf-page.active .opf-card:nth-of-type(3),\n.opf-theme-astral .opf-page.active .opf-split-l:nth-of-type(3){animation-delay:.09s;}\n@media (prefers-reduced-motion: reduce){\n  .opf-theme-astral .opf-page.active,\n  .opf-theme-astral .opf-page.active .opf-ph,\n  .opf-theme-astral .opf-page.active .opf-card,\n  .opf-theme-astral .opf-page.active .opf-split-l{animation:none;}\n}\n\n\n﻿/* ==========================================================================\n   配色方案 B+ · 雪松黄铜 + 始弦红（theme-v3，仅预览层）\n   在 B 的暖灰炭底上，把暗红收成三处「记忆点」，不再铺满整面：\n   ① 顶栏顶缘一道金→绯红细线\n   ② 品牌星标 ✦ 染成朱红（始弦的印记）\n   ③ 每个页面标题前的短划改成朱红\n   另外左上角留一层极淡的红晕，让底色不至于完全冷掉。\n   ========================================================================== */\n:root{\n  --ink-0:#0e0c0b;\n  --ink-1:#141110;\n  --ink-2:#1a1614;\n  --ink-3:#221d1a;\n  --line:rgba(211,177,132,.12);\n  --line-2:rgba(211,177,132,.24);\n  --tx:#f3ece2;\n  --tx-2:#c8b9ab;\n  --tx-3:#94837a;\n  --gold:#d3b184;\n  --gold-2:#a5885f;\n  --red:#cf4f57;\n  --red-2:#a9333c;\n  --sig:#c23b4b;          /* 始弦红：只用在记忆点与主操作上 */\n  --ok:#86c4a3;\n  --warn:#d9b171;\n  --err:#cf7a63;\n}\n\n#opf-shell{\n  background:\n    radial-gradient(820px 360px at 6% -12%, rgba(194,59,75,.13), transparent 62%),\n    radial-gradient(1200px 520px at 30% -14%, rgba(211,177,132,.070), transparent 62%),\n    radial-gradient(900px 460px at 94% -6%, rgba(194,59,75,.05), transparent 60%),\n    linear-gradient(180deg,#151110 0%,#110e0d 58%,#0c0a09 100%) !important;\n}\n#opf-shell-head{\n  background:linear-gradient(180deg, rgba(32,26,24,.94), rgba(21,17,16,.94)) !important;\n  border-bottom-color:rgba(194,59,75,.20) !important;\n}\n/* ① 顶缘细线：金与绯红交替，像书脊上的一道烫印 */\n#opf-shell-head::before{\n  height:2px !important;\n  background:linear-gradient(90deg, transparent 0%, rgba(207,70,88,.92) 16%, rgba(211,177,132,.42) 48%, rgba(207,70,88,.72) 78%, transparent 100%) !important;\n  box-shadow:0 1px 12px rgba(194,59,75,.45) !important;\n}\n/* ② 品牌星标：始弦的朱红印记 */\n#opf-shell-title .opf-brand-mark{\n  color:#e0505f;\n  font-size:17px;\n  text-shadow:0 0 10px rgba(224,80,95,.75), 0 0 24px rgba(194,59,75,.45);\n  margin-right:1px;\n}\n/* ③ 页标题前的短划改成朱红 */\n.opf-ph-eyebrow::before{\n  background:linear-gradient(90deg, rgba(194,59,75,.9), rgba(194,59,75,.12)) !important;\n  width:22px;\n}\n#opf-nav{\n  background:linear-gradient(180deg, rgba(255,255,255,.018), transparent 42%) !important;\n}\n#opf-nav .opf-tab.active{\n  background:linear-gradient(90deg, rgba(194,59,75,.16), rgba(194,59,75,.03)) !important;\n  box-shadow:inset 2px 0 0 #cf4658 !important;\n}\n#opf-projlist .opf-proj-row.active{\n  background:rgba(194,59,75,.10) !important;\n  box-shadow:inset 2px 0 0 rgba(207,70,88,.55) !important;\n}\n.opf-card{\n  background:linear-gradient(180deg, rgba(255,255,255,.032), rgba(255,255,255,.010)) !important;\n}\n#opf-shell #opf-actions{\n  background:linear-gradient(180deg, rgba(34,28,25,.95), rgba(19,16,15,.96)) !important;\n  box-shadow:0 14px 44px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.05) !important;\n}\n/* 主操作：一处饱和的始弦红就够 */\n\n\n.opf-tone-btn.active{\n  background:linear-gradient(180deg, rgba(211,177,132,.22), rgba(165,136,95,.10)) !important;\n  border-color:rgba(211,177,132,.6) !important;\n}\n#opf-demand, .opf-char-input, .opf-ref-input, .opf-qs-loc, .opf-num, #opf-pname{\n  background:rgba(11,9,8,.78) !important;\n}\n.opf-box, #opf-json-out, #opf-char-report, #opf-char-out{\n  background:rgba(11,9,8,.66) !important;\n}\n";
+
+var OPF_SKIN_PAGES = {
+  preset:   { group: '创作', kicker: '创作 · 六段管线', title: '开局预设', desc: '技能 → 装备 → 道具 → 资产 → 背景 → 汇总，六段一次跑完。', meta: true, hideHero: true },
+  char:     { group: '创作', kicker: '创作 · 角色条目', title: '二创角色工坊', desc: '分段写角色设定，产出可直接粘进世界书 DLC 的角色条目。', hideLabel: true },
+  destiny:  { group: '创作', kicker: '创作 · 命定核心', title: '命定系统工坊', desc: '分段写命定系统核心，产出世界书「命定系统」条目。', hideLabel: true },
+  world:    { group: '全局', kicker: '全局 · 世界书', title: '世界书', desc: '勾选要发送给 AI 的世界书条目；勾选与导入都会自动缓存。' },
+  settings: { group: '全局', kicker: '全局 · 生成传输', title: '生成传输', desc: '各页的生成统一走这一套：改一次，全局生效。', hideLabel: true },
+  regex:    { group: '命定系统', kicker: '命定系统 · 正则', title: '正则工坊', desc: '从框架、匹配式到自检，生成可用的正则脚本。', hideLabel: true },
+  refine:   { group: '命定系统', kicker: '命定系统 · 精修', title: '核心精修', desc: '对已有命定核心做结构体检、行级 diff 与保底补丁。', hideLabel: true },
+  atelier:  { group: '造物', kicker: '造物 · 单件 YAML', title: '造物工坊', desc: '单件 YAML 生成、脚本自检、改进与撤回，工作区长期保存。', hideLabel: true },
+  shixian:  { group: '对话', kicker: '对话 · 馆藏', title: '与始弦聊天', desc: '与始弦对话，基于馆藏回答创作问题。', hideLabel: true }
+};
+
+function opfSkinEl(tag, cls, text) {
+  var n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  return n;
+}
+
+// ---------- 统一页头 ----------
+function opfSkinHeader(id) {
+  var cfg = OPF_SKIN_PAGES[id];
+  if (!cfg) return null;
+  var box = opfSkinEl('div', 'opf-ph');
+  var main = opfSkinEl('div', 'opf-ph-main');
+  main.appendChild(opfSkinEl('div', 'opf-ph-eyebrow', cfg.kicker || cfg.group));
+  main.appendChild(opfSkinEl('h1', 'opf-ph-title', cfg.title));
+  main.appendChild(opfSkinEl('p', 'opf-ph-desc', cfg.desc));
+  box.appendChild(main);
+  var side = opfSkinEl('div', 'opf-ph-side'); side.id = 'opf-ph-side-' + id;
+  box.appendChild(side);
+  var frag = document.createDocumentFragment();
+  frag.appendChild(box);
+  frag.appendChild(opfSkinEl('div', 'opf-ph-rule'));
+  return frag;
+}
+
+function opfSkinPages() {
+  var pages = getEl('opf-pages');
+  if (!pages) return;
+  Object.keys(OPF_SKIN_PAGES).forEach(function (id) {
+    var page = getEl('opf-page-' + id);
+    if (!page || page.querySelector('.opf-ph')) return;
+    var cfg = OPF_SKIN_PAGES[id];
+    var frag = opfSkinHeader(id);
+    if (!frag) return;
+    page.insertBefore(frag, page.firstChild);
+    if (cfg.hideHero) {
+      var hero = page.querySelector('.opf-hero');
+      if (hero) {
+        var meta = hero.querySelector('#opf-meta');
+        var side = getEl('opf-ph-side-' + id);
+        if (meta && side) side.appendChild(meta);
+        hero.style.display = 'none';
+      }
+    }
+    if (cfg.hideLabel) {
+      var lbl = page.querySelector('.opf-char-wrap > .opf-col > .opf-sec-label') || page.querySelector('.opf-char-wrap > .opf-sec-label');
+      if (lbl) {
+        var nxt = lbl.nextElementSibling;
+        if (nxt && /opf-dim/.test(nxt.className)) nxt.style.display = 'none';
+        lbl.style.display = 'none';
+      }
+    }
+  });
+}
+
+// 命定系统的页内子标签挪进页头
+function opfSkinSubbar() {
+  var sb = getEl('opf-subbar');
+  var active = document.querySelector('.opf-page.active');
+  if (!sb || !active || sb.style.display === 'none') return;
+  var rule = active.querySelector('.opf-ph-rule');
+  if (rule && rule.nextElementSibling !== sb) active.insertBefore(sb, rule.nextSibling);
+}
+
+// ---------- 品牌星标单独包一层，好染成始弦红 ----------
+function opfSkinBrand() {
+  var t = getEl('opf-shell-title');
+  if (!t || t.querySelector('.opf-brand-mark')) return;
+  var m = (t.textContent || '').match(/^(\s*✦\s*)([\s\S]*)$/);
+  if (!m) return;
+  t.textContent = '';
+  var sp = opfSkinEl('span', 'opf-brand-mark', '✦');
+  t.appendChild(sp);
+  t.appendChild(document.createTextNode(' ' + m[2]));
+}
+
+// ---------- 按钮：去 emoji、长句收短、破坏性动作单独标记 ----------
+var OPF_SKIN_ICON_RE = /^[\s\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{27F0}-\u{27FF}\u{2300}-\u{23FF}\u{2B00}-\u{2BFF}\u{25A0}-\u{25FF}\u{2190}-\u{21FF}\u{29C0}-\u{29FF}\u{FE0F}\u{200D}\u{20E3}]+/u;
+var OPF_SKIN_LABELS = {
+  '重跑该步及后续': '重跑', '重跑本段及后续': '重跑',
+  '按方向精修本步': '精修', '该段建议': '建议', '定点修改本段': '改本段'
+};
+function opfSkinButtons() {
+  var list = document.querySelectorAll('#opf-shell button');
+  for (var i = 0; i < list.length; i++) {
+    var b = list[i];
+    if (b.id === 'opf-shell-close') continue;
+    var t = b.textContent || '';
+    var short = OPF_SKIN_LABELS[t.trim()];
+    if (short) { if (!b.title) b.title = t.trim(); b.textContent = short; continue; }
+    var n = t.replace(OPF_SKIN_ICON_RE, '');
+    if (n && n !== t) b.textContent = n;
+  }
+  ['opf-rx-new', 'opf-char-new', 'opf-dest-new', 'opf-atl-wipe', 'opf-atl-new'].forEach(function (id) {
+    var n = getEl(id);
+    if (n) n.classList.add('opf-danger');
+  });
+  // 快速开局的长括号说明收进 title
+  var qs = document.querySelector('#opf-qs-card .opf-qs-toggle');
+  if (qs && !qs.getAttribute('data-opf-short')) {
+    qs.setAttribute('data-opf-short', '1');
+    for (var j = 0; j < qs.childNodes.length; j++) {
+      var node = qs.childNodes[j];
+      if (node.nodeType === 3 && node.textContent.trim()) {
+        if (!qs.title) qs.title = node.textContent.trim();
+        node.textContent = ' 启用快速开局';
+        break;
+      }
+    }
+  }
+}
+
+// ---------- 两栏拆分：startSel 为左栏起点，第二个 .opf-sec 为右栏起点 ----------
+function opfSkinSplit(pageId, startSel, endSel) {
+  var page = getEl('opf-page-' + pageId);
+  if (!page || page.getAttribute('data-opf-split')) return;
+  var wrap = page.querySelector('.opf-char-wrap');
+  if (!wrap) return;
+  page.setAttribute('data-opf-split', '1');
+  var kids = Array.prototype.slice.call(wrap.children);
+  var secs = kids.filter(function (k) { return k.classList.contains('opf-sec'); });
+  if (secs.length < 2) return;
+  var endIdx = kids.indexOf(secs[1]);
+  var startIdx = startSel ? -1 : kids.indexOf(secs[0]);
+  if (startSel) {
+    for (var i = 0; i < kids.length; i++) { if (kids[i].matches(startSel)) { startIdx = i; break; } }
+  }
+  if (endSel) {
+    for (var j = startIdx + 1; j < kids.length; j++) {
+      if (kids[j].matches(endSel)) { endIdx = j; break; }
+    }
+  }
+  if (startIdx < 0 || startIdx >= endIdx) return;
+  var grid = opfSkinEl('div', 'opf-split');
+  var left = opfSkinEl('div', 'opf-split-l');
+  var right = opfSkinEl('div', 'opf-split-r');
+  kids.forEach(function (k, idx) {
+    if (idx >= startIdx && idx < endIdx) left.appendChild(k);
+    else if (idx >= endIdx) right.appendChild(k);
+  });
+  grid.appendChild(left); grid.appendChild(right);
+  wrap.appendChild(grid);
+}
+
+// ---------- 底栏顺序：快速初稿 → 复制 → 导出 → 生成（主操作最右） ----------
+function opfSkinBar() {
+  var bar = getEl('opf-actions');
+  if (!bar) return;
+  ['opf-btn-quick', 'opf-btn-copy', 'opf-btn-save', 'opf-btn-run'].forEach(function (id) {
+    var b = getEl(id);
+    if (b) bar.appendChild(b);
+  });
+}
+
+// ---------- 左侧导航：把草稿收进当前页下面的可展开面板 ----------
+var OPF_SKIN_CREATE = { 'opf-tab-preset': 1, 'opf-tab-char': 1, 'opf-tab-destiny': 1, 'opf-tab-destinyhub': 1 };
+function opfSkinNav() {
+  var nav = getEl('opf-nav');
+  if (!nav) return;
+  try {
+    var th = getSettings().uiTheme || 'frost';
+    if (!nav.getAttribute('data-sub-collapsed') && (th === 'clock' || th === 'astral')) {
+      nav.setAttribute('data-sub-collapsed', '1');   // 顶栏 / 竖脊布局默认收起草稿抽屉
+    }
+  } catch (e) {}
+  var sub = getEl('opf-nav-sub');
+  if (!sub) { sub = document.createElement('div'); sub.id = 'opf-nav-sub'; nav.appendChild(sub); }
+  if (sub.parentNode !== nav) nav.appendChild(sub);      // 曾经被摘出文档时先挂回去
+  var active = nav.querySelector('.opf-tab.active');
+  if (active && sub.previousElementSibling !== active) active.parentNode.insertBefore(sub, active.nextSibling);
+  var pl = getEl('opf-projlist');
+  if (pl && pl.parentNode !== sub) sub.appendChild(pl);
+  if (!active) return;
+  var isCreate = !!OPF_SKIN_CREATE[active.id];
+  var collapsed = nav.getAttribute('data-sub-collapsed') === '1';
+  sub.classList.toggle('open', isCreate && !collapsed);
+  nav.classList.toggle('opf-sub-closed', !isCreate || collapsed);
+}
+
+// ---------- 导航底部：最近草稿（跨三种流水线，按更新时间） ----------
+function opfSkinRecent() {
+  var nav = getEl('opf-nav');
+  if (!nav) return;
+  var box = getEl('opf-nav-recent');
+  if (!box) { box = document.createElement('div'); box.id = 'opf-nav-recent'; }
+  if (box.parentNode !== nav) nav.appendChild(box);
+  var list = [];
+  try {
+    var st = projState();
+    PROJ_TYPES.forEach(function (t) {
+      var g = st[t];
+      (g && g.list || []).forEach(function (p) { list.push({ t: t, p: p }); });
+    });
+  } catch (e) {}
+  list.sort(function (a, b) { return (b.p.updatedAt || 0) - (a.p.updatedAt || 0); });
+  list = list.slice(0, 4);
+  box.textContent = '';
+  var head = opfSkinEl('div', 'nr-head', '最近草稿');
+  box.appendChild(head);
+  if (!list.length) box.appendChild(opfSkinEl('div', 'nr-empty', '还没有草稿'));
+  list.forEach(function (it) {
+    var row = opfSkinEl('div', 'nr-row');
+    row.appendChild(opfSkinEl('span', 'nr-type', PROJ_TYPE_LABEL[it.t] || it.t));
+    row.appendChild(opfSkinEl('span', 'nr-name', it.p.name || '未命名'));
+    row.title = (PROJ_TYPE_LABEL[it.t] || it.t) + ' · ' + (it.p.name || '未命名');
+    row.addEventListener('click', function () {
+      try { switchPage(it.t); projOpen(it.t, it.p.id); } catch (e) { opfErr('recent open', e); }
+    });
+    box.appendChild(row);
+  });
+  if (!getEl('opf-nav-hint')) {
+    var hint = opfSkinEl('div', '', '点当前页可展开/收起草稿');
+    hint.id = 'opf-nav-hint';
+    nav.appendChild(hint);
+  }
+}
+
+function opfSkinNavSync() {
+  try { opfSkinNav(); } catch (e) { opfErr('nav sync', e); }
+}
+
+function opfSkinNavBind() {
+  var nav = getEl('opf-nav');
+  if (!nav || nav.getAttribute('data-nav-bound')) return;
+  nav.setAttribute('data-nav-bound', '1');
+  nav.addEventListener('click', function (ev) {
+    var tab = ev.target && ev.target.closest ? ev.target.closest('.opf-tab') : null;
+    if (!tab) return;
+    var wasActive = tab.classList.contains('active');
+    setTimeout(function () {
+      if (wasActive && OPF_SKIN_CREATE[tab.id]) {
+        var collapsed = nav.getAttribute('data-sub-collapsed') === '1';
+        nav.setAttribute('data-sub-collapsed', collapsed ? '0' : '1');
+      } else {
+        nav.setAttribute('data-sub-collapsed', '0');
+      }
+      opfSkinNav();
+    }, 0);
+  });
+}
+
+// ---------- 界面风格切换 ----------
+var OPF_SKIN_THEMES = [
+  { id: 'frost', label: '霜玻璃' },
+  { id: 'clock', label: '古典机械' },
+  { id: 'astral', label: '神殿几何' }
+];
+function opfSkinTheme() {
+  var sh = getEl('opf-shell');
+  if (!sh) return;
+  var t = 'frost';
+  try { t = getSettings().uiTheme || 'frost'; } catch (e) {}
+  sh.classList.toggle('opf-theme-frost', t === 'frost');
+  sh.classList.toggle('opf-theme-clock', t === 'clock');
+  sh.classList.toggle('opf-theme-astral', t === 'astral');
+}
+function opfSkinThemeUI() {
+  var wrap = document.querySelector('#opf-page-settings .opf-char-wrap');
+  if (!wrap) return;
+  var box = getEl('opf-ui-theme');
+  if (!box) {
+    box = document.createElement('div');
+    box.className = 'opf-shx-cfg'; box.id = 'opf-ui-theme';
+    box.appendChild(opfSkinEl('div', 'opf-sec-label', '界面风格'));
+    var pick = opfSkinEl('div', 'opf-theme-pick'); pick.id = 'opf-theme-pick';
+    box.appendChild(pick);
+    wrap.insertBefore(box, wrap.firstChild);
+  }
+  var pickEl = getEl('opf-theme-pick');
+  if (!pickEl) return;
+  pickEl.textContent = '';
+  var cur = 'frost';
+  try { cur = getSettings().uiTheme || 'frost'; } catch (e) {}
+  OPF_SKIN_THEMES.forEach(function (t) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'opf-theme-chip' + (cur === t.id ? ' on' : '');
+    b.textContent = t.label;
+    b.addEventListener('click', function () {
+      try { var s = getSettings(); s.uiTheme = t.id; saveSettings(); } catch (e) { opfErr('theme save', e); }
+      opfSkinTheme();
+      opfSkinThemeUI();
+    });
+    pickEl.appendChild(b);
+  });
+}
+
+// ---------- 2 号：卡片抽屉（点标题栏收起） ----------
+function opfSkinToggleDrawer(card) {
+  if (!card) return;
+  if (card._opfAnimating) return;
+  var open = !card.classList.contains('opf-drawer-closed');
+  card.classList.add('opf-drawer-anim', 'opf-rail-hit');
+  card._opfAnimating = true;
+  var h = card.scrollHeight;
+  if (open) {
+    // 收起：先把高度定住，再压到 0，结束后才真正隐藏内容
+    card.style.maxHeight = h + 'px';
+    card.style.overflow = 'hidden';
+    void card.offsetHeight;
+    card.style.maxHeight = '0px';
+    setTimeout(function () {
+      card.classList.add('opf-drawer-closed');
+      card.style.maxHeight = '';
+      card.style.overflow = '';
+      card.classList.remove('opf-drawer-anim');
+      card._opfAnimating = false;
+    }, 310);
+  } else {
+    card.classList.remove('opf-drawer-closed');
+    card.style.maxHeight = '0px';
+    card.style.overflow = 'hidden';
+    void card.offsetHeight;
+    card.style.maxHeight = h + 'px';
+    setTimeout(function () {
+      card.style.maxHeight = '';
+      card.style.overflow = '';
+      card.classList.remove('opf-drawer-anim');
+      card._opfAnimating = false;
+    }, 320);
+  }
+  setTimeout(function () { card.classList.remove('opf-rail-hit'); }, 340);
+}
+
+function opfSkinDrawerBind() {
+  var sh = getEl('opf-shell');
+  if (!sh || sh.getAttribute('data-drawer')) return;
+  sh.setAttribute('data-drawer', '1');
+  sh.addEventListener('click', function (ev) {
+    if (!/opf-theme-clock/.test(sh.className)) return;
+    var t = ev.target;
+    if (!t || !t.closest) return;
+    if (t.closest('button,input,select,textarea,a,label,.opf-btn')) return;
+    var hd = t.closest('.opf-card-hd');
+    if (!hd) return;
+    var card = hd.closest('.opf-card');
+    if (!card) return;
+    opfSkinToggleDrawer(card);
+  });
+}
+
+// ---------- 3 号：鼠标跟随的镜面高光 ----------
+function opfSkinSheen() {
+  var cards = document.querySelectorAll('#opf-shell .opf-card, #opf-shell .opf-split-l');
+  for (var i = 0; i < cards.length; i++) {
+    var c = cards[i];
+    var has = false;
+    for (var j = 0; j < c.children.length; j++) if (c.children[j].className === 'opf-sheen') { has = true; break; }
+    if (!has) {
+      var sd = document.createElement('div');
+      sd.className = 'opf-sheen';
+      c.appendChild(sd);
+    }
+  }
+}
+function opfSkinSheenBind() {
+  var sh = getEl('opf-shell');
+  if (!sh || sh.getAttribute('data-sheen')) return;
+  sh.setAttribute('data-sheen', '1');
+  sh.addEventListener('pointermove', function (ev) {
+    var t = ev.target;
+    if (!t || !t.closest) return;
+    var c = t.closest('.opf-card, .opf-split-l');
+    if (!c) return;
+    var r = c.getBoundingClientRect();
+    c.style.setProperty('--mx', (ev.clientX - r.left) + 'px');
+    c.style.setProperty('--my', (ev.clientY - r.top) + 'px');
+  }, { passive: true });
+}
+
+function opfSkinBoot() {
+  if (getEl(NS + '_css_skin')) return;
+  try {
+    var st = document.createElement('style');
+    st.id = NS + '_css_skin';
+    st.textContent = OPF_SKIN_CSS;
+    document.head.appendChild(st);
+  } catch (e) { opfErr('skin css', e); }
+  try {
+    opfSkinPages();
+    opfSkinSubbar();
+    opfSkinBrand();
+    opfSkinButtons();
+    opfSkinSplit('regex', '#opf-rx-core', '.opf-sec');
+    opfSkinSplit('atelier', null);
+    opfSkinSplit('refine', '#opf-rf-src');
+    opfSkinBar();
+    opfSkinTheme();
+    opfSkinThemeUI();
+    opfSkinNav();
+    opfSkinDrawerBind();
+    opfSkinSheen();
+    opfSkinSheenBind();
+    opfSkinRecent();
+    opfSkinNavBind();
+    opfSkinWatch();
+    try {
+      var pl = getEl('opf-projlist');
+      if (pl && !pl.getAttribute('data-skin-observed')) {
+        pl.setAttribute('data-skin-observed', '1');
+        new MutationObserver(function () {
+          try { opfSkinRecent(); opfSkinNav(); } catch (e) {}
+        }).observe(pl, { childList: true, subtree: true });
+      }
+    } catch (e) {}
+  } catch (e) { opfErr('skin init', e); }
+}
+
+// 插件会按状态重绘步骤列表等 DOM：盯住 shell，重绘后把按钮层级再收一遍
+function opfSkinWatch() {
+  var root = getEl('opf-shell');
+  if (!root || root.getAttribute('data-opf-watch')) return;
+  root.setAttribute('data-opf-watch', '1');
+  var t = null;
+  try {
+    new MutationObserver(function () {
+      clearTimeout(t);
+      t = setTimeout(function () { try { opfSkinButtons(); opfSkinSheen(); } catch (e) {} }, 60);
+    }).observe(root, { childList: true, subtree: true });
+  } catch (e) { opfErr('skin watch', e); }
+}
+
 //@module 99-boot — 启动（必须最后）
 // ============ boot ============
 function boot(){
@@ -11985,6 +12548,8 @@ function boot(){
   try { shxInit(); shxLoadCfgToUi(); } catch (e) { opfErr("shxInit", e); }
   // 工程列表：必须在三条流水线的草稿恢复之后引导，否则会把空状态当成"现有草稿"
   try { projBootstrap(); } catch (e) { opfErr("projBootstrap", e); }
+  // 有活跃工程就把它的内容恢复回来（否则新会话里 2.5 秒后的空快照会把草稿写空）
+  try { projRestoreActive(); } catch (e) { opfErr("projRestoreActive", e); }
   try { renderProjList(); } catch (e) { opfErr("renderProjList", e); }
   try { projAutosaveStart(); } catch (e) { opfErr("projAutosaveStart", e); }
   opfLog("loaded. context ready:", !!getCtx());

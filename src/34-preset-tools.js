@@ -52,7 +52,9 @@ async function runCompliance(){
   renderDirsStatus("🔍 正在按《技能装备道具生成规则》自检修复…");
   try {
     var prev = JSON.stringify(ST.finalJson);
-    var cur = prev.length > 12000 ? prev.slice(0, 12000) + "……(截断)" : prev;
+    // 以前超过 12000 字符会截断再发给模型，模型只能照着半截 JSON 编后半段，回来还无条件覆盖。
+    // 现在原样发；结果先做「条目数不能变少」的比对，丢条目就拒绝写回。
+    var cur = prev;
     var complyTask = "【合规自检与修复】请用下面“技能/装备/道具/资产生成规范”逐类检查开局预设 JSON：字段是否齐全、品质是否为七等、标签/消耗/效果/结算/总空间/内部资产等是否符合规范；只修正不合规处，其余内容保持原样，最后完整输出修订后的开局预设 JSON，放在 " + fence() + "text 代码块中。\n\n[生成规范]\n" + COMPLIANCE_SPEC + '\n\n' + buildSystemContent();
     var complyUser = "[当前开局预设 JSON]\n" + cur;
     var msgs = sxMessages(complyTask, complyUser);
@@ -61,6 +63,17 @@ async function runCompliance(){
       var resp = await callModel(msgs);
       var ex = extractJson(resp);
       if (ex.ok && ex.obj) {
+        var lost = 0;
+        ['equipments', 'items', 'assets', 'skills', 'partners'].forEach(function (k) {
+          var before = (ST.finalJson && Array.isArray(ST.finalJson[k])) ? ST.finalJson[k].length : 0;
+          var after = Array.isArray(ex.obj[k]) ? ex.obj[k].length : 0;
+          if (after < before) lost += before - after;
+        });
+        if (lost > 0) {
+          renderDirsStatus("⚠ 自检返回的 JSON 比原稿少 " + lost + " 条条目，已放弃写回（避免丢内容）");
+          toast("自检结果疑似丢条目，已保留原 JSON", "warning");
+          return;
+        }
         var changed = JSON.stringify(ex.obj) !== prev;
         ST.finalJson = ex.obj;
         var warns = validatePreset(ex.obj);

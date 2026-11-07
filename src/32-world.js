@@ -241,19 +241,21 @@ function importWorldEntries(rawEntries, sourceName, fileName){
 function updateSendText(){
   var s = getSettings();
   var wb = ST.wb || { entries: [] };
-  if (!s.includeWorld || !wb.entries || !wb.entries.length) { ST.worldInfo = ""; return; }
+  if (!s.includeWorld || !wb.entries || !wb.entries.length) { ST.worldInfo = ""; ST.worldTrunc = false; return; }
   var nl2 = String.fromCharCode(10) + String.fromCharCode(10);
-  var parts = []; var total = 0; var cap = s.capChars || 30000;
+  var parts = []; var total = 0; var cap = s.capChars || 30000; var cut = false;
   for (var i = 0; i < wb.entries.length; i++) {
     var e = wb.entries[i];
     if (!e.sel) continue;
     if (s.worldConstantOnly && !e.constant) continue;
     var head = e.comment || e.key || "";
     var line = (head ? "【" + String(head).slice(0, 60) + "】" : "") + e.content;
-    if (total + line.length > cap) { parts.push("……(超过" + cap + "字注入上限，其余未发送)"); break; }
+    if (total + line.length > cap) { cut = true; break; }
     parts.push(line); total += line.length;
   }
+  if (cut) parts.push("……(超过" + cap + "字注入上限，其余未发送)");
   ST.worldInfo = parts.join(nl2);
+  ST.worldTrunc = cut;   // 真被截断时要能在界面上看出来（字数没超过上限也可能被截）
   worldCachePersistSel();
   try { if (typeof qsRender === 'function' && getEl('opf-qs-list')) qsRender(); } catch (e) {}
 }
@@ -263,6 +265,7 @@ function clearWorldbook(){
   ST.regionOpen = null;
   ST.worldSource = "none";
   ST.worldInfo = "";
+  ST.worldTrunc = false;
   worldCacheClearSel();
   try { renderWorldSide(); } catch (e) {}
   renderMetaStatus();

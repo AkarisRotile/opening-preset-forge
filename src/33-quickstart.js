@@ -12,7 +12,7 @@ var QS_TOPIC_LABEL = {
   overview: '国家总览', culture: '文化', politics: '政治与社会', festival: '节庆',
   rule: '生成规则'
 };
-var QS = { marks: [], built: false };
+var QS = { marks: [], priorMarks: [], built: false };
 
 // ---------------- 解析 ----------------
 /** 去掉条目名末尾的 (作者) */
@@ -201,12 +201,22 @@ function qsApply(silent) {
   } else {
     QS.marks = qsPlan(wb.entries, locComment);
   }
+  // 换地点 / 重新计算：先撤掉上一次由本功能勾上的条目，避免两个地点的设定混在一起
+  var nextIds = {};
+  QS.marks.forEach(function (m) { nextIds[m.id] = true; });
+  var prevMarks = QS.priorMarks || [];
+  prevMarks.forEach(function (m) {
+    if (nextIds[m.id]) return;
+    var e = qsEntryById(m.id);
+    if (e && e.sel) e.sel = false;
+  });
   var applied = 0;
   QS.marks.forEach(function (m) {
     var e = qsEntryById(m.id);
     if (!e) return;
     if (!e.sel) { e.sel = true; applied++; }
   });
+  QS.priorMarks = QS.marks.slice();
   if (!s.includeWorld) {
     s.includeWorld = true;
     var cw = getEl('opf-ck-world'); if (cw) cw.checked = true;
@@ -339,9 +349,11 @@ function qsRender() {
     var head = '本功能 ' + QS.marks.length + ' 条 / 约 ' + Math.round(mine / 1000) + 'k 字';
     var tail = ' · 世界书已选 ' + c.selN + '/' + c.total + ' 条（约 ' + Math.round(c.chars / 1000) + 'k 字，上限 ' + Math.round(cap / 1000) + 'k）';
     statEl.textContent = head + tail;
-    statEl.className = 'opf-dim' + (c.chars >= cap ? ' warn' : '');
+    var truncated = !!ST.worldTrunc;
+    if (truncated) tail += ' · 有内容被截断';
+    statEl.className = 'opf-dim' + ((c.chars >= cap || truncated) ? ' warn' : '');
     var raise = getEl('opf-qs-raise');
-    if (raise) raise.style.display = (c.chars >= cap) ? '' : 'none';
+    if (raise) raise.style.display = (c.chars >= cap || truncated) ? '' : 'none';
   }
 }
 function qsSize(n) {

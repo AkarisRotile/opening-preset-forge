@@ -30,7 +30,8 @@ var DEFAULT_SETTINGS = {
   storyTone: 'default',      // 故事基调：sunny | default | gloomy（必选其一）
   storyType: '',             // 开局题材 id（11 选一，空=不指定）
   storySchool: 'normal',     // 校园题材的子项：normal | magic
-  storyRole: ''              // 血族真祖题材的子项：''(按人设) | butler | maid
+  storyRole: '',             // 血族真祖题材的子项：''(按人设) | butler | maid
+  uiTheme: 'frost'           // 界面风格：frost(霜玻璃·默认) | clock(古典机械) | astral(神殿几何)
 };
 
 // ---------------- 始弦人设（唯一真源 · 原版预设原文，一字不改） ----------------
@@ -187,7 +188,7 @@ var ST = {
 function resetPhase(pid) { ST.status[pid] = 'wait'; }
 function setPhase(pid, st) {
   ST.status[pid] = st;
-  var ui = getEl('ph-' + pid);
+  var ui = getEl('opf-ph-' + pid);       // 行 id 是 opf-ph-<id>；写成 ph-<id> 会让状态永远不刷新
   if (ui) {
     ui.setAttribute('data-st', st);
     var dot = ui.querySelector('.opf-dot');
@@ -324,10 +325,15 @@ function loadWorldFromFile(file) {
 }
 
 function applyWorldResult(res) {
-  if (!res || !res.entries || !res.entries.length) { clearWorldbook(); return; }
+  if (!res || !res.entries || !res.entries.length) {
+    // 解析不出条目时**不能**清空现场：用户可能只是选错了文件，清掉会把已有世界书与所有勾选缓存一起毁掉
+    toast("这个文件里没有解析到世界书条目（可能不是世界书 JSON），已保留当前世界书不动", "warning");
+    return false;
+  }
   var r = importWorldEntries(res.entries, res.sourceName || 'file', res.fileName || null);
   opfLog('世界书载入条目数：', r.total, '默认勾选常驻：', r.selConst);
   try { if (!getEl("opf-lside")) buildWorldSide(); } catch (e) {}
+  return true;
 }
 
 // ============================================================================
@@ -832,6 +838,7 @@ async function runAll() {
     if (s.quickMode) {
       await runQuick();
     } else {
+      ST.quickDraft = false;
       var msgs = sxPresetMessages();
       ST.msgs = msgs;
       for (var i = 0; i < PHASES.length; i++) {
@@ -864,6 +871,7 @@ async function runQuick() {
   try {
     var resp = await callModel(msgs);
     ST.results.final = resp;
+    ST.quickDraft = true;               // 快出模式只产出 final，渲染「重新汇总」时据此置灰
     setPhase('final', 'ok');
     if (ST.elPre && ST.elPre.final) ST.elPre.final.textContent = (resp || '').slice(0, 6000);
     handleModelReply(resp);
@@ -1081,7 +1089,7 @@ function buildExportDoc() {
   if (s.metaMode === 'full') {
     var now = Date.now();
     return {
-      name: obj.name || presetNameValue(),
+      name: presetNameFor(obj),
       createdAt: now,
       updatedAt: now,
       character: obj.character,
@@ -1094,7 +1102,22 @@ function buildExportDoc() {
       customInjectionSettings: obj.customInjectionSettings || { equipment: true, item: true, asset: true, skill: true, partner: true }
     };
   }
-  return obj;
+  // core 模式：只留 character 起，把模板里的元数据（name/createdAt/updatedAt）剥掉
+  var out = {};
+  Object.keys(obj).forEach(function (k) {
+    if (k === 'name' || k === 'createdAt' || k === 'updatedAt') return;
+    out[k] = obj[k];
+  });
+  return out;
+}
+// 导出名：用户改过「名称」就以输入框为准，否则用模型给的 name，再退回默认
+function presetNameFor(obj) {
+  var v = '';
+  try { var el = getEl('opf-pname'); v = el && el.value ? String(el.value).trim() : ''; } catch (e) {}
+  var def = '【自定义开局】';
+  if (v && v !== def) return v;
+  if (obj && obj.name) return obj.name;
+  return v || def;
 }
 function safeName(n) {
   return String(n || 'preset').replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 40) || 'preset';
