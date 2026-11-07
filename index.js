@@ -3683,10 +3683,10 @@ var LIB_CSS = [
   '#opf-page-library{font-size:13.5px}',
   // 库列表
   '.lib-kitlist{display:flex;flex-direction:column;gap:2px;max-height:300px;overflow:auto;padding:2px 0}',
-  '.lib-kitrow{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;border:1px solid transparent;cursor:pointer;line-height:1.4}',
+  '.lib-kitrow{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:8px 10px;border-radius:8px;border:1px solid transparent;cursor:pointer;line-height:1.4}',
   '.lib-kitrow:hover{background:rgba(255,235,238,.06)}',
   '.lib-kitrow.active{background:rgba(255,77,94,.14);border-color:rgba(255,150,165,.4)}',
-  '.lib-kitname{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ffeef1;font-size:14px;font-weight:600}',
+  '.lib-kitname{flex:1 1 90px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ffeef1;font-size:14px;font-weight:600}',
   '.lib-kitmeta{flex:none;font-size:11.5px;color:rgba(255,200,208,.6)}',
   '.lib-kitdel{flex:none;border:none;background:transparent;color:rgba(255,160,170,.6);cursor:pointer;font-size:11px;padding:0 4px;border-radius:4px;line-height:1.6}',
   '.lib-kitdel:hover{color:#fff;background:rgba(255,77,94,.3)}',
@@ -3785,6 +3785,7 @@ var LIB_HTML = [
   '        <button type="button" class="opf-btn primary" id="opf-lib-save">💾 保存库</button>',
   '        <button type="button" class="opf-btn ghost" id="opf-lib-aiall">✨ 按概要 AI 生成全套</button>',
   '        <button type="button" class="opf-btn ghost" id="opf-lib-expkit">⬇ 导出此库</button>',
+  '        <button type="button" class="opf-btn ghost" id="opf-lib-exppack" title="导出为捏物收藏扩展可导入的捏物包">📦 导出为捏物包</button>',
   '        <button type="button" class="opf-btn ghost" id="opf-lib-delkit">🗑 删除此库</button>',
   '      </div>',
   '      <div class="opf-dim" id="opf-lib-status">新建一个库，或者从「＋ 新增条目」开始写。</div>',
@@ -4542,6 +4543,12 @@ function libRenderKitList() {
     nm.title = kit.name;
     var n = 0; LIB_GROUPS.forEach(function (g) { n += libEntryArray(kit, g.key).length; });
     var meta = libCreate('span', 'lib-kitmeta', n + ' 条');
+    var exp = libCreate('button', 'lib-mini', '导出');
+    exp.type = 'button'; exp.title = '把这个库单独导出为 .json';
+    exp.addEventListener('click', function (ev) { ev.stopPropagation(); libExportKit(kit.id); });
+    var expPack = libCreate('button', 'lib-mini', '捏物包');
+    expPack.type = 'button'; expPack.title = '把这个库导出成捏物收藏扩展可导入的捏物包';
+    expPack.addEventListener('click', function (ev) { ev.stopPropagation(); libExportAsPack(kit.id); });
     var del = libCreate('button', 'lib-kitdel', '✕');
     del.type = 'button'; del.title = '删除这个库（不影响已经注入到开局预设里的快照）';
     del.addEventListener('click', function (ev) {
@@ -4549,7 +4556,7 @@ function libRenderKitList() {
       if (!libConfirm('删除开局库「' + kit.name + '」？不可撤销。', false)) return;
       libDeleteKit(kit.id); libRender();
     });
-    row.appendChild(nm); row.appendChild(meta); row.appendChild(del);
+    row.appendChild(nm); row.appendChild(meta); row.appendChild(exp); row.appendChild(expPack); row.appendChild(del);
     row.addEventListener('click', function () { libSetActive(kit.id); libSave(); });
     box.appendChild(row);
   });
@@ -4974,6 +4981,80 @@ function libImportCollectionPacks(packs) {
   return { kits: addedKits, entries: addedEntries, skipped: skipped, warnings: warnings };
 }
 
+// 反向导出：把自备库转成「捏物收藏扩展」能导入的捏物包（fated-opening-templates）。
+// 只是把同目录的条目塞进对方的公开格式里，不涉及它的实现。
+var LIB_PACK_CATS = { equipments: 'equipment', items: 'item', assets: 'asset', skills: 'skill', partners: 'partner', background: 'background' };
+function libToPackLibrary(kit) {
+  var out = { equipment: [], item: [], asset: [], skill: [], partner: [], background: [] };
+  if (!kit) return out;
+  LIB_GROUPS.forEach(function (g) {
+    var cat = LIB_PACK_CATS[g.key];
+    if (!cat) return;
+    var list = libEntryArray(kit, g.key);
+    list.forEach(function (entry) {
+      var payload = libToPresetEntry(g.key, entry);
+      if (!payload || typeof payload !== 'object') return;
+      if (g.key !== 'background') {
+        var c = Number(payload.cost);
+        if (!isFinite(c) || c < 0) payload.cost = 0;
+      }
+      out[cat].push({ id: libText(entry._lid) || libNewId('e'), payload: payload });
+    });
+  });
+  return out;
+}
+function libBuildPackDoc(kit) {
+  if (!kit) return null;
+  return {
+    format: 'fated-opening-templates',
+    schemaVersion: 1,
+    templates: [{
+      id: libNewId('p'),
+      name: kit.name,
+      updatedAt: new Date().toISOString(),
+      library: libToPackLibrary(kit)
+    }]
+  };
+}
+// 对方导入时会逐条校验：背景要有非空描述；其余要有 name / rarity / cost；伙伴还要核心字段。
+function libPackPayloadWarn(kit) {
+  var bad = [];
+  if (!kit) return bad;
+  LIB_GROUPS.forEach(function (g) {
+    libEntryArray(kit, g.key).forEach(function (entry) {
+      var e = libToPresetEntry(g.key, entry);
+      var name = libText(e && e.name).trim();
+      if (!name) { bad.push((g.label) + '：缺名称'); return; }
+      if (g.key === 'background') {
+        if (!libText(e.description).trim()) bad.push('背景「' + name + '」：描述为空');
+        return;
+      }
+      var c = Number(e.cost);
+      if (!isFinite(c) || c < 0) bad.push(g.label + '「' + name + '」：点数不是非负数字');
+      if (!libText(e.rarity).trim()) bad.push(g.label + '「' + name + '」：缺品质');
+      if (g.key === 'partners') {
+        if (!libText(e.race).trim()) bad.push('伙伴「' + name + '」：缺 race');
+        if (!libText(e.lifeLevel).trim()) bad.push('伙伴「' + name + '」：缺 lifeLevel');
+      }
+      if (g.key === 'assets' && !libText(e['类型']).trim()) bad.push('资产「' + name + '」：缺类型');
+    });
+  });
+  return bad;
+}
+function libExportAsPack(kitId) {
+  var kit = kitId ? libKit(kitId) : libActiveKit();
+  if (!kit) { toast('没有可导出的库', 'warning'); return; }
+  var total = 0; LIB_GROUPS.forEach(function (g) { total += libEntryArray(kit, g.key).length; });
+  if (!total) { toast('这个库还没有条目', 'warning'); return; }
+  var bad = libPackPayloadWarn(kit);
+  if (bad.length && !libConfirm('这个库有 ' + bad.length + ' 处不符合捏物包格式（' + bad.slice(0, 3).join('；') + (bad.length > 3 ? '…' : '') + '），对方扩展可能拒绝导入。仍要导出吗？', true)) return;
+  var doc = libBuildPackDoc(kit);
+  if (libDownload('捏物包-' + libSafeName(kit.name) + '.json', JSON.stringify(doc, null, 2))) {
+    toast('已导出为捏物包：' + kit.name + (bad.length ? '（有 ' + bad.length + ' 处格式提示）' : ''));
+    libStatus('已导出「' + kit.name + '」为捏物包 JSON，可直接给捏物收藏扩展导入。');
+  }
+}
+
 // ---------------- 导入 / 导出 ----------------
 function libExportKit(kitId) {
   var kit = kitId ? libKit(kitId) : libActiveKit();
@@ -5088,6 +5169,8 @@ function libBindPage() {
   if (aiAll) aiAll.addEventListener('click', function () { libAiGenerate(''); });
   var expKit = libEl('opf-lib-expkit');
   if (expKit) expKit.addEventListener('click', function () { libExportKit(); });
+  var expPack = libEl('opf-lib-exppack');
+  if (expPack) expPack.addEventListener('click', function () { libExportAsPack(); });
   var delKit = libEl('opf-lib-delkit');
   if (delKit) delKit.addEventListener('click', function () {
     var kit = libActiveKit(); if (!kit) return;
