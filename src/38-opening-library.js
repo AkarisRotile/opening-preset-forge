@@ -23,58 +23,85 @@ var LIB_GROUPS = [
 var LIB_RARITY = [['common', '普通'], ['uncommon', '优良'], ['rare', '稀有'], ['epic', '史诗'], ['legendary', '传说'], ['mythic', '神话'], ['only', '唯一']];
 
 var LIB_CSS = [
-  '#opf-page-library{font-size:13px}',
+  '#opf-page-library{font-size:13.5px}',
   // 库列表
   '.lib-kitlist{display:flex;flex-direction:column;gap:2px;max-height:300px;overflow:auto;padding:2px 0}',
-  '.lib-kitrow{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;border:1px solid transparent;cursor:pointer;line-height:1.4}',
+  '.lib-kitrow{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;border:1px solid transparent;cursor:pointer;line-height:1.4}',
   '.lib-kitrow:hover{background:rgba(255,235,238,.06)}',
   '.lib-kitrow.active{background:rgba(255,77,94,.14);border-color:rgba(255,150,165,.4)}',
-  '.lib-kitname{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ffeef1}',
-  '.lib-kitmeta{flex:none;font-size:10.5px;color:rgba(255,200,208,.5)}',
+  '.lib-kitname{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ffeef1;font-size:14px;font-weight:600}',
+  '.lib-kitmeta{flex:none;font-size:11.5px;color:rgba(255,200,208,.6)}',
   '.lib-kitdel{flex:none;border:none;background:transparent;color:rgba(255,160,170,.6);cursor:pointer;font-size:11px;padding:0 4px;border-radius:4px;line-height:1.6}',
   '.lib-kitdel:hover{color:#fff;background:rgba(255,77,94,.3)}',
-  '.lib-empty{font-size:11.5px;color:rgba(255,200,208,.5);padding:8px 4px;line-height:1.6}',
+  '.lib-empty{font-size:12.5px;color:rgba(255,200,208,.58);padding:9px 4px;line-height:1.6}',
   // 当前库编辑
   '.lib-field{display:flex;flex-direction:column;gap:3px;margin:5px 0}',
-  '.lib-field>label{font-size:11px;color:rgba(255,200,208,.6)}',
-  '.lib-field input,.lib-field select,.lib-field textarea{width:100%;border-radius:7px;padding:5px 7px;font-size:12.5px;color:#ffeef1;background:rgba(10,2,5,.55);border:1px solid rgba(255,122,138,.25);outline:none;font-family:inherit}',
+  '.lib-field>label{font-size:12px;color:rgba(255,200,208,.68)}',
+  '.lib-field input,.lib-field select,.lib-field textarea{width:100%;border-radius:7px;padding:6px 8px;font-size:13px;color:#ffeef1;background:rgba(10,2,5,.55);border:1px solid rgba(255,122,138,.25);outline:none;font-family:inherit}',
   '.lib-field input:focus,.lib-field select:focus,.lib-field textarea:focus{border-color:rgba(255,110,125,.65);box-shadow:0 0 6px rgba(255,77,94,.22)}',
   '.lib-field textarea{min-height:54px;resize:vertical;line-height:1.5}',
   '.lib-field .lib-row{display:flex;gap:5px;align-items:center}',
   // 分类与条目
   '.lib-cat{margin:9px 0 3px;padding:5px 8px;border-left:2px solid rgba(255,90,105,.5);background:rgba(255,77,94,.05);border-radius:0 6px 6px 0;display:flex;align-items:center;gap:6px;flex-wrap:wrap}',
-  '.lib-cat-t{font-size:12.5px;font-weight:600;color:#ffe3e7}',
-  '.lib-cat-n{font-size:10.5px;color:rgba(255,200,208,.55)}',
-  '.lib-entry{display:flex;align-items:center;gap:6px;padding:4px 6px;border-bottom:1px solid rgba(255,122,138,.1);font-size:12.5px;flex-wrap:wrap}',
+  '.lib-cat-t{font-size:14px;font-weight:600;color:#ffe3e7}',
+  '.lib-cat-n{font-size:11.5px;color:rgba(255,200,208,.6)}',
+  '.lib-entry{display:flex;align-items:center;gap:7px;padding:7px 8px;border-bottom:1px solid rgba(255,122,138,.1);font-size:13px;flex-wrap:wrap}',
   '.lib-entry:hover{background:rgba(255,235,238,.04)}',
-  '.lib-entry-name{flex:1 1 140px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ffeef1}',
-  '.lib-entry-meta{flex:none;font-size:10.5px;color:rgba(255,200,208,.55)}',
-  '.lib-mini{flex:none;border:1px solid rgba(255,122,138,.26);background:rgba(255,235,238,.05);color:#ffc9cf;border-radius:6px;padding:2px 7px;font-size:11px;line-height:1.6;cursor:pointer;white-space:nowrap}',
+  '.lib-entry-name{flex:1 1 140px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ffeef1;font-size:14px;font-weight:600;letter-spacing:.2px}',
+  '.lib-entry-meta{flex:none;font-size:11.5px;color:rgba(255,200,208,.62)}',
+  '.lib-mini{flex:none;border:1px solid rgba(255,122,138,.28);background:rgba(255,235,238,.055);color:#ffd0d6;border-radius:6px;padding:3px 8px;font-size:11.5px;line-height:1.55;cursor:pointer;white-space:nowrap}',
   '.lib-mini:hover{background:rgba(255,77,94,.2);color:#fff}',
   '.lib-mini.danger{color:#ff9aa4;border-color:rgba(255,110,122,.4)}',
   // 编辑器
   '#opf-lib-editor .lib-editor-hd{display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap}',
   '#opf-lib-editor .lib-editor-hd .lib-cat-t{font-size:13px}',
-  '.lib-warn{font-size:11.5px;line-height:1.55;color:#ffd0a0;padding:4px 0;white-space:pre-wrap}',
+  '.lib-warn{font-size:12.5px;line-height:1.55;color:#ffd0a0;padding:4px 0;white-space:pre-wrap}',
   // ① 页注入卡
+  '#opf-page-library .opf-card-t{font-size:15px !important}',
+  '#opf-page-library .opf-card-sub{font-size:12px !important;color:rgba(255,200,208,.62) !important}',
+  '#opf-page-library .opf-card-no{font-size:11.5px !important}',
+  '#opf-page-library .opf-dim{font-size:12px !important;line-height:1.6}',
+  '#opf-page-library .opf-btn{font-size:13px !important}',
+  '#opf-page-library .lib-editor-hd .lib-cat-t{font-size:14.5px !important}',
   '#opf-inject-card .lib-inj-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:4px 0;border-bottom:1px dashed rgba(255,122,138,.14)}',
-  '#opf-inject-card .lib-inj-label{flex:none;min-width:3em;font-size:12px;color:#ffd9de}',
-  '#opf-inject-card .lib-inj-count{flex:none;font-size:10.5px;color:rgba(255,200,208,.55)}',
+  '#opf-inject-card .lib-inj-label{flex:none;min-width:3.2em;font-size:13px;font-weight:600;color:#ffd9de}',
+  '#opf-inject-card .lib-inj-count{flex:none;font-size:11.5px;color:rgba(255,200,208,.6)}',
   '#opf-inject-card .lib-inj-chips{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:4px}',
-  '.lib-chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;line-height:1.6;padding:1px 6px;border-radius:999px;background:rgba(255,77,94,.12);border:1px solid rgba(255,150,165,.3);color:#ffe3e7;max-width:100%}',
+  '.lib-chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;line-height:1.6;padding:2px 8px;border-radius:999px;background:rgba(255,77,94,.12);border:1px solid rgba(255,150,165,.3);color:#ffe3e7;max-width:100%}',
   '.lib-chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px}',
   '.lib-chip button{border:none;background:transparent;color:#ff9aa4;cursor:pointer;font-size:11px;padding:0;line-height:1}',
   '.lib-chip button:hover{color:#fff}',
-  '#opf-inject-card .lib-inj-note{font-size:11px;line-height:1.6;color:rgba(255,200,208,.55);padding:2px 0}',
+  '#opf-inject-card .lib-inj-note{font-size:11.5px;line-height:1.65;color:rgba(255,200,208,.6);padding:3px 0}',
   // 选取弹窗
   '.lib-mask{position:fixed;inset:0;z-index:2147480500;background:rgba(5,1,3,.62);display:flex;align-items:center;justify-content:center;padding:16px}',
   '.lib-picker{width:min(620px,94vw);max-height:min(76vh,740px);display:flex;flex-direction:column;border-radius:14px;border:1px solid rgba(255,150,165,.35);background:linear-gradient(180deg,rgba(46,6,14,.98),rgba(20,3,9,.98));box-shadow:0 18px 50px rgba(0,0,0,.6);color:#fdeef0}',
-  '.lib-picker-hd{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid rgba(255,122,138,.24);font-size:14px;font-weight:600;color:#ffe3e7}',
+  // 选取弹窗：跟随界面风格；因为挂在 #opf-shell 里，能拿到主题类
+  '.lib-picker{background:linear-gradient(180deg,var(--ink-2,#1a1215),var(--ink-0,#0c0609));border:1px solid var(--line-2,rgba(216,178,116,.26));color:var(--tx,#fdeef0);box-shadow:0 18px 50px rgba(0,0,0,.62)}',
+  '.lib-picker-hd{color:var(--tx,#ffe3e7);border-bottom:1px solid var(--line,rgba(216,178,116,.16))}',
+  '.lib-picker-ft{border-top:1px solid var(--line,rgba(216,178,116,.16))}',
+  '.lib-picker-group{color:var(--gold,#ffb7be)}',
+  '.lib-picker-body .lib-empty{color:var(--tx-3,#94787a)}',
+  '.lib-picker .lib-mini{font-size:12px;border-color:var(--line-2,rgba(255,122,138,.3));color:var(--tx-2,#c9ada6);background:rgba(255,255,255,.03)}',
+  '.lib-picker .lib-mini:hover{background:rgba(255,255,255,.08);color:var(--tx,#fff)}',
+  '.lib-picker .lib-entry-meta{color:var(--tx-3,#94787a)}',
+  '.opf-theme-clock .lib-picker{background:linear-gradient(180deg,#1a120b,#100a06);border-color:rgba(150,100,56,.38);color:#f0dcb9;box-shadow:0 18px 50px rgba(0,0,0,.7),inset 0 0 0 1px rgba(198,150,96,.14)}',
+  '.opf-theme-clock .lib-picker-hd,.opf-theme-clock .lib-picker-ft{border-color:rgba(198,150,96,.28)}',
+  '.opf-theme-clock .lib-picker-hd{color:#f6dcb2}',
+  '.opf-theme-clock .lib-picker-group{color:rgba(226,174,112,.78);border-left:2px solid rgba(198,150,96,.5);padding-left:7px}',
+  '.opf-theme-clock .lib-picker .lib-mini{border-color:rgba(150,100,56,.42);color:#d6b68c;background:rgba(198,150,96,.06)}',
+  '.opf-theme-clock .lib-picker .lib-mini:hover{background:rgba(198,150,96,.16);color:#f6dcb2}',
+  '.opf-theme-astral .lib-picker{background:linear-gradient(180deg,#171a24,#0b0c12);border-color:rgba(226,232,246,.22);color:#eef2fb;box-shadow:0 18px 50px rgba(0,0,0,.7),inset 0 0 0 1px rgba(226,232,246,.06)}',
+  '.opf-theme-astral .lib-picker-hd,.opf-theme-astral .lib-picker-ft{border-color:rgba(226,232,246,.16)}',
+  '.opf-theme-astral .lib-picker-hd{color:#fff}',
+  '.opf-theme-astral .lib-picker-group{color:rgba(226,232,246,.66);border-left:2px solid rgba(226,232,246,.34);padding-left:7px}',
+  '.opf-theme-astral .lib-picker .lib-mini{border-color:rgba(226,232,246,.22);color:rgba(226,232,246,.78);background:rgba(255,255,255,.04)}',
+  '.opf-theme-astral .lib-picker .lib-mini:hover{background:rgba(226,232,246,.12);color:#fff}',
+  '.lib-picker-hd{display:flex;align-items:center;gap:8px;padding:11px 15px;border-bottom:1px solid rgba(255,122,138,.24);font-size:15px;font-weight:600;color:#ffe3e7}',
   '.lib-picker-hd .lib-mini{margin-left:auto}',
   '.lib-picker-body{flex:1 1 auto;min-height:0;overflow:auto;padding:8px 14px}',
   '.lib-picker-ft{display:flex;align-items:center;gap:8px;padding:9px 14px;border-top:1px solid rgba(255,122,138,.24)}',
   '.lib-picker-group{margin:8px 0 3px;font-size:11.5px;letter-spacing:1px;color:#ffb7be}',
-  '.lib-picker-item{display:flex;align-items:center;gap:7px;padding:4px 5px;border-radius:7px;font-size:12.5px;cursor:pointer;line-height:1.4}',
+  '.lib-picker-item{display:flex;align-items:center;gap:9px;padding:6px 7px;border-radius:7px;font-size:13.5px;cursor:pointer;line-height:1.45}',
   '.lib-picker-item:hover{background:rgba(255,235,238,.06)}',
   '.lib-picker-item input{accent-color:#ff4d5e;cursor:pointer;flex:none}',
   '.lib-picker-item .lib-entry-meta{margin-left:auto}'
@@ -683,7 +710,9 @@ function libPickOpen(key) {
   foot.appendChild(stat); foot.appendChild(goLib); foot.appendChild(done);
   box.appendChild(hd); box.appendChild(body); box.appendChild(foot);
   mask.appendChild(box);
-  (document.body || document.documentElement).appendChild(mask);
+  // 挂进 shell 而不是 body：这样弹窗能继承当前界面风格（.opf-theme-*）
+  var host = libEl('opf-shell') || (typeof document !== 'undefined' ? document.body : null);
+  if (host) host.appendChild(mask);
 }
 
 // ---------------- AI 生成 ----------------
