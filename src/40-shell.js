@@ -85,6 +85,80 @@ var SHELL_CSS2 = [
 
 var SHELL_CSS = "#opf-shell{position:fixed;inset:0;height:100vh;height:100dvh;z-index:2147480002;display:flex;flex-direction:column;color:#fdeef0;font-family:'Noto Sans SC','Microsoft YaHei',sans-serif;letter-spacing:.3px;background:linear-gradient(180deg,#18040b 0%,#0d0206 55%,#0a0105 100%);border:none;transition:opacity .16s ease,transform .16s ease}#opf-shell.opf-shell-hidden{opacity:0;pointer-events:none;transform:translateY(12px)}#opf-shell *{box-sizing:border-box}#opf-shell-head{position:relative;display:flex;align-items:center;gap:10px;padding:8px 12px;flex:none;background:rgba(46,6,14,.6);border-bottom:1px solid rgba(255,122,138,.28)}#opf-shell-head::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#ff4d5e 18%,#ffd9a8 50%,#c8102e 82%,transparent);box-shadow:0 0 12px rgba(255,90,100,.8)}#opf-shell-title{font-size:15px;font-weight:600;color:#ffd9de;text-shadow:0 0 10px rgba(255,77,94,.35);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#opf-shell-close{margin-left:auto;flex:none;border:1px solid rgba(255,122,138,.35);background:rgba(255,77,94,.14);color:#ff8a95;width:40px;height:40px;min-width:40px;border-radius:10px;font-size:16px;cursor:pointer}#opf-shell-close:hover{background:rgba(255,77,94,.3);color:#fff}#opf-nav{display:flex;gap:5px;padding:8px 10px 0;overflow-x:auto;overflow-y:hidden;flex:none;scrollbar-width:thin;scrollbar-color:rgba(255,122,138,.4) transparent}.opf-tab{flex:none;border:1px solid rgba(255,122,138,.26);background:rgba(255,235,238,.05);color:#ffc9cf;border-radius:10px 10px 0 0;padding:9px 13px;font-size:12.5px;line-height:1.2;cursor:pointer;white-space:nowrap;min-height:40px}.opf-tab.active{background:linear-gradient(180deg,rgba(255,77,94,.26),rgba(255,77,94,.07));color:#fff;border-color:rgba(255,150,165,.65);box-shadow:inset 0 2px 0 #ff4d5e}.opf-tab.placeholder{opacity:.6;border-style:dashed}#opf-pages{flex:1;min-height:0;position:relative}.opf-page{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;padding:10px 12px 14px;display:none;scrollbar-width:thin}.opf-page.active{display:block}.opf-page-ph{padding:32px 16px;text-align:center;color:rgba(255,200,208,.55);font-size:13.5px;line-height:2.2;white-space:pre-line}#opf-shell #opf-root{position:static;width:100%;max-width:100%;height:auto;min-height:100%;max-height:none;margin:0;border:none;border-radius:0;box-shadow:none;background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none}#opf-shell #opf-root.opf-hidden{opacity:1;pointer-events:auto;transform:none}#opf-shell #opf-root::before{display:none}#opf-shell #opf-lside{position:static;transform:none;width:100%;max-width:none;height:100%;top:auto;bottom:auto;left:auto;border:none;border-radius:0;box-shadow:none;background:transparent}#opf-shell #opf-lside.open{transform:none}.opf-char-wrap{display:flex;flex-direction:column;gap:8px;max-width:860px;margin:0 auto}.opf-char-input{width:100%;border-radius:8px;padding:8px 10px;font-size:12.5px;color:#ffeef1;background:rgba(10,2,5,.55);border:1px solid rgba(255,122,138,.25);outline:none;resize:vertical}.opf-char-input:focus{border-color:rgba(255,110,125,.6);box-shadow:0 0 6px rgba(255,77,94,.25)}#opf-char-demand{min-height:56px}#opf-char-ref{min-height:48px;font-size:12px}.opf-char-tools{display:flex;gap:6px;flex-wrap:wrap}.opf-char-tools .opf-btn{flex:1 1 130px;min-height:44px;font-size:13px}.opf-box{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;margin:6px 0 0;padding:10px 12px;border:1px solid rgba(255,122,138,.32);border-radius:10px;background:rgba(10,2,5,.62);box-shadow:inset 0 0 14px rgba(255,60,80,.05);color:#ffeef1;font-size:12px;line-height:1.55;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;overflow:auto}.opf-char-report{max-height:300px;min-height:64px}#opf-char-out{max-height:56vh;min-height:140px;font-size:12.5px;scrollbar-width:thin}.opf-char-copyrow{margin-top:6px}#opf-dest-demand{min-height:56px}#opf-dest-ref{min-height:48px;font-size:12px}#opf-dest-out{max-height:56vh;min-height:140px;font-size:12.5px;scrollbar-width:thin}#opf-dest-ejswrap{display:flex;align-items:flex-start;gap:7px;font-size:11.5px;line-height:1.5;color:#ffc9cf;background:rgba(60,140,200,.10);border:1px dashed rgba(120,190,255,.35);border-radius:8px;padding:7px 9px;cursor:pointer}#opf-dest-ejswrap input{width:16px;height:16px;margin:1px 0 0;flex:none;accent-color:#3c8cc8}.opf-rx-preview{max-width:100%;overflow:auto;border:1px dashed rgba(255,122,138,.3);border-radius:8px;padding:6px;margin:4px 0;background:rgba(10,2,5,.5);font-size:12px}#opf-rx-items select.opf-ref-input{flex:0 0 auto;min-width:120px}#opf-rx-core{min-height:90px}.opf-shx-cfg{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:4px 0}.opf-shx-cfg .opf-opt{display:flex;align-items:center;gap:5px;font-size:11.5px;color:#ffc9cf}.opf-shx-cfg .opf-ref-input{min-width:130px}.opf-shx-log{max-height:46vh;min-height:160px;overflow:auto;border:1px solid rgba(255,122,138,.28);border-radius:10px;background:rgba(10,2,5,.55);padding:8px 10px;display:flex;flex-direction:column;gap:8px}.opf-shx-msg{padding:7px 9px;border-radius:9px;font-size:12.5px;line-height:1.7}.opf-shx-msg.me{background:rgba(255,77,94,.10);border:1px solid rgba(255,122,138,.22);align-self:flex-end;max-width:86%}.opf-shx-msg.her{background:rgba(120,190,255,.08);border:1px solid rgba(120,190,255,.25);align-self:flex-start;max-width:92%}.opf-shx-who{font-size:10px;letter-spacing:1px;opacity:.65;margin-bottom:3px}.opf-shx-text{white-space:pre-wrap;word-break:break-word}#opf-shx-input{min-height:56px}.opf-shx-wblist{max-height:220px;overflow:auto;border:1px solid rgba(255,122,138,.2);border-radius:8px;padding:5px 7px;margin-top:5px}@media (max-width:760px){#opf-shell-head{padding:6px 8px}#opf-shell-title{font-size:13px}#opf-shell-close{width:40px;height:40px}.opf-tab{padding:8px 10px;font-size:11.5px;min-height:40px}.opf-page{padding:8px 8px 12px}#opf-shell #opf-root{font-size:13px}.opf-page .opf-btn{min-height:44px}.opf-char-tools .opf-btn{min-height:46px}.opf-wi-row{min-height:40px}.opf-wi-row input{width:18px;height:18px}#opf-lside-tools{gap:6px}#opf-lside-tools .opf-step-act{min-height:40px;font-size:12px}}";
 
+
+// ---------------- 手机端导航抽屉（MOBILE-SPEC §4/§5） ----------------
+// 只负责 DOM / 行为 / class 切换；抽屉与遮罩的视觉全部在 96-mobile.js 的 @media (max-width:720px) 里。
+var OPF_WORLD_LABEL_FULL = "▤ 世界书";
+var OPF_WORLD_LABEL_MOBILE = "▤";
+var OPF_MOBILE_MQ = null;
+var OPF_MOBILE_MQ_KEY = "";
+// 统一判定条件由 96 的 OPF_MOBILE_MEDIA 提供；96 尚未加载时退回纯宽度断点。
+function opfMobileMQString() {
+  try { if (typeof OPF_MOBILE_MEDIA !== "undefined" && OPF_MOBILE_MEDIA) return String(OPF_MOBILE_MEDIA); } catch (e) {}
+  return "(max-width:720px)";
+}
+function opfMobileMQ() {
+  var q = opfMobileMQString();
+  if (!OPF_MOBILE_MQ || OPF_MOBILE_MQ_KEY !== q) {
+    try { if (typeof window !== "undefined" && window.matchMedia) { OPF_MOBILE_MQ = window.matchMedia(q); OPF_MOBILE_MQ_KEY = q; } } catch (e) { OPF_MOBILE_MQ = null; }
+  }
+  return OPF_MOBILE_MQ;
+}
+// 判定优先走 96 的模式引擎（settings.uiLayout: auto|mobile|desktop），没有引擎时退回媒体查询。
+function isMobileShell() {
+  try { if (typeof opfLayoutIsMobile === "function") return !!opfLayoutIsMobile(); } catch (e) {}
+  var mq = opfMobileMQ();
+  return !!(mq && mq.matches);
+}
+function isMobileNavOpen() { var sh = getEl("opf-shell"); return !!(sh && sh.classList && sh.classList.contains("opf-nav-open")); }
+function openMobileNav() {
+  if (!isMobileShell()) return;
+  var sh = getEl("opf-shell"); if (!sh) return;
+  sh.classList.add("opf-nav-open");
+  var btn = getEl("opf-nav-toggle");
+  if (btn) { btn.textContent = "✕"; btn.title = "关闭菜单"; btn.setAttribute("aria-expanded", "true"); }
+}
+function closeMobileNav() {
+  var sh = getEl("opf-shell"); if (sh && sh.classList) sh.classList.remove("opf-nav-open");
+  var btn = getEl("opf-nav-toggle");
+  if (btn) { btn.textContent = "☰"; btn.title = "菜单"; btn.setAttribute("aria-expanded", "false"); }
+}
+function toggleMobileNav() { if (isMobileNavOpen()) closeMobileNav(); else openMobileNav(); }
+// 顶栏精简 + 断点同步。桌面把新控件内联 display:none，即使 96 的样式还没注入也不会占位/露出来。
+function syncMobileChrome() {
+  var mob = isMobileShell();
+  var wbtn = getEl("opf-chrome-world");
+  if (wbtn) {
+    var label = mob ? OPF_WORLD_LABEL_MOBILE : OPF_WORLD_LABEL_FULL;
+    if (wbtn.textContent !== label) wbtn.textContent = label;
+    if (wbtn.getAttribute("aria-label") !== "世界书") wbtn.setAttribute("aria-label", "世界书");
+  }
+  var tx = getEl("opf-tx-status");
+  if (tx && tx.getAttribute("aria-label") !== "传输状态") tx.setAttribute("aria-label", "传输状态");
+  var tgl = getEl("opf-nav-toggle");
+  if (tgl) tgl.style.display = mob ? "" : "none";
+  var mask = getEl("opf-nav-mask");
+  if (mask) mask.style.display = mob ? "" : "none";
+  if (!mob) closeMobileNav();
+}
+var OPF_MOBILE_BOUND = false;
+function bindMobileShell() {
+  if (OPF_MOBILE_BOUND) return;
+  OPF_MOBILE_BOUND = true;
+  var mq = opfMobileMQ();
+  if (mq) {
+    var onChange = function () { syncMobileChrome(); };
+    try { if (mq.addEventListener) mq.addEventListener("change", onChange); else if (mq.addListener) mq.addListener(onChange); } catch (e) {}
+  }
+  // Esc 收起抽屉（只在手机且抽屉确实打开时）
+  try {
+    document.addEventListener("keydown", function (ev) {
+      if (!isMobileShell() || !isMobileNavOpen()) return;
+      if (ev.key === "Escape" || ev.key === "Esc" || ev.keyCode === 27) closeMobileNav();
+    });
+  } catch (e) {}
+}
+
 function buildShell(){
   if (getEl("opf-shell")) return;
   try { if (!getEl(NS + "_css_shell")) { var st = document.createElement("style"); st.id = NS + "_css_shell"; st.textContent = SHELL_CSS; document.head.appendChild(st); } } catch (e) { opfErr("shell css", e); }
@@ -93,17 +167,23 @@ function buildShell(){
 
   // ---- 顶部全局 chrome：标题 ·（右）传输状态 · 世界书 · 设置 · 关闭 ----
   var head = document.createElement("div"); head.id = "opf-shell-head";
+  // 手机端 ☰：顶栏首位；桌面由 CSS/内联样式隐藏，不占位（MOBILE-SPEC §4）
+  var navToggle = document.createElement("button"); navToggle.type = "button"; navToggle.id = "opf-nav-toggle";
+  navToggle.className = "opf-chrome-btn"; navToggle.title = "菜单"; navToggle.textContent = "☰";
+  navToggle.setAttribute("aria-expanded", "false"); navToggle.setAttribute("aria-controls", "opf-nav");
+  navToggle.addEventListener("click", function () { toggleMobileNav(); });
+  head.appendChild(navToggle);
   var title = document.createElement("div"); title.id = "opf-shell-title"; title.textContent = "✦ 始弦的魔法大典";
   var tx = document.createElement("button"); tx.type = "button"; tx.id = "opf-tx-status"; tx.className = "opf-tx-status opf-tx-st"; tx.textContent = "传输：—";
-  tx.addEventListener("click", function () { switchPage("settings"); });
+  tx.addEventListener("click", function () { closeMobileNav(); switchPage("settings"); });
   var wbtn = document.createElement("button"); wbtn.type = "button"; wbtn.id = "opf-chrome-world"; wbtn.className = "opf-chrome-btn"; wbtn.textContent = "▤ 世界书";
   wbtn.title = "打开世界书条目勾选（决定哪些条目发送给 AI；勾选与导入自动缓存）";
-  wbtn.addEventListener("click", function () { toggleWorldSide(); });
+  wbtn.addEventListener("click", function () { closeMobileNav(); toggleWorldSide(); });
   var gear = document.createElement("button"); gear.type = "button"; gear.id = "opf-chrome-settings"; gear.className = "opf-chrome-btn"; gear.textContent = "⚙";
   gear.title = "设置：生成传输 / API / 模型";
-  gear.addEventListener("click", function () { switchPage("settings"); });
+  gear.addEventListener("click", function () { closeMobileNav(); switchPage("settings"); });
   var close = document.createElement("button"); close.type = "button"; close.id = "opf-shell-close"; close.title = "关闭"; close.textContent = "✕";
-  close.addEventListener("click", hidePanel);
+  close.addEventListener("click", function () { closeMobileNav(); hidePanel(); });
   head.appendChild(title); head.appendChild(tx); head.appendChild(wbtn); head.appendChild(gear); head.appendChild(close);
   shell.appendChild(head);
 
@@ -133,6 +213,11 @@ function buildShell(){
   });
   bodyWrap.appendChild(nav);
 
+  // 手机端：点任意 .opf-tab 后收起抽屉（MOBILE-SPEC §4）
+  nav.addEventListener("click", function (ev) {
+    var t = ev.target;
+    while (t && t !== nav) { if (t.classList && t.classList.contains("opf-tab")) { closeMobileNav(); return; } t = t.parentNode; }
+  });
   var pages = document.createElement("div"); pages.id = "opf-pages";
   PAGE_DEFS.forEach(function (p) {
     var d = document.createElement("div"); d.id = "opf-page-" + p.id; d.className = "opf-page";
@@ -167,7 +252,13 @@ function buildShell(){
   bodyWrap.appendChild(pages);
   shell.appendChild(bodyWrap);
 
+  // 手机抽屉遮罩：挂手机 class 由 CSS 控制显隐，点它收起抽屉（MOBILE-SPEC §4）
+  var navMask = document.createElement("div"); navMask.id = "opf-nav-mask";
+  navMask.addEventListener("click", closeMobileNav);
+  shell.appendChild(navMask);
+
   document.body.appendChild(shell);
+  try { bindMobileShell(); syncMobileChrome(); } catch (e) { opfErr("mobile shell", e); }
   launcher();
   var root = getEl("opf-root");
   bindPanel(root);
@@ -241,6 +332,8 @@ function switchPage(id, force){
   if (id === "regex") { try { rxRenderItems(); } catch (e) {} }
   if (id === "shixian") { try { renderShxWb(); renderShxMsgs(); shxRenderMem(); } catch (e) {} }
   if (id === "atelier") { try { atlRender(); } catch (e) {} }
+  // 手机端：切页完成后收起导航抽屉（MOBILE-SPEC §4）
+  if (isMobileShell()) closeMobileNav();
 }
 function currentPage(){ return getSettings().activePage || "preset"; }
 

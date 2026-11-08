@@ -15,6 +15,8 @@ function boot(){
   try { projRestoreActive(); } catch (e) { opfErr("projRestoreActive", e); }
   try { renderProjList(); } catch (e) { opfErr("renderProjList", e); }
   try { projAutosaveStart(); } catch (e) { opfErr("projAutosaveStart", e); }
+  // 手机端覆盖层：必须在所有样式（含 95 皮肤）注入之后
+  try { injectMobileCSS(); } catch (e) { opfErr("injectMobileCSS", e); }
   opfLog("loaded. context ready:", !!getCtx());
 }
 function tryBoot(tryCount){

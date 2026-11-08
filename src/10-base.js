@@ -31,7 +31,8 @@ var DEFAULT_SETTINGS = {
   storyType: '',             // 开局题材 id（11 选一，空=不指定）
   storySchool: 'normal',     // 校园题材的子项：normal | magic
   storyRole: '',             // 血族真祖题材的子项：''(按人设) | butler | maid
-  uiTheme: 'frost'           // 界面风格：frost(霜玻璃·默认) | clock(古典机械) | astral(神殿几何)
+  uiTheme: 'frost',          // 界面风格：frost(霜玻璃·默认) | clock(古典机械) | astral(神殿几何)
+  uiLayout: 'auto'           // 界面布局：auto(跟随屏幕) | mobile(强制手机版式) | desktop(强制桌面版式)
 };
 
 // ---------------- 始弦人设（唯一真源 · 原版预设原文，一字不改） ----------------
