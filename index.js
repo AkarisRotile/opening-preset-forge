@@ -14293,7 +14293,7 @@ var MOBILE_CSS = [
   // ================= 导航抽屉视觉（DOM/开合由 40-shell.js 负责） =================
   "#opf-shell #opf-shell-body{display:flex!important;flex-direction:row!important;min-height:0!important}",
   "#opf-shell #opf-pages{flex:1 1 auto!important;min-width:0!important}",
-  "#opf-shell #opf-shell-body #opf-nav#opf-nav{position:fixed!important;left:0!important;top:0!important;bottom:0!important;right:auto!important;width:min(84vw,300px)!important;max-width:300px!important;height:100%!important;min-height:0!important;margin:0!important;padding:58px 10px 20px!important;display:flex!important;flex-direction:column!important;flex-wrap:nowrap!important;align-items:stretch!important;gap:2px!important;overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior:contain!important;z-index:10!important;border:0!important;border-right:1px solid rgba(216,178,116,.22)!important;border-radius:0!important;background:linear-gradient(180deg,rgba(26,14,20,.985),rgba(11,5,9,.99))!important;box-shadow:0 0 40px rgba(0,0,0,.6)!important;transform:translateX(-102%)!important;visibility:hidden!important;transition:transform .22s ease,visibility 0s linear .22s!important}",
+  "#opf-shell #opf-shell-body #opf-nav#opf-nav{position:fixed!important;left:0!important;top:0!important;bottom:0!important;right:auto!important;width:min(86vw,320px)!important;max-width:320px!important;height:100%!important;height:100dvh!important;max-height:100dvh!important;min-height:0!important;margin:0!important;padding:58px 10px calc(24px + env(safe-area-inset-bottom))!important;display:flex!important;flex-direction:column!important;flex-wrap:nowrap!important;align-items:stretch!important;gap:2px!important;overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior:contain!important;-webkit-overflow-scrolling:touch!important;scrollbar-width:none!important;z-index:10!important;border:0!important;border-right:1px solid rgba(216,178,116,.22)!important;border-radius:0!important;background:linear-gradient(180deg,rgba(26,14,20,.985),rgba(11,5,9,.99))!important;box-shadow:0 0 40px rgba(0,0,0,.6)!important;transform:translateX(-102%)!important;visibility:hidden!important;transition:transform .22s ease,visibility 0s linear .22s!important}",
   "#opf-shell.opf-nav-open #opf-shell-body #opf-nav#opf-nav{transform:translateX(0)!important;visibility:visible!important;transition:transform .22s ease!important}",
   "#opf-shell #opf-nav-mask{display:none!important;position:fixed!important;inset:0!important;z-index:5!important;background:rgba(0,0,0,.55)!important}",
   "#opf-shell.opf-nav-open #opf-nav-mask{display:block!important}",
@@ -14448,7 +14448,8 @@ var MOBILE_CSS = [
   "#opf-shell #opf-chrome-world,#opf-shell #opf-chrome-settings,#opf-shell #opf-shell-close{width:34px!important;min-width:34px!important;height:34px!important;font-size:14px!important}",
   "#opf-shell #opf-page-preset #opf-actions .opf-btn{font-size:12.5px!important;min-height:38px!important}",
   "#opf-shell .opf-ph-title{font-size:20px!important}",
-  "}"
+  "}",
+  "@media " + OPF_MOBILE_MEDIA + " and (max-height:700px){#opf-shell #opf-shell-body #opf-nav#opf-nav{padding-top:52px!important}#opf-shell #opf-shell-body #opf-nav#opf-nav .opf-nav-group{padding:9px 10px 3px!important}#opf-shell #opf-shell-body #opf-nav#opf-nav .opf-tab{min-height:40px!important;padding:8px 12px!important}#opf-shell #opf-shell-body #opf-nav#opf-nav #opf-nav-recent{padding-top:6px!important}#opf-shell #opf-shell-body #opf-nav#opf-nav #opf-nav-recent .nr-row{min-height:28px!important}}",
 ].join("");
 
 function injectMobileCSS() {
