@@ -14353,7 +14353,7 @@ var MOBILE_CSS = [
   "#opf-shell #opf-json-out{max-height:42vh!important;font-size:12px!important;line-height:1.5!important}",
 
   // ================= 底部操作条（全宽 + 安全区） =================
-  "#opf-shell #opf-page-preset #opf-actions{position:fixed!important;left:0!important;right:0!important;bottom:0!important;top:auto!important;width:100%!important;max-width:none!important;margin:0!important;padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px))!important;z-index:4!important;display:flex!important;flex-wrap:wrap!important;align-items:center!important;gap:6px!important;border:0!important;border-top:1px solid rgba(216,178,116,.22)!important;border-radius:0!important;background:linear-gradient(180deg,rgba(28,16,22,.96),rgba(12,6,10,.98))!important;box-shadow:0 -8px 24px rgba(0,0,0,.4)!important;backdrop-filter:blur(12px)!important;-webkit-backdrop-filter:blur(12px)!important}",
+  "#opf-shell #opf-page-preset #opf-actions{position:fixed!important;left:0!important;right:0!important;bottom:calc(var(--opf-vv-bottom,0px) + env(safe-area-inset-bottom))!important;top:auto!important;width:100%!important;max-width:none!important;margin:0!important;padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px))!important;z-index:4!important;display:flex!important;flex-wrap:wrap!important;align-items:center!important;gap:6px!important;border:0!important;border-top:1px solid rgba(216,178,116,.22)!important;border-radius:0!important;background:linear-gradient(180deg,rgba(28,16,22,.96),rgba(12,6,10,.98))!important;box-shadow:0 -8px 24px rgba(0,0,0,.4)!important;backdrop-filter:blur(12px)!important;-webkit-backdrop-filter:blur(12px)!important}",
   "#opf-shell #opf-page-preset #opf-actions::before{display:none!important}",
   "#opf-shell #opf-page-preset #opf-actions .opf-btn{flex:1 1 calc(50% - 6px)!important;min-width:0!important;min-height:40px!important;font-size:13.5px!important;padding:8px 6px!important;letter-spacing:.5px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}",
 
@@ -14452,6 +14452,34 @@ var MOBILE_CSS = [
   "@media " + OPF_MOBILE_MEDIA + " and (max-height:700px){#opf-shell #opf-shell-body #opf-nav#opf-nav{padding-top:52px!important}#opf-shell #opf-shell-body #opf-nav#opf-nav .opf-nav-group{padding:9px 10px 3px!important}#opf-shell #opf-shell-body #opf-nav#opf-nav .opf-tab{min-height:40px!important;padding:8px 12px!important}#opf-shell #opf-shell-body #opf-nav#opf-nav #opf-nav-recent{padding-top:6px!important}#opf-shell #opf-shell-body #opf-nav#opf-nav #opf-nav-recent .nr-row{min-height:28px!important}}",
 ].join("");
 
+// 手机浏览器地址栏/底部工具栏会盖住 position:fixed 的底栏（iOS Safari 尤甚）：
+// 用 visualViewport 把「布局视口底部」和「能看见的底边」的差写成 CSS 变量，供底栏 bottom 使用。
+function opfBindViewportBottom() {
+  if (typeof window === "undefined") return;
+  var root = document.documentElement;
+  function apply() {
+    var gap = 0;
+    try {
+      var vv = window.visualViewport;
+      if (vv) {
+        gap = Math.round(window.innerHeight - (vv.height + vv.offsetTop));
+      }
+    } catch (e) { gap = 0; }
+    if (!isFinite(gap) || gap < 0) gap = 0;
+    if (gap > 240) gap = 240;           // 键盘/异常值时别把底栏顶到屏幕中间
+    try { root.style.setProperty("--opf-vv-bottom", gap + "px"); } catch (e) {}
+  }
+  apply();
+  try {
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", apply);
+      window.visualViewport.addEventListener("scroll", apply);
+    }
+    window.addEventListener("resize", apply);
+    window.addEventListener("orientationchange", function () { setTimeout(apply, 120); });
+  } catch (e) { opfErr("viewport bottom", e); }
+}
+
 function injectMobileCSS() {
   if (!getEl(NS + "_css_mobile")) {
     try {
@@ -14463,6 +14491,7 @@ function injectMobileCSS() {
   }
   // 注入完立刻接线：应用当前布局模式 + 往设置页塞「界面布局」选择器
   try { opfApplyLayoutMode(); } catch (e) { opfErr("layout mode", e); }
+  try { opfBindViewportBottom(); } catch (e) { opfErr("viewport bottom", e); }
   try { opfInstallLayoutUI(); } catch (e) { opfErr("layout ui", e); }
 }
 
