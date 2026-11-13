@@ -12,6 +12,8 @@ var OPF_MOBILE_MEDIA = "(max-width:720px),(pointer:coarse) and (max-width:1024px
 var MOBILE_CSS = [
   // 桌面：新控件不占位、不可见（media 外只允许这一类规则）
   "#opf-nav-toggle{display:none}",
+  "#opf-m-export{display:none}",
+  "#opf-build-tag{display:block;padding:18px 0 6px;font-size:11.5px;letter-spacing:.4px;color:rgba(148,120,122,.85);text-align:center}",
   "#opf-nav-mask{display:none}",
   // 设置页「界面布局」新控件的基样式（桌面/手机都要能看；对齐 #opf-ui-theme 的 chip 观感）
   "#opf-ui-layout{border-top:none!important;padding-top:2px!important}",
@@ -97,14 +99,14 @@ var MOBILE_CSS = [
   "#opf-shell #opf-json-out{max-height:42vh!important;font-size:12px!important;line-height:1.5!important}",
 
   // ================= 底部操作条（全宽 + 安全区） =================
-  "#opf-shell #opf-page-preset #opf-actions{position:fixed!important;left:0!important;right:0!important;bottom:calc(var(--opf-vv-bottom,0px) + env(safe-area-inset-bottom))!important;top:auto!important;width:100%!important;max-width:none!important;margin:0!important;padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px))!important;z-index:4!important;display:flex!important;flex-wrap:wrap!important;align-items:center!important;gap:6px!important;border:0!important;border-top:1px solid rgba(216,178,116,.22)!important;border-radius:0!important;background:linear-gradient(180deg,rgba(28,16,22,.96),rgba(12,6,10,.98))!important;box-shadow:0 -8px 24px rgba(0,0,0,.4)!important;backdrop-filter:blur(12px)!important;-webkit-backdrop-filter:blur(12px)!important}",
+  "#opf-shell #opf-page-preset #opf-actions{position:sticky!important;left:auto!important;right:auto!important;top:0!important;bottom:auto!important;width:100%!important;max-width:none!important;margin:0 0 10px!important;padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px))!important;z-index:4!important;display:flex!important;flex-wrap:wrap!important;align-items:center!important;gap:6px!important;border:0!important;border-top:1px solid rgba(216,178,116,.22)!important;border-radius:0!important;background:linear-gradient(180deg,rgba(28,16,22,.96),rgba(12,6,10,.98))!important;box-shadow:0 -8px 24px rgba(0,0,0,.4)!important;backdrop-filter:blur(12px)!important;-webkit-backdrop-filter:blur(12px)!important}",
   "#opf-shell #opf-page-preset #opf-actions::before{display:none!important}",
   "#opf-shell #opf-page-preset #opf-actions .opf-btn{flex:1 1 calc(50% - 6px)!important;min-width:0!important;min-height:40px!important;font-size:13.5px!important;padding:8px 6px!important;letter-spacing:.5px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}",
 
   // ================= 开局预设页 =================
   // 皮肤在 #opf-page-preset #opf-body 上后置了 grid 双栏（minmax(310px,392px)），
   // 手机必须用更高特异性 + !important 强制单列纵向，否则 390px 下横向溢出 +100~297px。
-  "#opf-shell #opf-page-preset #opf-body{display:flex!important;flex-direction:column!important;grid-template-columns:none!important;gap:12px!important;width:100%!important;max-width:100%!important;margin:0!important;padding:0 14px 132px!important;overflow-x:hidden!important;min-width:0!important}",
+  "#opf-shell #opf-page-preset #opf-body{display:flex!important;flex-direction:column!important;grid-template-columns:none!important;gap:12px!important;width:100%!important;max-width:100%!important;margin:0!important;padding:0 14px 18px!important;overflow-x:hidden!important;min-width:0!important}",
   "#opf-shell #opf-page-preset #opf-body>*{min-width:0!important;max-width:100%!important}",
   // 单列后把主流程提到最上面：01/02（左栏）→ 03/04（右栏）→ QS 快速开局 → ST 故事基调（桌面上的辅助件）
   "#opf-shell #opf-page-preset #opf-body>.opf-col-a{order:1!important}",
@@ -181,7 +183,9 @@ var MOBILE_CSS = [
   "#opf-shell.opf-force-mobile #opf-page-preset #opf-body{max-width:860px!important;margin:0 auto!important}",
   "#opf-shell.opf-force-mobile #opf-page-preset #opf-actions{max-width:860px!important;left:50%!important;right:auto!important;width:100%!important;transform:translateX(-50%)!important}",
 
+  "#opf-shell .opf-m-export{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:6px!important;width:100%!important;min-height:42px!important;margin-top:8px!important;border-radius:10px!important;border:1px solid rgba(216,178,116,.38)!important;background:linear-gradient(180deg,rgba(216,178,116,.14),rgba(216,178,116,.06))!important;color:#f2e7de!important;font-size:13.5px!important;letter-spacing:.5px!important;cursor:pointer!important}",
   "}",
+
 
   "@media (max-width:380px){",
   // 320~380：顶栏与底栏再收紧一点
@@ -224,6 +228,69 @@ function opfBindViewportBottom() {
   } catch (e) { opfErr("viewport bottom", e); }
 }
 
+// 手机：把操作条从 #opf-root 末尾搬到页头下方，用 sticky top 常驻顶部；
+// 这样不依赖 position:fixed，浏览器地址栏/工具栏盖不到，也不靠 bottom 定位。
+function opfInstallMobileToolbar() {
+  var actions = getEl("opf-actions");
+  var page = getEl("opf-page-preset");
+  if (!actions || !page) return;
+  var mobile = (typeof opfLayoutIsMobile === "function") ? !!opfLayoutIsMobile() : true;
+  if (!opfInstallMobileToolbar._bound && typeof window !== "undefined") {
+    opfInstallMobileToolbar._bound = true;
+    var reflow = function () { try { opfInstallMobileToolbar(); } catch (e) {} };
+    window.addEventListener("resize", reflow);
+    window.addEventListener("orientationchange", function () { setTimeout(reflow, 150); });
+  }
+  if (!actions.__opfHome) {
+    actions.__opfHome = { parent: actions.parentNode, next: actions.nextSibling };
+  }
+  if (mobile) {
+    var anchor = page.querySelector(".opf-ph") || page.firstElementChild;
+    if (anchor && anchor.parentNode === page) {
+      if (anchor.nextSibling !== actions) page.insertBefore(actions, anchor.nextSibling);
+    } else if (actions.parentNode !== page) {
+      page.insertBefore(actions, page.firstChild);
+    }
+  } else if (actions.__opfHome && actions.__opfHome.parent) {
+    if (actions.parentNode !== actions.__opfHome.parent || actions.nextSibling !== actions.__opfHome.next) {
+      actions.__opfHome.parent.insertBefore(actions, actions.__opfHome.next);
+    }
+  }
+}
+
+// 手机端顶部兜底导出：底栏被浏览器工具栏/刘海挡住时也点得到
+function opfInstallMobileExport() {
+  // 操作条已经搬到页头下方常驻；这里只在「04 预设 JSON」卡里再放一个内容流里的导出兜底
+  try {
+    var out = document.querySelector("#opf-page-preset #opf-json-out");
+    var outBox = out && out.parentNode;
+    if (outBox && !getEl("opf-m-export2")) {
+      var b2 = document.createElement("button");
+      b2.type = "button";
+      b2.id = "opf-m-export2";
+      b2.className = "opf-m-export";
+      b2.textContent = "⬇ 导出 .preset.json";
+      b2.addEventListener("click", function () {
+        try { if (typeof downloadPreset === "function") { downloadPreset(); return; } } catch (e) {}
+        var save = getEl("opf-btn-save");
+        if (save) save.click();
+      });
+      outBox.appendChild(b2);
+    }
+  } catch (e) { opfErr("mobile export", e); }
+}
+// 设置页版本标记：一眼确认手机加载的是哪一版（查缓存/旧包用）
+function opfInstallBuildTag() {
+  var wrap = document.querySelector("#opf-page-settings .opf-char-wrap");
+  if (!wrap || getEl("opf-build-tag")) return;
+  var d = document.createElement("div");
+  d.id = "opf-build-tag";
+  d.className = "opf-build-tag";
+  d.textContent = "版本 v" + (typeof OPF_VERSION !== "undefined" ? OPF_VERSION : "?") + " · " +
+    (window.matchMedia && typeof OPF_MOBILE_MEDIA === "string" && window.matchMedia(OPF_MOBILE_MEDIA).matches ? "手机版式" : "桌面版式");
+  wrap.appendChild(d);
+}
+
 function injectMobileCSS() {
   if (!getEl(NS + "_css_mobile")) {
     try {
@@ -236,6 +303,9 @@ function injectMobileCSS() {
   // 注入完立刻接线：应用当前布局模式 + 往设置页塞「界面布局」选择器
   try { opfApplyLayoutMode(); } catch (e) { opfErr("layout mode", e); }
   try { opfBindViewportBottom(); } catch (e) { opfErr("viewport bottom", e); }
+  try { opfInstallMobileToolbar(); } catch (e) { opfErr("mobile toolbar", e); }
+  try { opfInstallMobileExport(); } catch (e) { opfErr("mobile export", e); }
+  try { opfInstallBuildTag(); } catch (e) { opfErr("build tag", e); }
   try { opfInstallLayoutUI(); } catch (e) { opfErr("layout ui", e); }
 }
 
@@ -296,6 +366,7 @@ function opfApplyLayoutMode() {
   try { if (typeof syncMobileChrome === "function") syncMobileChrome(); } catch (e) {}
   // 非手机版式下收起抽屉
   if (!opfLayoutIsMobile() && typeof closeMobileNav === "function") { try { closeMobileNav(); } catch (e) {} }
+  try { if (typeof opfInstallMobileToolbar === "function") opfInstallMobileToolbar(); } catch (e) {}
 }
 function opfLayoutPickRender() {
   var box = getEl("opf-layout-pick");
