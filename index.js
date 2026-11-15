@@ -1,4 +1,4 @@
-var OPF_VERSION = "1.25.3";
+var OPF_VERSION = "1.26.0";
 //@module 00-header — 文件头与总说明
 
 // ============================================================================
@@ -2115,6 +2115,8 @@ function wpkCounts(){
   return { selN: selN, total: wb.entries.length, chars: (ST.worldInfo || "").length };
 }
 function renderWorldSide(){
+  // 页签在「酒馆世界书」时整页交给批量删除列表渲染（v1.26.0）
+  if (ST.stw && ST.stw.on) { stwRenderSide(); return; }
   var listEl = getEl("opf-lside-list"); if (!listEl) return;
   var cntEl = getEl("opf-lside-count");
   var c = wpkCounts();
@@ -2204,12 +2206,13 @@ function wpkSetAll(v){ var wb = ST.wb; if (!wb) return; wb.entries.forEach(funct
 function wpkSetConst(){ var wb = ST.wb; if (!wb) return; wb.entries.forEach(function (e){ e.sel = !!e.constant; }); updateSendText(); renderWorldSide(); renderMetaStatus(); }
 function buildWorldSide(){
   if (getEl("opf-lside")) return;
-  var st = document.createElement("style"); st.id = NS + "_css_lside"; st.textContent = LSIDE_CSS + LSIDE_CSS2 + LSIDE_CSS3; document.head.appendChild(st);
+  var st = document.createElement("style"); st.id = NS + "_css_lside"; st.textContent = LSIDE_CSS + LSIDE_CSS2 + LSIDE_CSS3 + LSIDE_CSS4; document.head.appendChild(st);
   var side = document.createElement("div"); side.id = "opf-lside";
   var head = document.createElement("div"); head.id = "opf-lside-head";
   var t = document.createElement("span"); t.className = "t"; t.textContent = "世界书条目 · 勾选发送";
   var hx = document.createElement("button"); hx.type = "button"; hx.className = "opf-lside-ico"; hx.textContent = "✕"; hx.addEventListener("click", function(){ switchPage("preset"); });
   head.appendChild(t); head.appendChild(hx); side.appendChild(head);
+  stwBuildTabs(side);
   var tools = document.createElement("div"); tools.id = "opf-lside-tools";
   var bImport = document.createElement("button"); bImport.type = "button"; bImport.className = "opf-step-act"; bImport.id = "opf-lside-import"; bImport.textContent = "导入文件"; bImport.title = "导入世界书 JSON（重复导入同一本 = 刷新内容并保留勾选，不会翻倍）";
   bImport.addEventListener("click", function(){ if (ST.fileInput) ST.fileInput.click(); else { var w0 = getEl("opf-wload"); if (w0) w0.click(); } });
@@ -2223,6 +2226,7 @@ function buildWorldSide(){
   ["全部","命定系统","规则·系统","导览开关","地区·地理","种族","角色","组织·势力","经济·产业","节庆","DLC扩展","DLC事件","DLC内容","其他"].forEach(function (v){ var o = document.createElement("option"); o.value = v; o.textContent = v; catSel.appendChild(o); });
   catSel.addEventListener("change", function(){ renderWorldSide(); });
   tools.appendChild(bImport); tools.appendChild(bClear); tools.appendChild(bAll); tools.appendChild(bConst); tools.appendChild(bNone); tools.appendChild(filt); tools.appendChild(catSel); side.appendChild(tools);
+  stwBuildTools(side);
   var cnt = document.createElement("div"); cnt.id = "opf-lside-count"; side.appendChild(cnt);
   var list = document.createElement("div"); list.id = "opf-lside-list"; side.appendChild(list);
   var host = getEl("opf-page-world") || document.body;
@@ -2304,6 +2308,413 @@ var SIZE_CSS = [
 function injectGlobalSizeCSS(){
   try { if (getEl(NS + "_css_size")) return; var st = document.createElement("style"); st.id = NS + "_css_size"; st.textContent = SIZE_CSS; document.head.appendChild(st); } catch (e) { opfErr("injectGlobalSizeCSS", e); }
 }
+
+// ============================================================================
+// 酒馆世界书：批量勾选删除（v1.26.0）
+// ② 世界书页新增「酒馆世界书」页签：列出 SillyTavern data/<用户>/worlds 下的
+// 全部世界书，搜索 + 勾选 + 批量删除。
+// 删除优先走酒馆自己的 world-info.js#deleteWorldInfo —— 它会同时解除全局选择、
+// 当前角色/人设绑定并刷新酒馆的列表；拿不到模块时退回 /api/worldinfo/delete。
+// 注意：这里删的是酒馆里的 .json 文件，不是本页「已载入条目」的内存快照。
+// ============================================================================
+var LSIDE_CSS4 = "#opf-lside-tabs{display:flex;gap:6px;padding:6px 10px 2px;flex:none}" +
+  "#opf-lside-tabs .opf-lside-tab{flex:1;cursor:pointer;border-radius:7px;padding:4px 6px;font-size:11.5px;color:#ffd9de;background:rgba(255,255,255,.05);border:1px solid rgba(255,122,138,.22);font-family:inherit}" +
+  "#opf-lside-tabs .opf-lside-tab:hover{background:rgba(255,77,94,.16);color:#fff}" +
+  "#opf-lside-tabs .opf-lside-tab.on{color:#fff;background:rgba(255,77,94,.28);border-color:rgba(255,150,165,.6);font-weight:600}" +
+  "#opf-stw-tools{display:flex;gap:4px;padding:6px 8px 2px;flex-wrap:wrap;flex:none}" +
+  "#opf-stw-filter{width:100%;margin:2px 0 0;border-radius:7px;padding:4px 7px;font-size:11px;color:#ffeef1;background:rgba(10,2,5,.55);border:1px solid rgba(255,122,138,.25);outline:none}" +
+  "#opf-stw-tools .opf-stw-hide{display:flex;align-items:center;gap:4px;width:100%;cursor:pointer;font-size:10.5px;color:rgba(255,226,230,.8)}" +
+  "#opf-stw-tools .opf-stw-hide input{accent-color:#ff4d5e;cursor:pointer}" +
+  "#opf-stw-del.opf-danger{color:#ffb3ba!important;border-color:rgba(255,90,105,.5)!important;background:rgba(255,77,94,.16)!important}" +
+  "#opf-stw-del:disabled{opacity:.45;cursor:default}" +
+  ".opf-wi-row .stwtag{flex:none;color:#ffd0a8;font-size:9px;border:1px solid rgba(255,190,120,.38);border-radius:8px;padding:0 4px}";
+
+function stwS() {
+  if (!ST.stw) {
+    ST.stw = {
+      on: false,          // 当前是否在看「酒馆世界书」页签
+      names: null,        // 酒馆世界书名（null = 还没读过）
+      mod: null,          // 动态 import 到的 world-info 模块（拿不到为 null）
+      modPromise: null,
+      loading: false,
+      error: '',
+      filter: '',
+      checked: {},        // 书名 -> true
+      hideActive: false,  // 只看未使用（没被全局/角色/聊天绑定）
+      busy: false
+    };
+  }
+  return ST.stw;
+}
+function stwCheckedNames() {
+  var s = ST.stw;
+  if (!s || !s.names) return [];
+  var out = [];
+  for (var i = 0; i < s.names.length; i++) if (s.checked[s.names[i]]) out.push(s.names[i]);
+  return out;
+}
+function stwSortNames(list) {
+  var seen = {}, arr = [];
+  for (var i = 0; i < list.length; i++) {
+    var n = list[i];
+    if (typeof n !== 'string' || !n) continue;
+    var k = n.toLowerCase();
+    if (seen[k]) continue;
+    seen[k] = 1; arr.push(n);
+  }
+  arr.sort(function (a, b) { return String(a).localeCompare(String(b), 'zh'); });
+  return arr;
+}
+// 动态 import 酒馆世界书模块：能拿到就用它自己的删除/列表逻辑，拿不到走公开接口兜底
+function stwEnsureModule(force) {
+  var s = stwS();
+  if (!force && s.modPromise) return s.modPromise;
+  var p = Promise.resolve(null);
+  try { if (typeof probeWorldModule === 'function') p = probeWorldModule() || Promise.resolve(null); } catch (e) { p = Promise.resolve(null); }
+  s.modPromise = p.then(function (m) { s.mod = m || null; return s.mod; }, function () { s.mod = null; return null; });
+  return s.modPromise;
+}
+function stwListFromApi() {
+  var ctx = getCtx();
+  if (!ctx || typeof fetch !== 'function') return Promise.resolve([]);
+  var headers = {};
+  try { if (typeof ctx.getRequestHeaders === 'function') headers = ctx.getRequestHeaders() || {}; } catch (e) {}
+  return fetch('/api/worldinfo/list', { method: 'POST', headers: headers, body: JSON.stringify({}) })
+    .then(function (r) {
+      if (!r.ok) throw new Error('读取世界书列表失败（HTTP ' + r.status + '）');
+      return r.json();
+    })
+    .then(function (data) {
+      var out = [];
+      (Array.isArray(data) ? data : []).forEach(function (x) {
+        var n = x && (x.file_id || x.name);
+        if (n) out.push(String(n));
+      });
+      return out;
+    });
+}
+function stwFetchNames() {
+  return stwEnsureModule(false).then(function (mod) {
+    var ctx = getCtx();
+    var names = null;
+    try { if (ctx && typeof ctx.getWorldInfoNames === 'function') names = ctx.getWorldInfoNames(); } catch (e) {}
+    if ((!names || !names.length) && mod && Array.isArray(mod.world_names)) names = mod.world_names.slice();
+    if (names && names.length) return stwSortNames(names);
+    return stwListFromApi().then(stwSortNames);
+  });
+}
+function stwRefresh(force) {
+  var s = stwS();
+  if (s.loading) return Promise.resolve(null);
+  s.loading = true; s.error = '';
+  if (force) { s.names = null; s.modPromise = null; s.mod = null; }
+  renderWorldSide();
+  // 点「刷新」= 也去磁盘重新扫一遍酒馆的 world_names，别只读页面里的旧缓存
+  var warm = Promise.resolve();
+  if (force) {
+    warm = stwEnsureModule(false).then(function (mod) {
+      if (mod && typeof mod.updateWorldInfoList === 'function') {
+        return Promise.resolve(mod.updateWorldInfoList()).then(function () {}, function () {});
+      }
+    });
+  }
+  return warm.then(stwFetchNames).then(function (names) {
+    s.loading = false; s.names = names;
+    renderWorldSide();
+    return names;
+  }, function (e) {
+    s.loading = false; s.error = (e && e.message) ? e.message : String(e);
+    renderWorldSide();
+    return null;
+  });
+}
+// 这本书现在被谁用着：全局选择 / 当前角色主世界书 / 当前聊天世界书
+function stwTags(name) {
+  var tags = [];
+  var s = ST.stw || {};
+  var mod = s.mod;
+  if (mod && Array.isArray(mod.selected_world_info) && mod.selected_world_info.indexOf(name) >= 0) tags.push('全局');
+  try {
+    var ctx = getCtx();
+    if (ctx && ctx.characters && ctx.characters[ctx.characterId]) {
+      var ch = ctx.characters[ctx.characterId];
+      if (ch.data && ch.data.extensions && ch.data.extensions.world === name) tags.push('角色');
+    }
+  } catch (e) {}
+  try {
+    var ctx2 = getCtx();
+    if (ctx2 && ctx2.chatMetadata && ctx2.chatMetadata.world_info === name) tags.push('聊天');
+  } catch (e) {}
+  return tags;
+}
+function stwUsed(name) { return stwTags(name).length > 0; }
+function stwVisibleNames() {
+  var s = stwS();
+  var names = s.names || [];
+  var f = String(s.filter || '').trim().toLowerCase();
+  var out = [];
+  for (var i = 0; i < names.length; i++) {
+    var n = names[i];
+    if (f && String(n).toLowerCase().indexOf(f) < 0) continue;
+    if (s.hideActive && stwUsed(n)) continue;
+    out.push(n);
+  }
+  return out;
+}
+function stwSetOn(v) {
+  var s = stwS();
+  var next = !!v;
+  if (s.on === next) { stwSyncChrome(); return; }
+  s.on = next;
+  stwSyncChrome();
+  if (next && s.names === null && !s.loading) { stwRefresh(false); return; }
+  renderWorldSide();
+}
+function stwSyncChrome() {
+  var s = ST.stw;
+  var on = !!(s && s.on);
+  var bE = getEl('opf-lside-tab-entries');
+  var bS = getEl('opf-lside-tab-stw');
+  if (bE) bE.className = 'opf-lside-tab' + (on ? '' : ' on');
+  if (bS) bS.className = 'opf-lside-tab' + (on ? ' on' : '');
+  var tE = getEl('opf-lside-tools');
+  var tS = getEl('opf-stw-tools');
+  if (tE) tE.style.display = on ? 'none' : '';
+  if (tS) tS.style.display = on ? '' : 'none';
+  var del = getEl('opf-stw-del');
+  if (del) {
+    var n = stwCheckedNames().length;
+    del.textContent = '删除选中' + (n ? '（' + n + '）' : '');
+    del.disabled = !n || !!(s && (s.busy || s.loading));
+  }
+  var hid = getEl('opf-stw-hideactive');
+  if (hid) hid.checked = !!(s && s.hideActive);
+  var fl = getEl('opf-stw-filter');
+  if (fl && fl.value !== (s && s.filter || '')) fl.value = (s && s.filter) || '';
+}
+function stwBuildTabs(side) {
+  if (getEl('opf-lside-tabs')) return;
+  var tabs = document.createElement('div');
+  tabs.id = 'opf-lside-tabs';
+  var bE = document.createElement('button');
+  bE.type = 'button'; bE.id = 'opf-lside-tab-entries'; bE.className = 'opf-lside-tab';
+  bE.textContent = '已载入条目'; bE.title = '本页导入的世界书条目，勾选后才发进 AI 上下文';
+  bE.addEventListener('click', function () { stwSetOn(false); });
+  var bS = document.createElement('button');
+  bS.type = 'button'; bS.id = 'opf-lside-tab-stw'; bS.className = 'opf-lside-tab';
+  bS.textContent = '酒馆世界书'; bS.title = '管理酒馆 data/<用户>/worlds 里的世界书文件，可批量勾选删除';
+  bS.addEventListener('click', function () { stwSetOn(true); });
+  tabs.appendChild(bE); tabs.appendChild(bS);
+  side.appendChild(tabs);
+  stwSyncChrome();
+}
+function stwBuildTools(side) {
+  if (getEl('opf-stw-tools')) return;
+  var row = document.createElement('div');
+  row.id = 'opf-stw-tools';
+  row.style.display = 'none';
+  var bRefresh = document.createElement('button');
+  bRefresh.type = 'button'; bRefresh.className = 'opf-step-act'; bRefresh.id = 'opf-stw-refresh';
+  bRefresh.textContent = '刷新';
+  bRefresh.title = '重新读取酒馆里的世界书列表';
+  bRefresh.addEventListener('click', function () { stwRefresh(true); });
+  var bAll = document.createElement('button');
+  bAll.type = 'button'; bAll.className = 'opf-step-act'; bAll.id = 'opf-stw-all';
+  bAll.textContent = '全选';
+  bAll.title = '勾选当前列表里看到的全部世界书（受筛选影响）';
+  bAll.addEventListener('click', function () { stwCheckVisible(true); });
+  var bNone = document.createElement('button');
+  bNone.type = 'button'; bNone.className = 'opf-step-act'; bNone.id = 'opf-stw-none';
+  bNone.textContent = '清空';
+  bNone.title = '清掉所有勾选（不只是当前筛选出来的）';
+  bNone.addEventListener('click', function () { stwS().checked = {}; renderWorldSide(); });
+  var bDel = document.createElement('button');
+  bDel.type = 'button'; bDel.className = 'opf-step-act opf-danger'; bDel.id = 'opf-stw-del';
+  bDel.textContent = '删除选中';
+  bDel.title = '删除勾选的酒馆世界书文件（不可撤销，会先弹确认）';
+  bDel.addEventListener('click', function () { stwConfirmDelete(); });
+  var hidLab = document.createElement('label');
+  hidLab.className = 'opf-stw-hide';
+  var hid = document.createElement('input');
+  hid.type = 'checkbox'; hid.id = 'opf-stw-hideactive';
+  hid.addEventListener('change', function () { stwS().hideActive = !!hid.checked; renderWorldSide(); });
+  hidLab.appendChild(hid);
+  hidLab.appendChild(document.createTextNode('只看未使用（没被全局/角色/聊天绑定）'));
+  var filt = document.createElement('input');
+  filt.type = 'text'; filt.id = 'opf-stw-filter'; filt.placeholder = '筛选书名…';
+  filt.addEventListener('input', function () { stwS().filter = filt.value || ''; renderWorldSide(); });
+  row.appendChild(bRefresh); row.appendChild(bAll); row.appendChild(bNone); row.appendChild(bDel);
+  row.appendChild(hidLab); row.appendChild(filt);
+  side.appendChild(row);
+}
+function stwHint(listEl, text) {
+  var d = document.createElement('div');
+  d.className = 'opf-lside-hint';
+  d.textContent = text;
+  listEl.appendChild(d);
+  return d;
+}
+function stwRow(name) {
+  var s = stwS();
+  var tags = stwTags(name);
+  var lab = document.createElement('label');
+  lab.className = 'opf-wi-row';
+  var cb = document.createElement('input');
+  cb.type = 'checkbox'; cb.checked = !!s.checked[name]; cb.disabled = !!s.busy;
+  cb.addEventListener('change', function () {
+    if (cb.checked) s.checked[name] = true; else delete s.checked[name];
+    stwSyncChrome();
+    var cntEl = getEl('opf-lside-count');
+    if (cntEl) {
+      cntEl.textContent = '酒馆共 ' + (s.names || []).length + ' 本世界书 · 显示 ' + stwVisibleNames().length + ' 本 · 已勾 ' + stwCheckedNames().length + ' 本';
+    }
+  });
+  lab.appendChild(cb);
+  var tx = document.createElement('span');
+  tx.className = 'tx';
+  tx.textContent = name;
+  tx.title = name + (tags.length ? '\n正被使用：' + tags.join(' · ') : '');
+  lab.appendChild(tx);
+  for (var i = 0; i < tags.length; i++) {
+    var sp = document.createElement('span');
+    sp.className = 'stwtag'; sp.textContent = tags[i];
+    lab.appendChild(sp);
+  }
+  return lab;
+}
+function stwRenderSide() {
+  var listEl = getEl('opf-lside-list');
+  if (!listEl) return;
+  var s = stwS();
+  stwSyncChrome();
+  listEl.textContent = '';
+  var cntEl = getEl('opf-lside-count');
+  var checked = stwCheckedNames();
+  var shown = stwVisibleNames();
+  var total = (s.names || []).length;
+  if (cntEl) {
+    var txt;
+    if (s.loading) txt = '正在读取酒馆世界书列表…';
+    else if (s.error) txt = '读取失败，点「刷新」重试';
+    else if (s.busy) txt = '正在删除…已勾 ' + checked.length + ' 本，先别关面板';
+    else txt = '酒馆共 ' + total + ' 本世界书 · 显示 ' + shown.length + ' 本 · 已勾 ' + checked.length + ' 本';
+    cntEl.textContent = txt;
+  }
+  if (s.loading) { stwHint(listEl, '正在读取酒馆世界书列表…'); return; }
+  if (s.error) {
+    stwHint(listEl, '读取失败：' + s.error);
+    var bt = document.createElement('button');
+    bt.type = 'button'; bt.className = 'opf-step-act'; bt.textContent = '刷新重试';
+    bt.addEventListener('click', function () { stwRefresh(true); });
+    listEl.appendChild(bt);
+    return;
+  }
+  if (!total) { stwHint(listEl, '酒馆里还没有世界书。'); return; }
+  if (!shown.length) {
+    stwHint(listEl, (s.filter ? '没有匹配的世界书。' : '没有可显示的世界书（可能都被「只看未使用」过滤掉了）。') + '\n\n这里删的是酒馆 data/<用户>/worlds 里的 .json 文件；删之前会先弹确认。');
+    return;
+  }
+  for (var i = 0; i < shown.length; i++) listEl.appendChild(stwRow(shown[i]));
+}
+function stwCheckVisible(v) {
+  var s = stwS();
+  if (s.loading || s.busy) return;
+  var names = stwVisibleNames();
+  for (var i = 0; i < names.length; i++) {
+    if (v) s.checked[names[i]] = true; else delete s.checked[names[i]];
+  }
+  renderWorldSide();
+}
+function stwConfirmDelete() {
+  var s = stwS();
+  if (s.busy || s.loading) return;
+  var names = stwCheckedNames();
+  if (!names.length) { toast('先在列表里勾要删的世界书', 'warning'); return; }
+  var used = [];
+  for (var i = 0; i < names.length; i++) if (stwUsed(names[i])) used.push(names[i]);
+  var msg = '要从酒馆里删除这 ' + names.length + ' 本世界书吗？\n\n' + names.slice(0, 8).join('\n');
+  if (names.length > 8) msg += '\n…还有 ' + (names.length - 8) + ' 本';
+  msg += '\n\n';
+  if (used.length) {
+    msg += '⚠ 其中 ' + used.length + ' 本正被使用（全局/角色/聊天）：\n' + used.slice(0, 6).join('、') + (used.length > 6 ? ' 等' : '') + '\n酒馆会顺便解除这些绑定。\n\n';
+  }
+  if (!s.mod || typeof s.mod.deleteWorldInfo !== 'function') {
+    msg += '（没拿到酒馆内部删除接口，会直接调接口删文件；删完建议刷新一次酒馆页面。）\n\n';
+  }
+  msg += '删的是 data/<用户>/worlds 里的 .json 文件，删了找不回来；已经载进本页的条目不受影响。';
+  var yes = false;
+  try { yes = window.confirm(msg); } catch (e) { yes = false; }
+  if (!yes) return;
+  stwDoDelete(names);
+}
+function stwDeleteOne(mod, name) {
+  if (mod && typeof mod.deleteWorldInfo === 'function') {
+    return Promise.resolve(mod.deleteWorldInfo(name)).then(function (ok) {
+      if (ok === false) throw new Error('酒馆返回未删除');
+      return true;
+    });
+  }
+  var ctx = getCtx();
+  if (ctx && typeof ctx.deleteWorldInfo === 'function') {
+    return Promise.resolve(ctx.deleteWorldInfo(name)).then(function (ok) {
+      if (ok === false) throw new Error('酒馆返回未删除');
+      return true;
+    });
+  }
+  if (!ctx || typeof fetch !== 'function') return Promise.reject(new Error('没有可用的删除通道'));
+  var headers = {};
+  try { if (typeof ctx.getRequestHeaders === 'function') headers = ctx.getRequestHeaders() || {}; } catch (e) {}
+  return fetch('/api/worldinfo/delete', { method: 'POST', headers: headers, body: JSON.stringify({ name: name }) })
+    .then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      // 兜底路径没有 deleteWorldInfo 的收尾，手动让酒馆重读一次世界书清单
+      var upd = Promise.resolve();
+      try { if (typeof ctx.updateWorldInfoList === 'function') upd = Promise.resolve(ctx.updateWorldInfoList()); } catch (e) {}
+      return upd.then(function () { return true; }, function () { return true; });
+    });
+}
+function stwDoDelete(names) {
+  var s = stwS();
+  s.busy = true;
+  renderWorldSide();
+  opfLog('批量删除酒馆世界书：', names.length, '本');
+  return stwEnsureModule(false).then(function (mod) {
+    var ok = [], fail = [];
+    var chain = Promise.resolve();
+    names.forEach(function (name) {
+      chain = chain.then(function () {
+        var p;
+        try { p = stwDeleteOne(mod, name); } catch (e) { p = Promise.reject(e); }
+        return p.then(function () {
+          ok.push(name); delete s.checked[name];
+        }, function (e) {
+          fail.push({ name: name, error: (e && e.message) ? e.message : String(e) });
+        });
+      });
+    });
+    return chain.then(function () { return { ok: ok, fail: fail }; });
+  }).then(function (res) {
+    s.busy = false;
+    return stwRefresh(false).then(function () { stwAfterDelete(res.ok, res.fail); }, function () { stwAfterDelete(res.ok, res.fail); });
+  }, function (e) {
+    s.busy = false;
+    renderWorldSide();
+    toast('批量删除失败：' + ((e && e.message) || e), 'error');
+  });
+}
+function stwAfterDelete(ok, fail) {
+  if (!ok.length && !fail.length) { toast('没有删除任何世界书', 'info'); return; }
+  var msg = '已删除 ' + ok.length + ' 本世界书';
+  if (fail.length) {
+    var names = [];
+    for (var i = 0; i < fail.length && i < 3; i++) names.push(fail[i].name);
+    msg += '，失败 ' + fail.length + ' 本（' + names.join('、') + (fail.length > 3 ? ' 等' : '') + '）';
+  }
+  toast(msg, fail.length ? 'warning' : 'success');
+  if (fail.length) opfErr('批量删除世界书失败：', fail);
+  opfLog('批量删除酒馆世界书完成：成功', ok.length, '失败', fail.length);
+}
+
 
 
 //@module 33-quickstart — ① 页「快速开局」：一键勾好生成所需条目 + 按开局地点智能勾选 + 可视化
