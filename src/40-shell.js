@@ -7,6 +7,7 @@ var PAGE_DEFS = [
   { id: "preset", label: "开局预设" },
   { id: "library", label: "自备开局" },
   { id: "world",  label: "世界书" },
+  { id: "stw",    label: "酒馆世界书" },
   { id: "char",   label: "二创角色" },
   { id: "destiny",label: "命定系统" },
   { id: "regex",  label: "正则工坊" },
@@ -40,7 +41,8 @@ function domainByNav(id) { for (var i = 0; i < DOMAINS.length; i++) if (DOMAINS[
 var NAV_GROUPS = [
   { title: "创作", items: ["preset", "library", "char", "destinyhub"] },
   { title: "造物", items: ["atelier"] },
-  { title: "对话", items: ["shixian"] }
+  { title: "对话", items: ["shixian"] },
+  { title: "管理", items: ["stw"] }
 ];
 // 外壳第二层样式（覆盖 SHELL_CSS 里那套横向标签）：左侧竖向分组导航 + 顶部 chrome。
 // 单独一份并在 SHELL_CSS 之后注入，避免去动那条几千字符的老 CSS 字符串。
@@ -242,6 +244,8 @@ function buildShell(){
       d.innerHTML = SETTINGS_HTML;
     } else if (p.id === "world") {
       /* 世界书侧栏由 buildWorldSide 挂载到本页 */
+    } else if (p.id === "stw") {
+      d.innerHTML = STW_HTML;
     } else {
       var hint = document.createElement("div"); hint.className = "opf-page-ph";
       hint.textContent = "（占位页）\n" + p.label + "\n\n此页留给后续功能，敬请期待。";
@@ -278,6 +282,7 @@ function buildShell(){
   try { bindRefinePage(); } catch (e) { opfErr("refine page", e); }
   try { bindAtelierPage(); } catch (e) { opfErr("atelier page", e); }
   try { buildWorldSide(); } catch (e) { opfErr("buildWorldSide", e); }
+  try { stwBindPage(); } catch (e) { opfErr("stw page", e); }
   try { opfSkinBoot(); } catch (e) { opfErr("skin boot", e); }
   if (getSettings().visible) showPanel();
 }
@@ -326,6 +331,7 @@ function switchPage(id, force){
   try { opfSkinNavSync(); } catch (e) { opfErr("skin nav", e); }
   try { renderProjList(); } catch (e) { opfErr("renderProjList", e); }
   if (id === "world") { try { buildWorldSide(); renderWorldSide(); } catch (e) {} }
+  if (id === "stw") { try { stwRenderPage(); } catch (e) {} }
   if (id === "library") { try { libRender(); } catch (e) {} }
   if (id === "char") { try { renderCharPage(); } catch (e) {} }
   if (id === "destiny") { try { renderDestinyPage(); } catch (e) {} }
