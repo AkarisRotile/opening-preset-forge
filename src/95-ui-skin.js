@@ -34,7 +34,7 @@ var OPF_SKIN_PAGES = {
   char:     { group: '创作', kicker: '创作 · 角色条目', title: '二创角色工坊', desc: '分段写角色设定，产出可直接粘进世界书 DLC 的角色条目。', hideLabel: true },
   destiny:  { group: '创作', kicker: '创作 · 命定核心', title: '命定系统工坊', desc: '分段写命定系统核心，产出世界书「命定系统」条目。', hideLabel: true },
   world:    { group: '全局', kicker: '全局 · 世界书', title: '世界书', desc: '勾选要发送给 AI 的世界书条目；勾选与导入都会自动缓存。' },
-  stw:      { group: '管理', kicker: '管理 · 酒馆书库', title: '酒馆世界书', desc: '管理酒馆 data/<用户>/worlds 里的世界书文件；勾选后批量删除，删了找不回来。' },
+  stw:      { group: '管理', kicker: '管理 · 酒馆书库', title: '酒馆世界书', desc: '管理酒馆 data/<用户>/worlds 里的世界书文件；删除前会自动备份，可在「最近删除」恢复。' },
   settings: { group: '全局', kicker: '全局 · 生成传输', title: '生成传输', desc: '各页的生成统一走这一套：改一次，全局生效。', hideLabel: true },
   regex:    { group: '命定系统', kicker: '命定系统 · 正则', title: '正则工坊', desc: '从框架、匹配式到自检，生成可用的正则脚本。', hideLabel: true },
   refine:   { group: '命定系统', kicker: '命定系统 · 精修', title: '核心精修', desc: '对已有命定核心做结构体检、行级 diff 与保底补丁。', hideLabel: true },

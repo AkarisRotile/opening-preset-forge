@@ -5254,7 +5254,7 @@ var STW_HTML = [
   '  <div class="opf-col">',
   '    <section class="opf-card">',
   '      <div class="opf-card-hd"><span class="opf-card-no">01</span><span class="opf-card-t">酒馆世界书</span><span class="opf-card-sub">data/&lt;用户&gt;/worlds</span></div>',
-  '      <div class="opf-dim opf-stw-warn">这里管的是酒馆自己的世界书文件，不是「世界书」页里已载入的条目。删掉就是磁盘上的 .json 没了，找不回来。</div>',
+  '      <div class="opf-dim opf-stw-warn">这里管的是酒馆自己的世界书文件，不是「世界书」页里已载入的条目。删掉就是磁盘上的 .json 没了；删前会先备份到下面「最近删除」，但只保留最近几十本。</div>',
   '      <div class="opf-stw-tools">',
   '        <button type="button" class="opf-btn ghost" id="opf-stw-refresh">刷新列表</button>',
   '        <input type="text" id="opf-stw-filter" placeholder="筛选书名…">',
@@ -5538,7 +5538,7 @@ function stwConfirmDelete() {
   if (!s.mod || typeof s.mod.deleteWorldInfo !== 'function') {
     msg += '（没拿到酒馆内部删除接口，会直接调接口删文件；删完建议刷新一次酒馆页面。）\n\n';
   }
-  msg += '删的是 data/<用户>/worlds 里的 .json 文件，删了找不回来；已经载进「世界书」页的条目不受影响。';
+  msg += '删的是 data/<用户>/worlds 里的 .json 文件，删前会先备份到本页「最近删除」；「世界书」页里已载入的条目不受影响。';
   var yes = false;
   try { yes = window.confirm(msg); } catch (e) { yes = false; }
   if (!yes) return;
@@ -14445,7 +14445,7 @@ var OPF_SKIN_PAGES = {
   char:     { group: '创作', kicker: '创作 · 角色条目', title: '二创角色工坊', desc: '分段写角色设定，产出可直接粘进世界书 DLC 的角色条目。', hideLabel: true },
   destiny:  { group: '创作', kicker: '创作 · 命定核心', title: '命定系统工坊', desc: '分段写命定系统核心，产出世界书「命定系统」条目。', hideLabel: true },
   world:    { group: '全局', kicker: '全局 · 世界书', title: '世界书', desc: '勾选要发送给 AI 的世界书条目；勾选与导入都会自动缓存。' },
-  stw:      { group: '管理', kicker: '管理 · 酒馆书库', title: '酒馆世界书', desc: '管理酒馆 data/<用户>/worlds 里的世界书文件；勾选后批量删除，删了找不回来。' },
+  stw:      { group: '管理', kicker: '管理 · 酒馆书库', title: '酒馆世界书', desc: '管理酒馆 data/<用户>/worlds 里的世界书文件；删除前会自动备份，可在「最近删除」恢复。' },
   settings: { group: '全局', kicker: '全局 · 生成传输', title: '生成传输', desc: '各页的生成统一走这一套：改一次，全局生效。', hideLabel: true },
   regex:    { group: '命定系统', kicker: '命定系统 · 正则', title: '正则工坊', desc: '从框架、匹配式到自检，生成可用的正则脚本。', hideLabel: true },
   refine:   { group: '命定系统', kicker: '命定系统 · 精修', title: '核心精修', desc: '对已有命定核心做结构体检、行级 diff 与保底补丁。', hideLabel: true },

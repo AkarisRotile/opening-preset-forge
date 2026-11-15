@@ -48,7 +48,7 @@ var STW_HTML = [
   '  <div class="opf-col">',
   '    <section class="opf-card">',
   '      <div class="opf-card-hd"><span class="opf-card-no">01</span><span class="opf-card-t">酒馆世界书</span><span class="opf-card-sub">data/&lt;用户&gt;/worlds</span></div>',
-  '      <div class="opf-dim opf-stw-warn">这里管的是酒馆自己的世界书文件，不是「世界书」页里已载入的条目。删掉就是磁盘上的 .json 没了，找不回来。</div>',
+  '      <div class="opf-dim opf-stw-warn">这里管的是酒馆自己的世界书文件，不是「世界书」页里已载入的条目。删掉就是磁盘上的 .json 没了；删前会先备份到下面「最近删除」，但只保留最近几十本。</div>',
   '      <div class="opf-stw-tools">',
   '        <button type="button" class="opf-btn ghost" id="opf-stw-refresh">刷新列表</button>',
   '        <input type="text" id="opf-stw-filter" placeholder="筛选书名…">',
@@ -332,7 +332,7 @@ function stwConfirmDelete() {
   if (!s.mod || typeof s.mod.deleteWorldInfo !== 'function') {
     msg += '（没拿到酒馆内部删除接口，会直接调接口删文件；删完建议刷新一次酒馆页面。）\n\n';
   }
-  msg += '删的是 data/<用户>/worlds 里的 .json 文件，删了找不回来；已经载进「世界书」页的条目不受影响。';
+  msg += '删的是 data/<用户>/worlds 里的 .json 文件，删前会先备份到本页「最近删除」；「世界书」页里已载入的条目不受影响。';
   var yes = false;
   try { yes = window.confirm(msg); } catch (e) { yes = false; }
   if (!yes) return;
