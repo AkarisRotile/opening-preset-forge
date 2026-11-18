@@ -23,6 +23,10 @@ var OPF_LAYOUT_FIX_CSS = [
   '}',
   /* 古典机械的竖排导航：6 个 4 字页签在 900 高里本来就紧，压高度 + 允许滚动 */
   '.opf-theme-clock #opf-nav{overflow-y:auto !important;overflow-x:hidden !important;padding-top:8px !important;padding-bottom:18px !important;gap:4px !important;scrollbar-width:thin;}',
+  /* 竖脊的草稿抽屉是从脊右侧飞出来的（#opf-nav-sub 定位于 left:calc(100% + 10px)），
+     #opf-nav 一旦 overflow 裁切，整块面板就被裁成看不见 —— 展开时把裁切放开，
+     收起时仍保留滚动（短窗口里 6 个竖排页签要靠它）。类名由 opfSkinNav 维护。 */
+  '.opf-theme-clock #opf-nav.opf-fly-open{overflow:visible !important;}',
   '.opf-theme-clock #opf-nav .opf-tab{height:100px !important;min-height:100px !important;letter-spacing:4px !important;font-size:12.5px !important;}',
   '@media (max-height:820px){.opf-theme-clock #opf-nav .opf-tab{height:88px !important;min-height:88px !important;letter-spacing:3px !important;font-size:12px !important;}}',
   '@media (max-height:680px){.opf-theme-clock #opf-nav .opf-tab{height:76px !important;min-height:76px !important;letter-spacing:2px !important;font-size:11.5px !important;}}'
@@ -214,11 +218,17 @@ function opfSkinNav() {
   if (active && sub.previousElementSibling !== active) active.parentNode.insertBefore(sub, active.nextSibling);
   var pl = getEl('opf-projlist');
   if (pl && pl.parentNode !== sub) sub.appendChild(pl);
-  if (!active) return;
+  if (!active) { nav.classList.remove('opf-fly-open'); return; }
   var isCreate = !!OPF_SKIN_CREATE[active.id];
   var collapsed = nav.getAttribute('data-sub-collapsed') === '1';
-  sub.classList.toggle('open', isCreate && !collapsed);
-  nav.classList.toggle('opf-sub-closed', !isCreate || collapsed);
+  var subOpen = isCreate && !collapsed;
+  sub.classList.toggle('open', subOpen);
+  nav.classList.toggle('opf-sub-closed', !subOpen);
+  // 竖脊布局（桌面）：面板展开时要放开 #opf-nav 的 overflow，否则飞出到脊右侧的面板会被裁掉。
+  // 手机上 96-mobile 已把面板改成抽屉内的静态块，这里不能放开 overflow，否则抽屉滚不动。
+  var mobileShell = false;
+  try { mobileShell = (typeof isMobileShell === 'function') && !!isMobileShell(); } catch (e) {}
+  nav.classList.toggle('opf-fly-open', th === 'clock' && subOpen && !mobileShell);
 }
 
 // ---------- 导航底部：最近草稿（跨三种流水线，按更新时间） ----------
@@ -297,6 +307,8 @@ function opfSkinTheme() {
   sh.classList.toggle('opf-theme-frost', t === 'frost');
   sh.classList.toggle('opf-theme-clock', t === 'clock');
   sh.classList.toggle('opf-theme-astral', t === 'astral');
+  // 换风格会改变草稿抽屉的默认开合与定位方式，顺手把导航状态重算一遍
+  try { opfSkinNav(); } catch (e) { opfErr('theme nav', e); }
 }
 function opfSkinThemeUI() {
   var wrap = document.querySelector('#opf-page-settings .opf-char-wrap');
